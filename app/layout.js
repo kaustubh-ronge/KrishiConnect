@@ -4,6 +4,8 @@ import { ClerkProvider } from "@clerk/nextjs";
 import HeaderServer from "@/components/HeaderComponent/header-server";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
+import GoogleTranslateManager from "@/components/GoogleTranslateManger";
+import Chatbot from "@/components/Chatbot";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,8 +27,10 @@ export default function RootLayout({ children }) {
             enableSystem
             disableTransitionOnChange
           >
+            <GoogleTranslateManager />
             <HeaderServer />
             <main className="min-h-screen">{children}</main>
+            <Chatbot />
             <Toaster />
           </ThemeProvider>
         </body>
