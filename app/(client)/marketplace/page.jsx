@@ -2,7 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/prisma";
 import { getMarketplaceListings } from "@/actions/products";
-import MarketplaceClient from "./_components/MarketplaceClient";
+import MarketplaceClient from "./_components/MarketPlaceClient";
 
 export const dynamic = 'force-dynamic'; // Ensure fresh data
 
