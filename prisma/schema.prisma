@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- USER MANAGEMENT ---
+
+model User {
+  id    String @id @unique // Clerk User ID
+  email String @unique
+  role  String // "farmer", "agent", or "admin"
+
+  farmerProfile FarmerProfile?
+  agentProfile  AgentProfile?
+
+  // Buying History (Both Farmers and Agents can buy)
+  orders Order[] @relation("BuyerOrders")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+// --- PROFILES ---
+
+model FarmerProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Basic Info
+  name     String
+  farmName String?
+  phone    String?
+  address  String?
+
+  // Verification / Detailed Info
+  aadharNumber      String?  @unique
+  farmSize          Float? // Acres
+  primaryProduce    String[] // ["Tomato", "Onion"]
+  farmingExperience Int? // Years
+
+  // Payment Receiving Details (For Payouts)
+  upiId         String?
+  bankName      String?
+  accountNumber String?
+  ifscCode      String?
+
+  // Selling
+  listings ProductListing[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("farmer_profiles")
+}
+
+model AgentProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  companyName String?
+  phone       String?
+  region      String?
+
+  // Payment Receiving Details (If agents sell too)
+  upiId         String?
+  bankName      String?
+  accountNumber String?
+  ifscCode      String?
+
+  // Selling (Agents can now list products too)
+  listings ProductListing[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("agent_profiles")
+}
+
+// --- MARKETPLACE & COMMERCE ---
+
+model ProductListing {
+  id String @id @default(cuid())
+
+  // --- Basic Info ---
+  productName String
+  variety     String? // e.g., "Nashik Red", "Alphonso"
+  description String? // Detailed description
+
+  // --- Images (Array for multiple photos) ---
+  images String[] // Stores URLs of uploaded images
+
+  // --- Inventory & Pricing ---
+  quantityLabel    String // Display: "500 kg"
+  availableStock   Float // Math: 500.0
+  unit             String // "kg", "ton", "quintal"
+  pricePerUnit     Float // Math: 20.0
+  minOrderQuantity Float? // NEW: Minimum amount agent must buy
+
+  // --- Quality & Freshness ---
+  harvestDate  DateTime? // NEW: When was it picked?
+  qualityGrade String? // NEW: "Export Quality", "Grade A", "Grade B"
+  shelfLife    String? // NEW: e.g. "15 Days"
+
+  // --- Contact for this Product ---
+  whatsappNumber String? // NEW: For the direct inquiry button
+
+  isAvailable Boolean @default(true)
+
+  // --- Relationships ---
+  sellerType String // "farmer" or "agent"
+  farmerId   String?
+  farmer     FarmerProfile? @relation(fields: [farmerId], references: [id])
+  agentId    String?
+  agent      AgentProfile?  @relation(fields: [agentId], references: [id])
+
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("product_listings")
+}
+
+// --- ORDER TRACKING (For Your Revenue) ---
+
+model Order {
+  id String @id @default(cuid())
+
+  // Buyer Info
+  buyerId   String
+  buyerUser User   @relation("BuyerOrders", fields: [buyerId], references: [id])
+
+  // Money Breakdown
+  totalAmount  Float // Total paid by buyer (e.g. 50,000)
+  platformFee  Float // Your Income (e.g. 2,500)
+  sellerAmount Float // Payout to Seller (e.g. 47,500)
+
+  paymentStatus   String  @default("PENDING") // "PENDING", "PAID", "FAILED"
+  razorpayOrderId String? // For Payment Gateway
+
+  orderStatus String @default("PROCESSING") // "PROCESSING", "SHIPPED", "DELIVERED"
+
+  items OrderItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  productId String
+  product   ProductListing @relation(fields: [productId], references: [id])
+
+  quantity        Float // e.g. 100 (kg)
+  priceAtPurchase Float // Lock the price at time of buying
+
+  @@map("order_items")
+}
