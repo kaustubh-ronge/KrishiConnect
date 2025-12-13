@@ -10,16 +10,15 @@ import { revalidatePath } from "next/cache";
 const clerkClient = new Clerk({ secretKey: process.env.CLERK_SECRET_KEY });
 
 export async function selectRole(formData) {
-  console.log("CLERK_SECRET_KEY available:", !!process.env.CLERK_SECRET_KEY);
-  console.log(`\n--- selectRole Action Started ---`);
+  // selectRole invoked
   const role = formData.get("role")?.toString();
-  console.log(`Role selected from form: ${role}`);
+  // Role selected from form
 
   let user;
   try {
     user = await currentUser();
     if (!user || !user.id) throw new Error("User not found via currentUser()");
-    console.log(`currentUser() fetched: User ID: ${user.id}`);
+    // Clerk user fetched from currentUser
   } catch (err) {
     console.error("selectRole Error: currentUser() failed -", err);
     return { error: "Failed to get user information." };
@@ -37,7 +36,7 @@ export async function selectRole(formData) {
       select: { role: true },
     });
     if (existingUser?.role && existingUser.role !== "none") {
-      console.log(`User ${userId} already has role: ${existingUser.role}`);
+      // User already has a role
       return {
         error: "Role already selected",
         message: `You are already registered as a ${existingUser.role}. Role cannot be changed.`,
@@ -60,7 +59,7 @@ export async function selectRole(formData) {
     await clerkClient.users.updateUserMetadata(userId, {
       publicMetadata: { role: role },
     });
-    console.log("Clerk metadata update successful");
+    // Clerk metadata update attempted
   } catch (err) {
     console.error(
       "selectRole Error: Explicit clerkClient.users.updateUserMetadata failed -",
@@ -75,13 +74,13 @@ export async function selectRole(formData) {
       where: { id: userId },
       data: { role: role },
     });
-    console.log("Database update successful: User role set.");
+    // Database update successful: User role set.
   } catch (err) {
     console.error("selectRole Error: Database update failed -", err);
     return { error: "Database error updating role." };
   }
 
   revalidatePath("/onboarding");
-  console.log(`Redirecting user ${userId} to ${role}-dashboard...`);
+  // Redirecting user to dashboard
   redirect(`/${role}-dashboard`);
 }

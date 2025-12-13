@@ -7,11 +7,11 @@ export default async function OnboardingPage() {
   const { sessionClaims } = auth();
   const role = sessionClaims?.role;
 
-  console.log("OnboardingPage (Server): Fetched role:", role);
+  // Onboarding page (server): role fetched
 
   // 🔒 CRITICAL: PREVENT ACCESS IF ROLE ALREADY SELECTED
   if (role && role !== "none") {
-    console.log(`User already has role ${role}, redirecting to dashboard`);
+    // User already has role; redirecting
     redirect(`/${role}-dashboard`);
   }
 

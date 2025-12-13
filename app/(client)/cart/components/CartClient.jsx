@@ -33,8 +33,9 @@ export default function CartClient({ initialCart }) {
     const { removeItem, updateQuantity, fetchCart } = useCartStore(); 
     const { isSignedIn, user } = useUser();
   
-  // Use initial data for now (in production, sync with store state)
-  const cartItems = initialCart?.items || [];
+    // Use initial data for now (in production, sync with store state)
+    const cartItems = initialCart?.items || [];
+    const totalQuantity = cartItems.reduce((acc, it) => acc + (it.quantity || 0), 0);
 
   // --- Calculations ---
   // 1. Subtotal: Sum of (Price * Quantity) for all items
@@ -97,7 +98,6 @@ export default function CartClient({ initialCart }) {
     method: { upi: true, netbanking: true, card: true }, // Restrict to only these 3
     handler: async function (response) {
         // Success Callback
-        console.log("Payment ID:", response.razorpay_payment_id);
         toast.success("Payment Successful!", {
             description: `Transaction ID: ${response.razorpay_payment_id}`
         });
@@ -160,7 +160,7 @@ export default function CartClient({ initialCart }) {
             <h1 className="text-3xl font-extrabold text-gray-900 flex items-center gap-3">
                 Shopping Cart 
                 <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
-                    {cartItems.length} items
+                    {totalQuantity} items
                 </span>
             </h1>
         </div>
@@ -275,7 +275,7 @@ export default function CartClient({ initialCart }) {
                     </CardHeader>
                     <CardContent className="p-6 space-y-4">
                         <div className="flex justify-between text-gray-600 text-sm">
-                            <span>Subtotal ({cartItems.length} items)</span>
+                            <span>Subtotal ({totalQuantity} items)</span>
                             <span className="font-medium text-gray-900">₹ {subtotal.toLocaleString('en-IN')}</span>
                         </div>
                         <div className="flex justify-between text-gray-600 text-sm">

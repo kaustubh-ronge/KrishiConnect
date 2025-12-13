@@ -16,7 +16,6 @@ export default function OnboardingClient({ userRole }) {
   const [selectedRole, setSelectedRole] = useState(null);
 
   useEffect(() => {
-    console.log("OnboardingClient: Received role:", userRole);
     if (userRole === 'farmer') {
       toast.success("Farmer role selected successfully!", {
         description: "Welcome to your farmer dashboard"

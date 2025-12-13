@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/prisma";
 
 export async function createAgentProfile(formData) {
-  console.log("--- createAgentProfile Action Started ---");
+  // createAgentProfile invoked
 
   // 1. Auth Check
   let clerkUser;
@@ -57,7 +57,9 @@ export async function createAgentProfile(formData) {
     const existingProfile = await db.agentProfile.findUnique({ where: { userId } });
 
     if (existingProfile) {
-      console.warn(`Agent profile already exists for ${userId}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`Agent profile already exists for ${userId}`);
+      }
       return { success: true };
     }
 
@@ -75,7 +77,7 @@ export async function createAgentProfile(formData) {
         ifscCode
       }
     });
-    console.log(`Agent profile created for ${userId}`);
+    // Agent profile record created
 
   } catch (err) {
     console.error("Agent Profile DB Error:", err);

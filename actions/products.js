@@ -8,7 +8,7 @@ import { db } from "@/lib/prisma";
  * 1. CREATE LISTING (Handles Farmer & Agent)
  */
 export async function createProductListing(formData) {
-  console.log("--- createProductListing Action Started ---");
+  // createProductListing invoked
 
   // 1. Auth Check
   let user;

@@ -8,7 +8,7 @@ import { db } from "@/lib/prisma";
  * Creates a FarmerProfile record linked to the current user.
  */
 export async function createFarmerProfile(formData) {
-  console.log("--- createFarmerProfile Action Started ---");
+  // createFarmerProfile invoked
 
   // 1. Get Clerk User
   let clerkUser;
@@ -23,8 +23,7 @@ export async function createFarmerProfile(formData) {
   }
   const userId = clerkUser.id;
 
-  // 2. Verify Role from Database
-  // We explicitly check the DB to ensure they are actually a farmer
+
   try {
     const dbUser = await db.user.findUnique({
       where: { id: userId },
@@ -66,7 +65,7 @@ export async function createFarmerProfile(formData) {
     return { success: false, error: "Name, Phone, and Address are required." };
   }
 
-  console.log("Farmer Data to Save:", { userId, name, farmName, phone, produceCount: primaryProduce.length });
+  // Farmer data validated and ready to save
 
   // 4. Database Operation
   try {
@@ -76,7 +75,9 @@ export async function createFarmerProfile(formData) {
     });
 
     if (existingProfile) {
-      console.warn(`createFarmerProfile: Profile already exists for ${userId}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`createFarmerProfile: Profile already exists for ${userId}`);
+      }
       return { success: true }; // Treat as success, maybe they double-clicked
     }
 
@@ -94,7 +95,7 @@ export async function createFarmerProfile(formData) {
       }
     });
 
-    console.log(`Farmer profile created successfully for ${userId}`);
+    // Farmer profile created
 
   } catch (err) {
     console.error("createFarmerProfile Error: Database failed -", err);
