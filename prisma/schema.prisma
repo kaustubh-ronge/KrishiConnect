@@ -7,152 +7,209 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// --- USER MANAGEMENT ---
 
 model User {
-  id    String @id @unique 
+  id    String @id @unique // Clerk User ID
   email String @unique
-  role  String
+  role  String // "farmer", "agent", or "admin"
 
   farmerProfile FarmerProfile?
   agentProfile  AgentProfile?
+  
+  // Buying History
+  orders        Order[]        @relation("BuyerOrders")
 
-  orders Order[] @relation("BuyerOrders")
+  // Shopping (New)
+  cart          Cart?
+  wishlist      Wishlist[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
+// --- PROFILES ---
 
 model FarmerProfile {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name              String
+  farmName          String?
+  phone             String?
+  address           String?
+  
+  aadharNumber      String?   @unique
+  farmSize          Float?
+  primaryProduce    String[]
+  farmingExperience Int?
 
-  name     String
-  farmName String?
-  phone    String?
-  address  String?
+  upiId             String?
+  bankName          String?
+  accountNumber     String?
+  ifscCode          String?
 
-  aadharNumber      String?  @unique
-  farmSize          Float? 
-  primaryProduce    String[] 
-  farmingExperience Int? 
+  listings          ProductListing[]
 
-  upiId         String?
-  bankName      String?
-  accountNumber String?
-  ifscCode      String?
-
-  listings ProductListing[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("farmer_profiles")
 }
 
 model AgentProfile {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   name        String
   companyName String?
   phone       String?
   region      String?
+  
+  agentType   String[] 
 
-  agentType   String[]
+  upiId             String?
+  bankName          String?
+  accountNumber     String?
+  ifscCode          String?
 
-  upiId         String?
-  bankName      String?
-  accountNumber String?
-  ifscCode      String?
+  listings          ProductListing[]
 
-  listings ProductListing[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("agent_profiles")
 }
 
+// --- MARKETPLACE & COMMERCE ---
 
 model ProductListing {
-  id String @id @default(cuid())
-
+  id                String   @id @default(cuid())
   
-  productName String
-  variety     String? 
-  description String? 
-
-  images String[] 
-
-  quantityLabel    String 
-  availableStock   Float 
-  unit             String 
-  pricePerUnit     Float 
-  minOrderQuantity Float? 
-
-  harvestDate  DateTime?
+  productName       String
+  description       String?
+  images            String[]
+  
+  quantityLabel     String
+  availableStock    Float
+  unit              String
+  pricePerUnit      Float
+  minOrderQuantity  Float?
+  
+  harvestDate       DateTime?
   shelfLifeStartDate DateTime?
-  qualityGrade String? 
-  shelfLife    String? 
+  qualityGrade      String?
+  shelfLife         String?
+  whatsappNumber    String?
+  variety           String?
 
-  whatsappNumber String? 
+  isAvailable       Boolean  @default(true)
 
-  isAvailable Boolean @default(true)
+  sellerType        String
+  farmerId          String?
+  farmer            FarmerProfile? @relation(fields: [farmerId], references: [id])
+  agentId           String?
+  agent             AgentProfile?  @relation(fields: [agentId], references: [id])
 
-  sellerType String 
-  farmerId   String?
-  farmer     FarmerProfile? @relation(fields: [farmerId], references: [id])
-  agentId    String?
-  agent      AgentProfile?  @relation(fields: [agentId], references: [id])
+  orderItems        OrderItem[]
+  
+  // Relations for Cart/Wishlist (New)
+  cartItems         CartItem[]
+  wishlistItems     Wishlist[]
 
-  orderItems OrderItem[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("product_listings")
 }
 
+// --- SHOPPING CART (New) ---
 
-
-model Order {
-  id String @id @default(cuid())
-
-  buyerId   String
-  buyerUser User   @relation("BuyerOrders", fields: [buyerId], references: [id])
-
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  totalAmount  Float 
-  platformFee  Float 
-  sellerAmount Float 
-
-  paymentStatus   String  @default("PENDING") 
-  razorpayOrderId String? 
-
-  orderStatus String @default("PROCESSING") 
-
-  items OrderItem[]
+  items     CartItem[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String         @id @default(cuid())
+  cartId    String
+  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  
+  productId String
+  product   ProductListing @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  quantity  Float          // How much they want to buy
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([cartId, productId]) // Prevent duplicate items in same cart
+  @@map("cart_items")
+}
+
+// --- WISHLIST (New) ---
+
+model Wishlist {
+  id        String         @id @default(cuid())
+  
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  productId String
+  product   ProductListing @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, productId]) // Prevent adding same item twice
+  @@map("wishlists")
+}
+
+// --- ORDERS ---
+
+model Order {
+  id              String      @id @default(cuid())
+  
+  buyerId         String
+  buyerUser       User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  
+  totalAmount     Float
+  platformFee     Float
+  sellerAmount    Float
+  
+  paymentStatus   String      @default("PENDING")
+  razorpayOrderId String?
+  
+  orderStatus     String      @default("PROCESSING")
+  
+  items           OrderItem[]
+
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
 
   @@map("orders")
 }
 
 model OrderItem {
-  id      String @id @default(cuid())
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id])
-
-  productId String
-  product   ProductListing @relation(fields: [productId], references: [id])
-
-  quantity        Float 
+  id              String         @id @default(cuid())
+  orderId         String
+  order           Order          @relation(fields: [orderId], references: [id])
+  
+  productId       String
+  product         ProductListing @relation(fields: [productId], references: [id])
+  
+  quantity        Float
   priceAtPurchase Float
 
   @@map("order_items")

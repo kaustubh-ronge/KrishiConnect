@@ -14,6 +14,7 @@ import {
   ShoppingBag, Search, TrendingUp, ArrowRight, Plus, Package, Settings
 } from "lucide-react";
 import { toast } from "sonner";
+import Link from 'next/link';
 
 // New List of Agent Types
 const agentTypeOptions = [
@@ -217,8 +218,17 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
 
             {/* Card 2: My Orders */}
             <DashboardCard icon={ShoppingBag} title="My Orders" description="Track your purchases and delivery status." color="indigo">
-              <Button variant="outline" disabled className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50">
-                No Orders Yet
+              <Link href={'/my-orders'}>
+              <Button variant="outline" className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                My Orders
+              </Button>
+              </Link>
+            </DashboardCard>
+
+            {/* Card: Sales */}
+            <DashboardCard icon={TrendingUp} title="Sales" description="View your sold products and earnings." color="purple">
+              <Button variant="outline" onClick={() => router.push('/agent-dashboard/sales')} className="w-full border-purple-200 text-purple-700 hover:bg-purple-50">
+                View Sales
               </Button>
             </DashboardCard>
 

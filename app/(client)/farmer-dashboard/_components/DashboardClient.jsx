@@ -14,8 +14,12 @@ import { toast } from "sonner";
 import {
   Sprout, User, MapPin, LandPlot, CheckCircle2,
   Plus, Package, BarChart3, Settings, MessageCircle,
-  ArrowRight, X
+  ArrowRight, X, TrendingUp,
+  ShoppingBag,
+  Store,
+  Search
 } from "lucide-react";
+import Link from 'next/link';
 
 // List of standard crops
 const produceOptions = ["Tomatoes", "Onions", "Potatoes", "Grapes", "Pomegranate", "Sugarcane", "Wheat", "Rice", "Other"];
@@ -243,9 +247,19 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+            <DashboardCard icon={Store} title="Marketplace" description="Browse fresh produce from farmers and other agents." color="blue">
+              <Button
+                onClick={() => router.push('/marketplace')}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-lg h-12 shadow-md font-medium"
+              >
+                <Search className="mr-2 h-5 w-5" /> Browse Products
+              </Button>
+            </DashboardCard>
+
             <DashboardCard icon={Plus} title="New Product Listing" description="List your harvest to connect with agents immediately." color="green">
               <Button onClick={goToCreateListing} className="w-full bg-green-600 hover:bg-green-700 font-medium shadow-sm">
-                Create Listing <ArrowRight className="ml-2 h-4 w-4" />
+                Sell Products <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </DashboardCard>
 
@@ -255,12 +269,17 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
               </Button>
             </DashboardCard>
 
-            <DashboardCard icon={BarChart3} title="Sales Insights" description="Track your revenue and most popular produce." color="yellow">
-              <Button variant="ghost" disabled className="w-full text-gray-400 bg-gray-50">Coming Soon</Button>
+            {/* Sales Page */}
+            <DashboardCard icon={TrendingUp} title="Sales" description="See sold items and revenue." color="purple">
+              <Button variant="outline" onClick={() => router.push('/farmer-dashboard/sales')} className="w-full border-purple-200 text-purple-700 hover:bg-purple-50">
+                View Sales
+              </Button>
             </DashboardCard>
 
-            <DashboardCard icon={MessageCircle} title="Messages" description="Chat directly with interested agents and buyers." color="purple">
-              <Button variant="ghost" disabled className="w-full text-gray-400 bg-gray-50">Coming Soon</Button>
+            <DashboardCard icon={ShoppingBag} title="My Orders" description="Chat directly with interested agents and buyers." color="purple">
+              <Link href={'/my-orders'}>
+                <Button variant="outline" className="w-full">My Orders</Button>
+              </Link>
             </DashboardCard>
 
             <DashboardCard icon={Settings} title="Settings" description="Update profile, bank details, and preferences." color="gray">
