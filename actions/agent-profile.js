@@ -25,9 +25,9 @@ export async function createAgentProfile(formData) {
     });
 
     if (!dbUser) return { success: false, error: "User not found in database." };
-    
+
     if (dbUser.role !== 'agent') {
-       return { success: false, error: "Unauthorized. You are registered as a farmer." };
+      return { success: false, error: "Unauthorized. You are registered as a farmer." };
     }
   } catch (err) {
     return { success: false, error: "Failed to verify role." };
@@ -38,15 +38,18 @@ export async function createAgentProfile(formData) {
   const companyName = formData.get("companyName")?.toString();
   const phone = formData.get("phone")?.toString();
   const region = formData.get("region")?.toString();
-  
+
   // Payment Info (For selling)
   const upiId = formData.get("upiId")?.toString() || null;
   const bankName = formData.get("bankName")?.toString() || null;
   const accountNumber = formData.get("accountNumber")?.toString() || null;
   const ifscCode = formData.get("ifscCode")?.toString() || null;
 
-  if (!name || !phone || !region) {
-    return { success: false, error: "Name, Phone, and Region are required." };
+  // --- NEW: Handle Agent Types Array ---
+  const agentType = formData.getAll("agentType").filter(t => t.trim() !== "");
+
+  if (!name || !phone || !region || agentType.length === 0) {
+    return { success: false, error: "Name, Phone, Region, and Agent Type are required." };
   }
 
   // 4. Database Operation
@@ -54,22 +57,23 @@ export async function createAgentProfile(formData) {
     const existingProfile = await db.agentProfile.findUnique({ where: { userId } });
 
     if (existingProfile) {
-        console.warn(`Agent profile already exists for ${userId}`);
-        return { success: true };
+      console.warn(`Agent profile already exists for ${userId}`);
+      return { success: true };
     }
 
     await db.agentProfile.create({
-        data: {
-            userId,
-            name,
-            companyName,
-            phone,
-            region,
-            upiId,
-            bankName,
-            accountNumber,
-            ifscCode
-        }
+      data: {
+        userId,
+        name,
+        companyName,
+        phone,
+        region,
+        agentType, // NEW: Saves the array
+        upiId,
+        bankName,
+        accountNumber,
+        ifscCode
+      }
     });
     console.log(`Agent profile created for ${userId}`);
 

@@ -1,15 +1,3 @@
-// import { auth } from "@clerk/nextjs/server";
-// import OnboardingClient from "./_components/OnboardinClient";
-
-// export default async function OnboardingPage() {
-//   const { sessionClaims } = auth();
-//   const role = sessionClaims?.role;
-
-//   console.log("OnboardingPage (Server): Fetched role:", role);
-
-//   return <OnboardingClient userRole={role} />;
-// }
-
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation"; // ADD THIS

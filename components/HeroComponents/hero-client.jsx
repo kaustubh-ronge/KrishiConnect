@@ -4,14 +4,13 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowRight, PlayCircle, CheckCircle } from "lucide-react";
-import { useUser } from "@clerk/nextjs"; // Use Clerk's client-side hook
+import { useUser } from "@clerk/nextjs";
 
 export default function HeroClient({ title, subtitle, description, stats, isLoggedIn, userRole }) {
-  const { isSignedIn, user } = useUser(); // Client-side auth state
+  const { isSignedIn } = useUser();
 
-  console.log("HeaderClient Props:", { isLoggedIn, userRole });
-
-  // Determine button state based on client-side auth
+  // Determine button state using the SERVER-PROVIDED 'userRole' prop
+  // This ensures it matches the database state (e.g., 'none' after deletion)
   const getButtonState = () => {
     if (!isSignedIn) {
       return {
@@ -21,8 +20,7 @@ export default function HeroClient({ title, subtitle, description, stats, isLogg
       };
     }
 
-    const userRole = user?.publicMetadata?.role;
-
+    // Use the prop 'userRole', not client metadata
     if (!userRole || userRole === "none") {
       return {
         text: "Complete Your Profile",
@@ -42,19 +40,12 @@ export default function HeroClient({ title, subtitle, description, stats, isLogg
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.2 }
-    }
+    visible: { opacity: 1, transition: { staggerChildren: 0.2 } }
   };
 
   const itemVariants = {
     hidden: { opacity: 0, y: 30 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.6, ease: "easeOut" }
-    }
+    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
   };
 
   return (
@@ -81,7 +72,8 @@ export default function HeroClient({ title, subtitle, description, stats, isLogg
             >
               <CheckCircle className="h-4 w-4" />
               <span>{buttonState.description}</span>
-              {user?.publicMetadata?.role && user.publicMetadata.role !== "none" && (
+              {/* Only show 'Permanent' if role is actually set */}
+              {userRole && userRole !== "none" && (
                 <span className="text-yellow-600 ml-2">(Role is permanent)</span>
               )}
             </motion.div>

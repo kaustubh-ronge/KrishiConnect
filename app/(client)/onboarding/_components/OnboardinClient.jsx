@@ -93,15 +93,15 @@ export default function OnboardingClient({ userRole }) {
       title: "Farmer",
       description: "Sell your vegetables and fruits directly to agents",
       icon: Sprout,
-      features: ["List your produce", "Set your prices", "Connect with agents", "Free for limited time"],
+      features: ["List your produce", "Set your prices", "Connect with agents"],
       buttonVariant: "default"
     },
     {
       value: "agent",
       title: "Agent",
-      description: "Buy fresh produce directly from farmers",
+      description: "Buy fresh produce directly from farmers also sell your products",
       icon: Users,
-      features: ["Access farmer details", "Bulk purchasing", "Quality assurance", "₹5000 after free period"],
+      features: ["Access farmer details", "Bulk purchasing", "Quality assurance"],
       buttonVariant: "outline"
     }
   ];
@@ -166,15 +166,6 @@ export default function OnboardingClient({ userRole }) {
                     ))}
                   </div>
 
-                  {/* Pricing Note */}
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-sm text-yellow-800 text-center">
-                      {role.value === "farmer"
-                        ? "₹500 after free period"
-                        : "₹5000 after free period"
-                      }
-                    </p>
-                  </div>
 
                   {/* Action Button */}
                   <Button

@@ -12,21 +12,41 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { ArrowLeft, Edit, Save, Image as ImageIcon, Tag, X, Leaf, Phone, Calendar, Scale, IndianRupee, Briefcase } from "lucide-react";
 import ImageUpload from "@/components/ImageUpload";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
-// Constants
-const produceCategories = ["Tomatoes", "Onions", "Potatoes", "Grapes", "Pomegranate", "Sugarcane", "Wheat", "Rice", "Soybean", "Cotton", "Ginger", "Turmeric", "Green Chilli", "Lemon", "Other"];
-const unitOptions = ["kg", "ton", "quintal", "crate", "box"];
-const gradeOptions = ["Export Quality", "Grade A (Premium)", "Grade B (Standard)", "Grade C (Mixed)", "Organic Certified"];
+// --- Constants for Agents ---
+const agentProductCategories = [
+  "Fertilizers",
+  "Pesticides",
+  "Seeds",
+  "Nursery Plants",
+  "Farming Tools/Machinery",
+  "Vegetables (Bulk Trade)",
+  "Fruits (Bulk Trade)",
+  "Grains & Pulses",
+  "Animal Feed",
+  "Other"
+];
+
+const unitOptions = ["kg", "ton", "quintal", "crate", "box", "liter", "packet", "piece"];
+const gradeOptions = ["Standard", "Premium", "Export Quality", "Organic", "Commercial Grade", "Not Applicable"];
+
+// Helper to check if name is standard
+const isStandardCategory = (name) => agentProductCategories.includes(name);
 
 export default function AgentEditClient({ product }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  // --- State Initialization (Pre-filling data) ---
+  // --- State Initialization ---
   const [images, setImages] = useState(product.images || []);
   const [tags, setTags] = useState(product.variety ? product.variety.split(", ") : []);
   const [tagInput, setTagInput] = useState("");
+
+  // --- Custom Product Logic (For 'Other') ---
+  const initialProductName = product.productName || "";
+  const [selectedProduct, setSelectedProduct] = useState(isStandardCategory(initialProductName) ? initialProductName : "Other");
+  const [customProduct, setCustomProduct] = useState(isStandardCategory(initialProductName) ? "" : initialProductName);
 
   // --- Handlers ---
   const handleAddTag = (e) => {
@@ -42,6 +62,16 @@ export default function AgentEditClient({ product }) {
   const handleImageUpload = (newImages) => setImages([...images, ...newImages]);
   const handleRemoveImage = (url) => setImages(images.filter(i => i !== url));
 
+  // Helper for Date Input
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
+
   // --- Submit ---
   const handleSubmit = async (formData) => {
     if (images.length === 0) {
@@ -49,11 +79,23 @@ export default function AgentEditClient({ product }) {
       return;
     }
 
-    // Append Images
+    // 1. Handle Custom Product Name
+    if (selectedProduct === "Other") {
+        if (!customProduct.trim()) {
+            toast.error("Please specify the product name.");
+            return;
+        }
+        formData.set("productName", customProduct.trim());
+    } else if (!selectedProduct) {
+        toast.error("Please select a product category.");
+        return;
+    }
+
+    // 2. Append Images
     formData.delete("images");
     images.forEach(url => formData.append("images", url));
 
-    // Append Tags
+    // 3. Append Tags
     if (tags.length > 0) formData.set("variety", tags.join(", "));
 
     startTransition(async () => {
@@ -68,28 +110,29 @@ export default function AgentEditClient({ product }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-12 px-4">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-indigo-50 py-12 px-4">
       <div className="max-w-4xl mx-auto">
-
+        
         <Button variant="ghost" onClick={() => router.back()} className="mb-4 text-gray-600 hover:text-blue-600 pl-0">
           <ArrowLeft className="mr-2 h-4 w-4" /> Cancel
         </Button>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="shadow-xl border-blue-100 bg-white/90 backdrop-blur-sm">
+            
             <CardHeader className="bg-blue-50/50 border-b border-blue-100 pb-6">
               <div className="flex items-center gap-3">
-                <div className="bg-blue-100 p-3 rounded-xl text-blue-600"><Edit className="h-6 w-6" /></div>
+                <div className="bg-blue-100 p-3 rounded-xl text-blue-600"><Edit className="h-6 w-6"/></div>
                 <div>
                   <CardTitle className="text-2xl text-gray-900">Edit Listing (Agent)</CardTitle>
-                  <p className="text-sm text-gray-500">Update stock levels, pricing, or details.</p>
+                  <p className="text-sm text-gray-500">Update stock, pricing, or details.</p>
                 </div>
               </div>
             </CardHeader>
 
             <form action={handleSubmit}>
               <CardContent className="grid gap-8 pt-8">
-
+                
                 {/* 1. Product Details */}
                 <section className="space-y-4">
                   <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2 border-b pb-2">
@@ -97,25 +140,56 @@ export default function AgentEditClient({ product }) {
                     Product Details
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    {/* Category Select + Custom Input */}
                     <div className="space-y-2">
-                      <Label>Crop / Product</Label>
-                      <Select name="productName" defaultValue={product.productName}>
+                      <Label>Product Category</Label>
+                      <Select 
+                        name="productName" 
+                        defaultValue={selectedProduct} 
+                        onValueChange={setSelectedProduct}
+                      >
                         <SelectTrigger className="bg-white h-12"><SelectValue /></SelectTrigger>
-                        <SelectContent>{produceCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                        <SelectContent>
+                          {agentProductCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
                       </Select>
+
+                      {/* Conditional Input */}
+                      <AnimatePresence>
+                        {selectedProduct === "Other" && (
+                            <motion.div 
+                                initial={{ opacity: 0, height: 0 }} 
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="pt-1 overflow-hidden"
+                            >
+                                <Label className="text-blue-600 text-xs font-semibold uppercase tracking-wide">Specify Product Name</Label>
+                                <Input 
+                                    placeholder="e.g. Neem Oil, Tractor Parts..." 
+                                    value={customProduct}
+                                    onChange={(e) => setCustomProduct(e.target.value)}
+                                    className="bg-blue-50 border-blue-200 focus:border-blue-500 h-11 mt-1"
+                                    required
+                                />
+                            </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
+
                     <div className="space-y-2">
-                      <Label>Quality Grade</Label>
+                      <Label>Grade / Quality</Label>
                       <Select name="qualityGrade" defaultValue={product.qualityGrade}>
                         <SelectTrigger className="bg-white h-12"><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>{gradeOptions.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
+
                     {/* Tags */}
                     <div className="space-y-2 md:col-span-2">
-                      <Label className="flex items-center gap-2"><Tag className="h-4 w-4 text-blue-600" /> Variety & Features</Label>
+                      <Label className="flex items-center gap-2"><Tag className="h-4 w-4 text-blue-600"/> Brands / Features</Label>
                       <div className="flex gap-2">
-                        <Input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleTagKeyDown} placeholder="Add tags..." className="bg-white h-12" />
+                        <Input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleTagKeyDown} placeholder="Add tags..." className="bg-white h-12"/>
                         <Button type="button" onClick={handleAddTag} variant="outline" className="h-12 border-blue-200 text-blue-600 hover:bg-blue-50">Add</Button>
                       </div>
                       <div className="flex flex-wrap gap-2 mt-2 min-h-[30px]">
@@ -126,7 +200,21 @@ export default function AgentEditClient({ product }) {
                         ))}
                       </div>
                     </div>
+
+                    {/* Shelf Life Fields */}
                     <div className="space-y-2 md:col-span-2"><Label>Shelf Life</Label><Input name="shelfLife" defaultValue={product.shelfLife} className="bg-white h-12" /></div>
+                    
+                    <div className="space-y-2 md:col-span-2">
+                        <Label className="text-gray-700">Shelf Life Start Date</Label>
+                        <Input 
+                            type="date" 
+                            name="shelfLifeStartDate" 
+                            defaultValue={formatDate(product.shelfLifeStartDate)} 
+                            className="bg-white h-12 border-gray-200 focus:ring-blue-500" 
+                        />
+                         <p className="text-xs text-gray-500 mt-1">Date the shelf life countdown begins.</p>
+                    </div>
+
                   </div>
                 </section>
 
@@ -137,11 +225,11 @@ export default function AgentEditClient({ product }) {
                     Inventory & Pricing
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2"><Label className="flex items-center gap-2"><Scale className="h-4 w-4 text-gray-500" /> Stock</Label><Input name="availableStock" type="number" step="0.01" defaultValue={product.availableStock} required className="bg-white h-12" /></div>
+                    <div className="space-y-2"><Label>Stock</Label><Input name="availableStock" type="number" step="0.01" defaultValue={product.availableStock} required className="bg-white h-12" /></div>
                     <div className="space-y-2"><Label>Unit</Label><Select name="unit" defaultValue={product.unit}><SelectTrigger className="bg-white h-12"><SelectValue /></SelectTrigger><SelectContent>{unitOptions.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="space-y-2"><Label className="flex items-center gap-2"><IndianRupee className="h-4 w-4 text-gray-500" /> Price</Label><Input name="pricePerUnit" type="number" step="0.01" defaultValue={product.pricePerUnit} required className="bg-white h-12" /></div>
+                    <div className="space-y-2"><Label>Price/Unit</Label><Input name="pricePerUnit" type="number" step="0.01" defaultValue={product.pricePerUnit} required className="bg-white h-12" /></div>
                     <div className="space-y-2"><Label>Min Order Qty</Label><Input name="minOrderQuantity" type="number" step="0.01" defaultValue={product.minOrderQuantity} className="bg-white h-12" /></div>
-                    <div className="space-y-2 md:col-span-2"><Label className="flex items-center gap-2"><Calendar className="h-4 w-4 text-gray-500" /> Harvest Date</Label><Input type="date" name="harvestDate" defaultValue={product.harvestDate ? new Date(product.harvestDate).toISOString().split('T')[0] : ''} className="bg-white h-12" /></div>
+                    <div className="space-y-2 md:col-span-2"><Label>Procured Date</Label><Input type="date" name="harvestDate" defaultValue={formatDate(product.harvestDate)} className="bg-white h-12" /></div>
                   </div>
                 </section>
 

@@ -1,10 +1,10 @@
-import { checkUser } from "@/lib/checkUser";
 import HeroClient from "./hero-client";
+import { checkUser } from "@/lib/checkUser"; // Import checkUser
 
 export default async function HeroServer() {
-
+  // 1. Fetch the REAL user status from the DB (Single Source of Truth)
   const dbUser = await checkUser();
-  // No auth calls in server component - let client handle it
+
   const heroData = {
     title: "Connecting Farmers & Agents",
     subtitle: "Direct B2B platform for vegetables and fruits trading in rural areas",
@@ -17,8 +17,12 @@ export default async function HeroServer() {
     ]
   };
 
-  return <HeroClient
-    isLoggedIn={!!dbUser}
-    userRole={dbUser?.role}
-    {...heroData} />;
+  // 2. Pass the DB role to the client
+  return (
+    <HeroClient 
+      {...heroData} 
+      isLoggedIn={!!dbUser} 
+      userRole={dbUser?.role} // This will be 'none' if re-created, fixing your issue
+    />
+  );
 }

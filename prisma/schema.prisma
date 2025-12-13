@@ -7,17 +7,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- USER MANAGEMENT ---
 
 model User {
-  id    String @id @unique // Clerk User ID
+  id    String @id @unique 
   email String @unique
-  role  String // "farmer", "agent", or "admin"
+  role  String
 
   farmerProfile FarmerProfile?
   agentProfile  AgentProfile?
 
-  // Buying History (Both Farmers and Agents can buy)
   orders Order[] @relation("BuyerOrders")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -26,32 +24,27 @@ model User {
   @@map("users")
 }
 
-// --- PROFILES ---
 
 model FarmerProfile {
   id     String @id @default(cuid())
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Basic Info
   name     String
   farmName String?
   phone    String?
   address  String?
 
-  // Verification / Detailed Info
   aadharNumber      String?  @unique
-  farmSize          Float? // Acres
-  primaryProduce    String[] // ["Tomato", "Onion"]
-  farmingExperience Int? // Years
+  farmSize          Float? 
+  primaryProduce    String[] 
+  farmingExperience Int? 
 
-  // Payment Receiving Details (For Payouts)
   upiId         String?
   bankName      String?
   accountNumber String?
   ifscCode      String?
 
-  // Selling
   listings ProductListing[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -70,13 +63,13 @@ model AgentProfile {
   phone       String?
   region      String?
 
-  // Payment Receiving Details (If agents sell too)
+  agentType   String[]
+
   upiId         String?
   bankName      String?
   accountNumber String?
   ifscCode      String?
 
-  // Selling (Agents can now list products too)
   listings ProductListing[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -85,38 +78,33 @@ model AgentProfile {
   @@map("agent_profiles")
 }
 
-// --- MARKETPLACE & COMMERCE ---
 
 model ProductListing {
   id String @id @default(cuid())
 
-  // --- Basic Info ---
+  
   productName String
-  variety     String? // e.g., "Nashik Red", "Alphonso"
-  description String? // Detailed description
+  variety     String? 
+  description String? 
 
-  // --- Images (Array for multiple photos) ---
-  images String[] // Stores URLs of uploaded images
+  images String[] 
 
-  // --- Inventory & Pricing ---
-  quantityLabel    String // Display: "500 kg"
-  availableStock   Float // Math: 500.0
-  unit             String // "kg", "ton", "quintal"
-  pricePerUnit     Float // Math: 20.0
-  minOrderQuantity Float? // NEW: Minimum amount agent must buy
+  quantityLabel    String 
+  availableStock   Float 
+  unit             String 
+  pricePerUnit     Float 
+  minOrderQuantity Float? 
 
-  // --- Quality & Freshness ---
-  harvestDate  DateTime? // NEW: When was it picked?
-  qualityGrade String? // NEW: "Export Quality", "Grade A", "Grade B"
-  shelfLife    String? // NEW: e.g. "15 Days"
+  harvestDate  DateTime?
+  shelfLifeStartDate DateTime?
+  qualityGrade String? 
+  shelfLife    String? 
 
-  // --- Contact for this Product ---
-  whatsappNumber String? // NEW: For the direct inquiry button
+  whatsappNumber String? 
 
   isAvailable Boolean @default(true)
 
-  // --- Relationships ---
-  sellerType String // "farmer" or "agent"
+  sellerType String 
   farmerId   String?
   farmer     FarmerProfile? @relation(fields: [farmerId], references: [id])
   agentId    String?
@@ -130,24 +118,23 @@ model ProductListing {
   @@map("product_listings")
 }
 
-// --- ORDER TRACKING (For Your Revenue) ---
+
 
 model Order {
   id String @id @default(cuid())
 
-  // Buyer Info
   buyerId   String
   buyerUser User   @relation("BuyerOrders", fields: [buyerId], references: [id])
 
-  // Money Breakdown
-  totalAmount  Float // Total paid by buyer (e.g. 50,000)
-  platformFee  Float // Your Income (e.g. 2,500)
-  sellerAmount Float // Payout to Seller (e.g. 47,500)
+  
+  totalAmount  Float 
+  platformFee  Float 
+  sellerAmount Float 
 
-  paymentStatus   String  @default("PENDING") // "PENDING", "PAID", "FAILED"
-  razorpayOrderId String? // For Payment Gateway
+  paymentStatus   String  @default("PENDING") 
+  razorpayOrderId String? 
 
-  orderStatus String @default("PROCESSING") // "PROCESSING", "SHIPPED", "DELIVERED"
+  orderStatus String @default("PROCESSING") 
 
   items OrderItem[]
 
@@ -165,8 +152,8 @@ model OrderItem {
   productId String
   product   ProductListing @relation(fields: [productId], references: [id])
 
-  quantity        Float // e.g. 100 (kg)
-  priceAtPurchase Float // Lock the price at time of buying
+  quantity        Float 
+  priceAtPurchase Float
 
   @@map("order_items")
 }

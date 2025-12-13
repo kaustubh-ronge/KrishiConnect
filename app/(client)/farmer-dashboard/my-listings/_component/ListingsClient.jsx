@@ -110,7 +110,7 @@ export default function ListingsClient({ initialListings }) {
                 </div>
 
                 {/* Price Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-5 pt-16">
+                <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 via-black/40 to-transparent p-5 pt-16">
                    <div className="text-white">
                         <p className="text-xs opacity-90 font-medium uppercase tracking-wider">Price</p>
                         <p className="text-2xl font-bold flex items-center">
