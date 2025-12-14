@@ -98,6 +98,10 @@ model ProductListing {
   availableStock    Float
   unit              String
   pricePerUnit      Float
+  // Delivery charge per unit (can be 0)
+  deliveryCharge    Float   @default(0)
+  // 'per_unit' or 'flat' (flat = once per listing in cart)
+  deliveryChargeType String  @default("per_unit")
   minOrderQuantity  Float?
   
   harvestDate       DateTime?
@@ -211,6 +215,10 @@ model OrderItem {
   
   quantity        Float
   priceAtPurchase Float
+  // Delivery charge recorded at time of purchase (per unit)
+  deliveryChargeAtPurchase Float @default(0)
+  // Store delivery charge type at purchase time
+  deliveryChargeTypeAtPurchase String? 
 
   @@map("order_items")
 }

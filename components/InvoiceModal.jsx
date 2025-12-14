@@ -44,25 +44,29 @@ export default function InvoiceModal({ isOpen, onClose, order }) {
                   <th className="px-4 py-3 font-medium">Seller</th>
                   <th className="px-4 py-3 font-medium text-right">Qty</th>
                   <th className="px-4 py-3 font-medium text-right">Price</th>
+                  <th className="px-4 py-3 font-medium text-right">Delivery</th>
                   <th className="px-4 py-3 font-medium text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {order.items.map((item) => (
-                  <tr key={item.id} className="border-b last:border-0">
-                    <td className="px-4 py-3">{item.product.productName}</td>
-                    <td className="px-4 py-3 text-gray-500">
-                        {item.product.sellerType === 'farmer' 
-                           ? item.product.farmer?.name 
-                           : item.product.agent?.companyName || item.product.agent?.name}
-                    </td>
-                    <td className="px-4 py-3 text-right">{item.quantity} {item.product.unit}</td>
-                    <td className="px-4 py-3 text-right">₹{item.priceAtPurchase}</td>
-                    <td className="px-4 py-3 text-right font-medium">
-                        ₹{(item.quantity * item.priceAtPurchase).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
+                {order.items.map((item) => {
+                  const deliveryAmount = item.deliveryChargeTypeAtPurchase === 'per_unit' ? (item.quantity * (item.deliveryChargeAtPurchase || 0)) : (item.deliveryChargeAtPurchase || 0);
+                  const lineTotal = (item.quantity * item.priceAtPurchase) + deliveryAmount;
+                  return (
+                    <tr key={item.id} className="border-b last:border-0">
+                      <td className="px-4 py-3">{item.product.productName}</td>
+                      <td className="px-4 py-3 text-gray-500">
+                          {item.product.sellerType === 'farmer' 
+                             ? item.product.farmer?.name 
+                             : item.product.agent?.companyName || item.product.agent?.name}
+                      </td>
+                      <td className="px-4 py-3 text-right">{item.quantity} {item.product.unit}</td>
+                      <td className="px-4 py-3 text-right">₹{item.priceAtPurchase.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right">₹{deliveryAmount.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-medium">₹{lineTotal.toFixed(2)}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -70,9 +74,13 @@ export default function InvoiceModal({ isOpen, onClose, order }) {
           {/* Totals */}
           <div className="flex justify-end">
             <div className="w-1/2 space-y-2">
+               {/* Compute subtotal explicitly from items */}
                <div className="flex justify-between text-gray-600">
                  <span>Subtotal</span>
-                 <span>₹{order.totalAmount - (order.platformFee || 0)}</span>
+                 <span>₹{order.items.reduce((s, it) => {
+                   const deliveryAmount = it.deliveryChargeTypeAtPurchase === 'per_unit' ? (it.quantity * (it.deliveryChargeAtPurchase || 0)) : (it.deliveryChargeAtPurchase || 0);
+                   return s + (it.quantity * it.priceAtPurchase) + deliveryAmount;
+                 }, 0).toFixed(2)}</span>
                </div>
                <div className="flex justify-between text-gray-600">
                  <span>Platform Fee</span>

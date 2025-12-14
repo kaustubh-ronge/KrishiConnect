@@ -18,6 +18,14 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
 
+If you pulled recent schema changes (e.g. added `deliveryCharge` or `deliveryChargeType` on listings), run Prisma migrations locally:
+
+```bash
+npx prisma migrate dev --name add_delivery_charge_and_type
+```
+
+Then restart the dev server.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

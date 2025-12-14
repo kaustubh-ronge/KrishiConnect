@@ -228,6 +228,18 @@ export default function AgentEditClient({ product }) {
                     <div className="space-y-2"><Label>Stock</Label><Input name="availableStock" type="number" step="0.01" defaultValue={product.availableStock} required className="bg-white h-12" /></div>
                     <div className="space-y-2"><Label>Unit</Label><Select name="unit" defaultValue={product.unit}><SelectTrigger className="bg-white h-12"><SelectValue /></SelectTrigger><SelectContent>{unitOptions.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></div>
                     <div className="space-y-2"><Label>Price/Unit</Label><Input name="pricePerUnit" type="number" step="0.01" defaultValue={product.pricePerUnit} required className="bg-white h-12" /></div>
+                    <div className="space-y-2"><Label>Delivery Charge (per unit)</Label><Input name="deliveryCharge" type="number" step="0.01" defaultValue={product.deliveryCharge || 0} className="bg-white h-12" /></div>
+                    <div className="space-y-2">
+                      <Label>Delivery Type</Label>
+                      <Select name="deliveryChargeType" defaultValue={product.deliveryChargeType || 'per_unit'}>
+                        <SelectTrigger className="bg-white h-12"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="per_unit">Per Unit</SelectItem>
+                          <SelectItem value="flat">Flat (once per listing)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500 mt-1">Choose how delivery is applied: per unit multiplies by quantity; flat applies once per listing.</p>
+                    </div>
                     <div className="space-y-2"><Label>Min Order Qty</Label><Input name="minOrderQuantity" type="number" step="0.01" defaultValue={product.minOrderQuantity} className="bg-white h-12" /></div>
                     <div className="space-y-2 md:col-span-2"><Label>Procured Date</Label><Input type="date" name="harvestDate" defaultValue={formatDate(product.harvestDate)} className="bg-white h-12" /></div>
                   </div>

@@ -105,10 +105,21 @@ export async function initiateCheckout() {
       return { success: false, error: "Cart is empty" };
     }
 
-    // Compute totals
-    const subtotal = cart.items.reduce((sum, it) => sum + (it.quantity * it.product.pricePerUnit), 0);
-    const platformFee = Math.round(subtotal * 0.05);
-    const total = subtotal + platformFee;
+    // Compute totals: separate product subtotal and delivery total
+    const productSubtotal = cart.items.reduce((sum, it) => sum + (it.quantity * it.product.pricePerUnit), 0);
+    const deliveryTotal = cart.items.reduce((sum, it) => {
+      if (it.product.deliveryChargeType === 'per_unit') {
+        return sum + (it.quantity * (it.product.deliveryCharge || 0));
+      }
+      // flat: add once per listing
+      return sum + (it.product.deliveryCharge || 0);
+    }, 0);
+
+    // Platform fee rate depends on product price (1% for cheap items, 2% for others)
+    const platformRateFor = (price) => (price < 20 ? 0.01 : 0.02);
+    const platformFee = Math.round(cart.items.reduce((sum, it) => sum + (it.product.pricePerUnit * it.quantity * platformRateFor(it.product.pricePerUnit)), 0));
+
+    const total = productSubtotal + deliveryTotal + platformFee;
 
     // Transaction: create order + order items
     const created = await db.$transaction(async (tx) => {
@@ -117,7 +128,7 @@ export async function initiateCheckout() {
           buyerId: user.id,
           totalAmount: total,
           platformFee: platformFee,
-          sellerAmount: subtotal,
+          sellerAmount: Math.max(0, productSubtotal - platformFee),
           paymentStatus: "PENDING",
           orderStatus: "PROCESSING"
         }
@@ -130,7 +141,9 @@ export async function initiateCheckout() {
             orderId: newOrder.id,
             productId: it.productId,
             quantity: it.quantity,
-            priceAtPurchase: it.product.pricePerUnit
+            priceAtPurchase: it.product.pricePerUnit,
+            deliveryChargeAtPurchase: it.product.deliveryCharge || 0,
+            deliveryChargeTypeAtPurchase: it.product.deliveryChargeType || 'per_unit'
           }
         });
       }

@@ -89,8 +89,18 @@ export default function MyOrdersPage() {
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <p className="font-medium text-gray-900">Qty: {item.quantity} {item.product.unit}</p>
-                                                <p className="text-sm text-gray-500">₹{item.priceAtPurchase} / unit</p>
+                                                {(() => {
+                                                    const deliveryDisplay = item.deliveryChargeAtPurchase ? (item.deliveryChargeTypeAtPurchase === 'per_unit' ? `+ ₹${item.deliveryChargeAtPurchase} delivery / ${item.product.unit}` : `+ ₹${item.deliveryChargeAtPurchase} delivery (flat)`) : '';
+                                                    const deliveryAmount = item.deliveryChargeTypeAtPurchase === 'per_unit' ? (item.quantity * (item.deliveryChargeAtPurchase || 0)) : (item.deliveryChargeAtPurchase || 0);
+                                                    const lineTotal = (item.quantity * item.priceAtPurchase) + deliveryAmount;
+                                                    return (
+                                                        <>
+                                                            <p className="font-medium text-gray-900">Qty: {item.quantity} {item.product.unit}</p>
+                                                            <p className="text-sm text-gray-500">₹{item.priceAtPurchase} / unit {deliveryDisplay}</p>
+                                                            <p className="text-sm font-medium text-gray-900">Line Total: ₹{lineTotal.toFixed(2)}</p>
+                                                        </>
+                                                    )
+                                                })()}
                                             </div>
                                         </div>
                                     ))}

@@ -38,14 +38,22 @@ export default function CartClient({ initialCart }) {
     const totalQuantity = cartItems.reduce((acc, it) => acc + (it.quantity || 0), 0);
 
   // --- Calculations ---
-  // 1. Subtotal: Sum of (Price * Quantity) for all items
-  const subtotal = cartItems.reduce((acc, item) => acc + (item.quantity * item.product.pricePerUnit), 0);
-  
-  // 2. Platform Fee (Your Commission - e.g., 5%)
-  const platformFee = Math.round(subtotal * 0.05); 
-  
-  // 3. Final Total (Subtotal + Platform Fee only)
-  const total = subtotal + platformFee;
+  // 1. Product subtotal (price only)
+  const productSubtotal = cartItems.reduce((acc, item) => acc + (item.quantity * item.product.pricePerUnit), 0);
+  // 2. Delivery total (per unit or flat per listing)
+  const deliveryTotal = cartItems.reduce((acc, item) => {
+    if (item.product.deliveryChargeType === 'per_unit') {
+      return acc + (item.quantity * (item.product.deliveryCharge || 0));
+    }
+    return acc + (item.product.deliveryCharge || 0);
+  }, 0);
+
+  // 3. Platform Fee (rate depends on product price: 1% for < ₹20, else 2%)
+  const platformRateFor = (price) => (price < 20 ? 0.01 : 0.02);
+  const platformFee = Math.round(cartItems.reduce((acc, item) => acc + (item.product.pricePerUnit * item.quantity * platformRateFor(item.product.pricePerUnit)), 0));
+
+  // 4. Final Total (Product + Delivery + Platform Fee)
+  const total = productSubtotal + deliveryTotal + platformFee;
 
   // --- Handlers ---
   const handleRemove = async (itemId) => {
@@ -203,7 +211,7 @@ export default function CartClient({ initialCart }) {
                     </div>
 
                     {/* Product Details */}
-                    <div className="flex-grow p-5 flex flex-col justify-between">
+                    <div className="grow p-5 flex flex-col justify-between">
                         <div>
                             <div className="flex justify-between items-start">
                                 <div>
@@ -216,8 +224,17 @@ export default function CartClient({ initialCart }) {
                                     </p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="font-bold text-xl text-gray-900">₹ {(item.quantity * item.product.pricePerUnit).toLocaleString('en-IN')}</p>
-                                    <p className="text-xs text-gray-500">₹{item.product.pricePerUnit} / {item.product.unit}</p>
+                                    {(() => {
+                                        const deliveryForThis = item.product.deliveryChargeType === 'per_unit' ? (item.quantity * (item.product.deliveryCharge || 0)) : (item.product.deliveryCharge || 0);
+                                        const lineTotal = (item.quantity * item.product.pricePerUnit) + deliveryForThis;
+                                        return (
+                                            <>
+                                                <p className="font-bold text-xl text-gray-900">₹ {lineTotal.toLocaleString('en-IN')}</p>
+                                                <p className="text-xs text-gray-500">₹{item.product.pricePerUnit} / {item.product.unit}</p>
+                                                <p className="text-xs text-gray-500">{item.product.deliveryCharge ? (item.product.deliveryChargeType === 'per_unit' ? `Delivery: ₹${item.product.deliveryCharge} / ${item.product.unit}` : `Delivery (flat): ₹${item.product.deliveryCharge}`) : "Free Delivery"}</p>
+                                            </>
+                                        )
+                                    })()}
                                 </div>
                             </div>
                         </div>
@@ -275,8 +292,12 @@ export default function CartClient({ initialCart }) {
                     </CardHeader>
                     <CardContent className="p-6 space-y-4">
                         <div className="flex justify-between text-gray-600 text-sm">
-                            <span>Subtotal ({totalQuantity} items)</span>
-                            <span className="font-medium text-gray-900">₹ {subtotal.toLocaleString('en-IN')}</span>
+                            <span>Products ({totalQuantity} items)</span>
+                            <span className="font-medium text-gray-900">₹ {productSubtotal.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-600 text-sm">
+                            <span>Delivery</span>
+                            <span className="font-medium text-gray-900">₹ {deliveryTotal.toLocaleString('en-IN')}</span>
                         </div>
                         <div className="flex justify-between text-gray-600 text-sm">
                             <span>Platform Fee (5%)</span>

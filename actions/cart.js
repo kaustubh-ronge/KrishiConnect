@@ -20,6 +20,8 @@ export async function getCart() {
                 id: true,
                 productName: true,
                 pricePerUnit: true,
+                deliveryCharge: true,
+                deliveryChargeType: true,
                 unit: true,
                 images: true,
                 availableStock: true, // Needed for stock validation
@@ -46,7 +48,6 @@ export async function getCart() {
 export async function addToCart(productId, quantity) {
   const user = await currentUser();
   if (!user) return { success: false, error: "Please log in." };
-
   try {
     return await db.$transaction(async (tx) => {
       // Check Stock
@@ -146,53 +147,76 @@ export async function removeFromCart(cartItemId) {
 /**
  * 4. UPDATE CART ITEM QUANTITY (The Missing Function)
  */
+/**
+ * 4. UPDATE CART ITEM QUANTITY (Fixed Timeout)
+ */
 export async function updateCartItemQuantity(cartItemId, newQuantity) {
-    const user = await currentUser();
-    if (!user) return { success: false, error: "Not logged in" };
+  const user = await currentUser();
+  if (!user) return { success: false, error: "Not logged in" };
+  
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+  const maxAttempts = 3;
 
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-        return await db.$transaction(async (tx) => {
-            const item = await tx.cartItem.findUnique({
-                where: { id: cartItemId },
-                include: { product: true }
-            });
-
-            if (!item) throw new Error("Item not found");
-
-            const difference = newQuantity - item.quantity;
-
-            // If increasing quantity, check if we have enough extra stock
-            if (difference > 0) {
-                 // Note: availableStock in DB is what is remaining *after* the item was added to cart.
-                 // So we check against that remaining stock.
-                 const currentProduct = await tx.productListing.findUnique({
-                     where: { id: item.productId },
-                     select: { availableStock: true }
-                 });
-
-                 if (currentProduct.availableStock < difference) {
-                     throw new Error(`Not enough stock available.`);
-                 }
-            }
-
-            // Update Stock (Decrement if buying more, Increment if buying less)
-            await tx.productListing.update({
-                where: { id: item.productId },
-                data: { availableStock: { decrement: difference } } 
-            });
-
-            // Update Cart Item
-            await tx.cartItem.update({
-                where: { id: cartItemId },
-                data: { quantity: newQuantity }
-            });
-
-            return { success: true };
+      // FIX: Added the options object as the second argument
+      return await db.$transaction(async (tx) => {
+        const item = await tx.cartItem.findUnique({
+          where: { id: cartItemId },
+          include: { product: true }
         });
+
+        if (!item) throw new Error("Item not found");
+
+        const difference = newQuantity - item.quantity;
+
+        // If increasing quantity, check if we have enough extra stock
+        if (difference > 0) {
+          const currentProduct = await tx.productListing.findUnique({
+            where: { id: item.productId },
+            select: { availableStock: true }
+          });
+
+          if (currentProduct.availableStock < difference) {
+            throw new Error(`Not enough stock available.`);
+          }
+          // Decrement available stock by the increased amount
+          await tx.productListing.update({
+            where: { id: item.productId },
+            data: { availableStock: { decrement: difference } }
+          });
+        } else if (difference < 0) {
+          // If decreasing quantity, increment stock back
+          await tx.productListing.update({
+            where: { id: item.productId },
+            data: { availableStock: { increment: -difference } }
+          });
+        }
+
+        // Update Cart Item
+        await tx.cartItem.update({
+          where: { id: cartItemId },
+          data: { quantity: newQuantity }
+        });
+
+        return { success: true };
+      }, {
+        maxWait: 5000,  // Max time to wait for a connection
+        timeout: 10000  // FIX: Increased transaction timeout to 10 seconds
+      });
+
     } catch (error) {
-        console.error("Update Qty Error:", error);
+      const isTransient = error && (error.code === 'P2028' || (error.message && /Transaction not found|Transaction already closed/i.test(error.message)));
+      console.error(`Update Qty Error (attempt ${attempt}):`, error);
+      
+      if (attempt === maxAttempts || !isTransient) {
         return { success: false, error: error.message || "Failed to update quantity" };
+      }
+
+      await sleep(150 * attempt);
+      continue;
     }
+  }
 }
 
 /**

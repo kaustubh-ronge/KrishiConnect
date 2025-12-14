@@ -65,7 +65,7 @@ export default function ProductDetailClient({ product }) {
           
           {/* Left: Images */}
           <div className="lg:col-span-7 space-y-6">
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative aspect-[4/3] w-full rounded-3xl overflow-hidden bg-white shadow-sm border border-gray-200">
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative aspect-4/3 w-full rounded-3xl overflow-hidden bg-white shadow-sm border border-gray-200">
                {activeImage && <Image src={activeImage} alt="Product" fill className="object-cover" />}
                <Badge className={`absolute top-4 left-4 ${bgColor} text-white border-0 px-3 py-1`}>{isFarmer ? "Farm Fresh" : "Trader Stock"}</Badge>
              </motion.div>
@@ -123,7 +123,16 @@ export default function ProductDetailClient({ product }) {
                             />
                             <div className="flex flex-col justify-center">
                                 <p className="text-sm text-gray-500">Total Price</p>
-                                <p className="text-lg font-bold text-gray-900">₹{(qty * product.pricePerUnit).toFixed(2)}</p>
+                                {(() => {
+                                    const deliveryForThis = product.deliveryChargeType === 'per_unit' ? (qty * (product.deliveryCharge || 0)) : (product.deliveryCharge || 0);
+                                    const totalPrice = (qty * product.pricePerUnit) + deliveryForThis;
+                                    return (
+                                        <>
+                                            <p className="text-lg font-bold text-gray-900">₹{totalPrice.toFixed(2)}</p>
+                                            <p className="text-xs text-gray-500">{product.deliveryCharge ? (product.deliveryChargeType === 'per_unit' ? `Delivery: ₹${product.deliveryCharge} / ${product.unit}` : `Delivery (flat): ₹${product.deliveryCharge}`) : 'Free Delivery'}</p>
+                                        </>
+                                    )
+                                })()}
                             </div>
                         </div>
                     </div>

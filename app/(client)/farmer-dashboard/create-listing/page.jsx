@@ -193,6 +193,19 @@ export default function CreateListingPage() {
                     <div className="space-y-2"><Label>Unit *</Label><Select name="unit" defaultValue="kg" onValueChange={setUnit}><SelectTrigger className="bg-white h-12"><SelectValue /></SelectTrigger><SelectContent>{unitOptions.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></div>
                     <div className="space-y-2"><Label>Price per Unit *</Label><Input type="number" step="0.01" name="pricePerUnit" required className="bg-white h-12" onChange={(e) => setPrice(e.target.value)} /></div>
 
+                    <div className="space-y-2"><Label>Delivery Charge (per unit)</Label><Input type="number" step="0.01" name="deliveryCharge" defaultValue={0} className="bg-white h-12" /></div>
+                    <div className="space-y-2">
+                      <Label>Delivery Type</Label>
+                      <Select name="deliveryChargeType" defaultValue="flat">
+                        <SelectTrigger className="bg-white h-12"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="per_unit">Per Unit</SelectItem>
+                          <SelectItem value="flat">Flat (once per listing)</SelectItem>
+                        </SelectContent>
+                      <p className="text-xs text-gray-500 mt-1">Choose how delivery is applied: per unit multiplies by quantity; flat applies once per listing.</p>
+                      </Select>
+                    </div>
+
                     <div className="space-y-2"><Label>Min Order Qty</Label><Input type="number" step="0.01" name="minOrderQuantity" className="bg-white h-12" /></div>
                     <div className="space-y-2 md:col-span-2"><Label>Harvest Date (Optional)</Label><Input type="date" name="harvestDate" className="bg-white h-12" /></div>
                   </div>

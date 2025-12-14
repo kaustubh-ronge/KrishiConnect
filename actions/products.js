@@ -53,6 +53,8 @@ export async function createProductListing(formData) {
   const pricePerUnit = parseFloat(formData.get("pricePerUnit")?.toString() || "0");
   const minOrderQuantity = parseFloat(formData.get("minOrderQuantity")?.toString() || "0");
   const unit = formData.get("unit")?.toString();
+  const deliveryCharge = parseFloat(formData.get("deliveryCharge")?.toString() || "0");
+  const deliveryChargeType = formData.get("deliveryChargeType")?.toString() || "per_unit";
 
   const qualityGrade = formData.get("qualityGrade")?.toString();
   const shelfLife = formData.get("shelfLife")?.toString();
@@ -72,12 +74,20 @@ export async function createProductListing(formData) {
     return { success: false, error: "Required fields missing." };
   }
 
+  // Validate delivery charge
+  if (isNaN(deliveryCharge) || deliveryCharge < 0) {
+    return { success: false, error: "Invalid delivery charge." };
+  }
+  if (!['per_unit','flat'].includes(deliveryChargeType)) {
+    return { success: false, error: "Invalid delivery type." };
+  }
+
   try {
     await db.productListing.create({
       data: {
         productName, variety, description, images,
         quantityLabel: `${availableStock} ${unit}`,
-        availableStock, unit, pricePerUnit, minOrderQuantity,
+        availableStock, unit, pricePerUnit, deliveryCharge, deliveryChargeType, minOrderQuantity,
         qualityGrade, shelfLife, harvestDate, whatsappNumber,
         shelfLifeStartDate, // <<< NEW FIELD
         isAvailable: true,
@@ -182,6 +192,8 @@ export async function updateProductListing(listingId, formData) {
     const pricePerUnit = parseFloat(formData.get("pricePerUnit")?.toString() || "0");
     const minOrderQuantity = parseFloat(formData.get("minOrderQuantity")?.toString() || "0");
     const unit = formData.get("unit")?.toString();
+    const deliveryCharge = parseFloat(formData.get("deliveryCharge")?.toString() || "0");
+    const deliveryChargeType = formData.get("deliveryChargeType")?.toString() || "per_unit";
     const qualityGrade = formData.get("qualityGrade")?.toString();
     const shelfLife = formData.get("shelfLife")?.toString();
     const whatsappNumber = formData.get("whatsappNumber")?.toString();
@@ -195,12 +207,20 @@ export async function updateProductListing(listingId, formData) {
     // Filter empty images
     const images = formData.getAll("images").filter(img => img && img.toString().trim() !== "");
 
+    // Validate delivery charge
+    if (isNaN(deliveryCharge) || deliveryCharge < 0) {
+      return { success: false, error: "Invalid delivery charge." };
+    }
+    if (!['per_unit','flat'].includes(deliveryChargeType)) {
+      return { success: false, error: "Invalid delivery type." };
+    }
+
     await db.productListing.update({
       where: { id: listingId },
       data: {
         productName, variety, description, images,
         quantityLabel: `${availableStock} ${unit}`,
-        availableStock, unit, pricePerUnit, minOrderQuantity,
+        availableStock, unit, pricePerUnit, deliveryCharge, deliveryChargeType, minOrderQuantity,
         qualityGrade, shelfLife, harvestDate, whatsappNumber,
         shelfLifeStartDate, // <<< NEW FIELD
       }
