@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { createFarmerProfile } from '@/actions/farmer-profile';
+import { createFarmerProfile, updateFarmerProfile } from '@/actions/farmer-profile';
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -37,6 +37,9 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
   useEffect(() => {
     if (!initialProfileExists) {
       setIsDialogOpen(true);
+    } else if (initialProfileExists && user?.farmerProfile) {
+      // Prefill produce selections when editing
+      setSelectedProduce(user.farmerProfile.primaryProduce || []);
     }
   }, [initialProfileExists]);
 
@@ -71,11 +74,11 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
     }
 
     startTransition(async () => {
-      const result = await createFarmerProfile(formData);
+      const result = profileExists ? await updateFarmerProfile(formData) : await createFarmerProfile(formData);
       if (result.success) {
         setIsDialogOpen(false);
         setProfileExists(true);
-        toast.success("Welcome to KrishiConnect!", { description: "Your profile is ready." });
+        toast.success(profileExists ? 'Profile updated' : "Welcome to KrishiConnect!", { description: profileExists ? undefined : "Your profile is ready." });
         router.refresh();
       } else {
         toast.error("Error", { description: result.error || "Something went wrong." });
@@ -126,9 +129,9 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
                       <User className="h-5 w-5 text-green-600" /> Personal Information
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2"><Label htmlFor="name">Full Name *</Label><Input id="name" name="name" required defaultValue={user.name || ""} /></div>
-                      <div className="space-y-2"><Label htmlFor="phone">Phone *</Label><Input id="phone" name="phone" required /></div>
-                      <div className="space-y-2 sm:col-span-2"><Label htmlFor="aadharNumber">Aadhar</Label><Input id="aadharNumber" name="aadharNumber" placeholder="12-digit number" maxLength={12} /></div>
+                      <div className="space-y-2"><Label htmlFor="name">Full Name *</Label><Input id="name" name="name" required defaultValue={user.farmerProfile?.name || user.name || ""} /></div>
+                      <div className="space-y-2"><Label htmlFor="phone">Phone *</Label><Input id="phone" name="phone" required defaultValue={user.farmerProfile?.phone || ""} /></div>
+                      <div className="space-y-2 sm:col-span-2"><Label htmlFor="aadharNumber">Aadhar</Label><Input id="aadharNumber" name="aadharNumber" placeholder="12-digit number" maxLength={12} defaultValue={user.farmerProfile?.aadharNumber || ""} /></div>
                     </div>
                   </section>
 
@@ -138,9 +141,9 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
                       <LandPlot className="h-5 w-5 text-green-600" /> Farm Information
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2"><Label htmlFor="farmName">Farm Name</Label><Input id="farmName" name="farmName" placeholder="(Optional)" /></div>
-                      <div className="space-y-2"><Label htmlFor="farmSize">Farm Size (Acres)</Label><Input id="farmSize" name="farmSize" type="number" step="0.1" placeholder="0.0" /></div>
-                      <div className="space-y-2 sm:col-span-2"><Label htmlFor="farmingExperience">Experience (Years)</Label><Input id="farmingExperience" name="farmingExperience" type="number" placeholder="0" /></div>
+                      <div className="space-y-2"><Label htmlFor="farmName">Farm Name</Label><Input id="farmName" name="farmName" placeholder="(Optional)" defaultValue={user.farmerProfile?.farmName || ""} /></div>
+                      <div className="space-y-2"><Label htmlFor="farmSize">Farm Size (Acres)</Label><Input id="farmSize" name="farmSize" type="number" step="0.1" placeholder="0.0" defaultValue={user.farmerProfile?.farmSize ?? ""} /></div>
+                      <div className="space-y-2 sm:col-span-2"><Label htmlFor="farmingExperience">Experience (Years)</Label><Input id="farmingExperience" name="farmingExperience" type="number" placeholder="0" defaultValue={user.farmerProfile?.farmingExperience ?? ""} /></div>
                     </div>
                   </section>
 
@@ -149,7 +152,7 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
                     <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2 border-b pb-2">
                       <MapPin className="h-5 w-5 text-green-600" /> Location
                     </h3>
-                    <div className="space-y-2"><Label htmlFor="address">Full Address *</Label><Textarea id="address" name="address" required className="min-h-20" placeholder="Village, Taluka, District..." /></div>
+                    <div className="space-y-2"><Label htmlFor="address">Full Address *</Label><Textarea id="address" name="address" required className="min-h-20" placeholder="Village, Taluka, District..." defaultValue={user.farmerProfile?.address || ""} /></div>
                   </section>
 
                   {/* Primary Produce - UPDATED LOGIC */}
@@ -198,19 +201,19 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="upiId">UPI ID</Label>
-                        <Input id="upiId" name="upiId" placeholder="e.g. user@oksbi" />
+                        <Input id="upiId" name="upiId" placeholder="e.g. user@oksbi" defaultValue={user.farmerProfile?.upiId || ""} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="bankName">Bank Name</Label>
-                        <Input id="bankName" name="bankName" placeholder="e.g. SBI" />
+                        <Input id="bankName" name="bankName" placeholder="e.g. SBI" defaultValue={user.farmerProfile?.bankName || ""} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="ifscCode">IFSC Code</Label>
-                        <Input id="ifscCode" name="ifscCode" />
+                        <Input id="ifscCode" name="ifscCode" defaultValue={user.farmerProfile?.ifscCode || ""} />
                       </div>
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="accountNumber">Account Number</Label>
-                        <Input id="accountNumber" name="accountNumber" type="password" />
+                        <Input id="accountNumber" name="accountNumber" type="password" defaultValue={user.farmerProfile?.accountNumber || ""} />
                       </div>
                     </div>
                   </section>
@@ -283,7 +286,7 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
             </DashboardCard>
 
             <DashboardCard icon={Settings} title="Settings" description="Update profile, bank details, and preferences." color="gray">
-              <Button variant="ghost" disabled className="w-full text-gray-400 bg-gray-50">Coming Soon</Button>
+              <Button variant="ghost" onClick={() => router.push('/farmer-dashboard/edit')} className="w-full">Edit Profile</Button>
             </DashboardCard>
           </div>
         </motion.div>

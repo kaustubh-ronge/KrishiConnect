@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox
-import { createAgentProfile } from '@/actions/agent-profile';
+import { createAgentProfile, updateAgentProfile } from '@/actions/agent-profile';
 import { motion, AnimatePresence } from "framer-motion"; // Added AnimatePresence
 import {
   Store, User, Phone, Briefcase, CheckCircle2, MapPin,
@@ -40,6 +40,10 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
 
   useEffect(() => {
     if (!initialProfileExists) setIsDialogOpen(true);
+    // If profile exists, prefill selected types
+    if (initialProfileExists && user?.agentProfile?.agentType) {
+      setSelectedTypes(user.agentProfile.agentType || []);
+    }
   }, [initialProfileExists]);
 
   const handleProfileSubmit = async (formData) => {
@@ -67,11 +71,11 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
     }
 
     startTransition(async () => {
-      const result = await createAgentProfile(formData);
+      const result = profileExists ? await updateAgentProfile(formData) : await createAgentProfile(formData);
       if (result.success) {
         setIsDialogOpen(false);
         setProfileExists(true);
-        toast.success("Agent Profile Setup Complete!");
+        toast.success(profileExists ? "Profile updated" : "Agent Profile Setup Complete!");
         router.refresh();
       } else {
         toast.error("Setup Failed", { description: result.error });
@@ -113,10 +117,10 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
                 <section className="space-y-4">
                   <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 flex gap-2"><User className="h-5 w-5 text-blue-600" /> Business Information</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Full Name *</Label><Input name="name" required defaultValue={user.name || ""} /></div>
-                    <div className="space-y-2"><Label>Company Name</Label><Input name="companyName" placeholder="e.g. Fresh Traders" /></div>
-                    <div className="space-y-2"><Label>Phone *</Label><Input name="phone" required placeholder="Contact Number" /></div>
-                    <div className="space-y-2"><Label>Operating Region *</Label><Input name="region" required placeholder="e.g. Solapur, Pune" /></div>
+                    <div className="space-y-2"><Label>Full Name *</Label><Input name="name" required defaultValue={user.agentProfile?.name || user.name || ""} /></div>
+                    <div className="space-y-2"><Label>Company Name</Label><Input name="companyName" placeholder="e.g. Fresh Traders" defaultValue={user.agentProfile?.companyName || ""} /></div>
+                    <div className="space-y-2"><Label>Phone *</Label><Input name="phone" required placeholder="Contact Number" defaultValue={user.agentProfile?.phone || ""} /></div>
+                    <div className="space-y-2"><Label>Operating Region *</Label><Input name="region" required placeholder="e.g. Solapur, Pune" defaultValue={user.agentProfile?.region || ""} /></div>
                   </div>
                 </section>
 
@@ -162,10 +166,10 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
                 <section className="space-y-4">
                   <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 flex gap-2"><span className="text-blue-600 font-bold">₹</span> Payment Details (For Selling)</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2 sm:col-span-2"><Label>UPI ID</Label><Input name="upiId" placeholder="user@bank" /></div>
-                    <div className="space-y-2"><Label>Bank Name</Label><Input name="bankName" placeholder="Bank Name" /></div>
-                    <div className="space-y-2"><Label>IFSC Code</Label><Input name="ifscCode" placeholder="IFSC" /></div>
-                    <div className="space-y-2 sm:col-span-2"><Label>Account Number</Label><Input name="accountNumber" type="password" placeholder="Account Number" /></div>
+                    <div className="space-y-2 sm:col-span-2"><Label>UPI ID</Label><Input name="upiId" placeholder="user@bank" defaultValue={user.agentProfile?.upiId || ""} /></div>
+                    <div className="space-y-2"><Label>Bank Name</Label><Input name="bankName" placeholder="Bank Name" defaultValue={user.agentProfile?.bankName || ""} /></div>
+                    <div className="space-y-2"><Label>IFSC Code</Label><Input name="ifscCode" placeholder="IFSC" defaultValue={user.agentProfile?.ifscCode || ""} /></div>
+                    <div className="space-y-2 sm:col-span-2"><Label>Account Number</Label><Input name="accountNumber" type="password" placeholder="Account Number" defaultValue={user.agentProfile?.accountNumber || ""} /></div>
                   </div>
                 </section>
               </div>
@@ -254,7 +258,7 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
             {/* --- ACCOUNT SECTION --- */}
 
             <DashboardCard icon={User} title="Business Profile" description="Update company details and payment info." color="gray">
-              <Button variant="ghost" onClick={() => setIsDialogOpen(true)} className="w-full hover:bg-gray-100 border border-gray-200">Edit Profile</Button>
+              <Button variant="ghost" onClick={() => router.push('/agent-dashboard/edit')} className="w-full hover:bg-gray-100 border border-gray-200">Edit Profile</Button>
             </DashboardCard>
 
             <DashboardCard icon={Settings} title="Settings" description="Notifications and security settings." color="gray">

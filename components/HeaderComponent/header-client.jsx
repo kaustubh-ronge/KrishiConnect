@@ -318,6 +318,9 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
             <Link href="/marketplace" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
               Marketplace
             </Link>
+            <Link href="/admin" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
+              Super Admin
+            </Link>
             <Link href="/about" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
               About
             </Link>
@@ -428,6 +431,13 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
                             onClick={() => setIsMobileMenuOpen(false)}
                         >
                             Marketplace
+                        </Link>
+                        <Link 
+                            href="/admin" 
+                            className="text-lg font-medium text-gray-700 hover:text-green-600"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                            Super Admin
                         </Link>
                         <Link 
                             href="/about" 

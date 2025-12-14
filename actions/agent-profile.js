@@ -87,3 +87,49 @@ export async function createAgentProfile(formData) {
   revalidatePath('/agent-dashboard');
   return { success: true };
 }
+
+export async function updateAgentProfile(formData) {
+  let clerkUser;
+  try {
+    clerkUser = await currentUser();
+    if (!clerkUser || !clerkUser.id) throw new Error('Clerk user not found.');
+  } catch (err) {
+    return { success: false, error: 'Session invalid. Please log in.' };
+  }
+  const userId = clerkUser.id;
+
+  // Role check
+  try {
+    const dbUser = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!dbUser || dbUser.role !== 'agent') return { success: false, error: 'Unauthorized.' };
+  } catch (err) {
+    return { success: false, error: 'Failed to verify role.' };
+  }
+
+  // Extract fields
+  const name = formData.get('name')?.toString();
+  const companyName = formData.get('companyName')?.toString() || null;
+  const phone = formData.get('phone')?.toString() || null;
+  const region = formData.get('region')?.toString() || null;
+  const upiId = formData.get('upiId')?.toString() || null;
+  const bankName = formData.get('bankName')?.toString() || null;
+  const accountNumber = formData.get('accountNumber')?.toString() || null;
+  const ifscCode = formData.get('ifscCode')?.toString() || null;
+  const agentType = formData.getAll('agentType').filter(t => t.trim() !== '');
+
+  try {
+    const existing = await db.agentProfile.findUnique({ where: { userId } });
+    if (!existing) return { success: false, error: 'Profile not found.' };
+
+    await db.agentProfile.update({
+      where: { userId },
+      data: { name, companyName, phone, region, upiId, bankName, accountNumber, ifscCode, agentType }
+    });
+
+    revalidatePath('/agent-dashboard');
+    return { success: true };
+  } catch (err) {
+    console.error('updateAgentProfile Error:', err);
+    return { success: false, error: 'Failed to update profile.' };
+  }
+}

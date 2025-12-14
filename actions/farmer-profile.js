@@ -111,3 +111,56 @@ export async function createFarmerProfile(formData) {
   
   return { success: true };
 }
+
+export async function updateFarmerProfile(formData) {
+  let clerkUser;
+  try {
+    clerkUser = await currentUser();
+    if (!clerkUser || !clerkUser.id) throw new Error('User not found');
+  } catch (err) {
+    return { success: false, error: 'Session invalid. Please log in.' };
+  }
+  const userId = clerkUser.id;
+
+  try {
+    const dbUser = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!dbUser || dbUser.role !== 'farmer') return { success: false, error: 'Unauthorized.' };
+  } catch (err) {
+    return { success: false, error: 'Failed to verify role.' };
+  }
+
+  // Extract fields
+  const name = formData.get('name')?.toString();
+  const phone = formData.get('phone')?.toString() || null;
+  const address = formData.get('address')?.toString() || null;
+  const aadharNumber = formData.get('aadharNumber')?.toString() || null;
+  const farmName = formData.get('farmName')?.toString() || null;
+  const farmSizeRaw = formData.get('farmSize')?.toString();
+  const farmSize = farmSizeRaw ? parseFloat(farmSizeRaw) : null;
+  const farmingExperienceRaw = formData.get('farmingExperience')?.toString();
+  const farmingExperience = farmingExperienceRaw ? parseInt(farmingExperienceRaw) : null;
+  const primaryProduce = formData.getAll('primaryProduce');
+
+  // Payment details
+  const upiId = formData.get('upiId')?.toString() || null;
+  const bankName = formData.get('bankName')?.toString() || null;
+  const accountNumber = formData.get('accountNumber')?.toString() || null;
+  const ifscCode = formData.get('ifscCode')?.toString() || null;
+
+  try {
+    const existing = await db.farmerProfile.findUnique({ where: { userId } });
+    if (!existing) return { success: false, error: 'Profile not found.' };
+
+    await db.farmerProfile.update({
+      where: { userId },
+      data: { name, phone, address, aadharNumber, farmName, farmSize, farmingExperience, primaryProduce, upiId, bankName, accountNumber, ifscCode }
+    });
+
+    revalidatePath('/farmer-dashboard');
+    return { success: true };
+  } catch (err) {
+    console.error('updateFarmerProfile Error:', err);
+    if (err.code === 'P2002') return { success: false, error: 'Aadhar already registered' };
+    return { success: false, error: 'Failed to update profile.' };
+  }
+}

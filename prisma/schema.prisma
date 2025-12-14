@@ -13,6 +13,7 @@ model User {
   id    String @id @unique // Clerk User ID
   email String @unique
   role  String // "farmer", "agent", or "admin"
+  isDisabled Boolean @default(false)
 
   farmerProfile FarmerProfile?
   agentProfile  AgentProfile?
@@ -196,6 +197,11 @@ model Order {
   razorpayOrderId String?
   
   orderStatus     String      @default("PROCESSING")
+
+  // Payout tracking (super admin manually settles payouts to sellers)
+  payoutStatus    String      @default("PENDING")
+  payoutSettledAt DateTime?
+  payoutSettledBy String?
   
   items           OrderItem[]
 
