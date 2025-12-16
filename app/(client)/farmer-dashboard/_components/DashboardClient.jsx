@@ -112,7 +112,7 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
               </Button>
             </DialogTrigger>
 
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogContent className="sm:max-w-150 max-h-[90vh] overflow-hidden flex flex-col">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                   <User className="h-6 w-6 text-green-600" /> Farmer Profile Details
