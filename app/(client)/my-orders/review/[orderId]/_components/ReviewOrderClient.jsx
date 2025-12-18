@@ -1,209 +1,111 @@
+
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Star, StarOff, CheckCircle2, ArrowLeft } from "lucide-react";
-import { motion } from "framer-motion";
-import { createReview } from "@/actions/reviews";
-import { toast } from "sonner";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { createReview } from "@/actions/reviews"; // Make sure this path matches
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Star } from "lucide-react";
+import { toast } from "sonner";
+import Image from "next/image";
 
-export default function ReviewOrderClient({ order }) {
+export default function ReviewFormClient({ orderId, product, userId }) {
   const router = useRouter();
-  const [reviews, setReviews] = useState({});
-  const [submitting, setSubmitting] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
 
-  const handleRatingChange = (productId, rating) => {
-    setReviews(prev => ({
-      ...prev,
-      [productId]: {
-        ...prev[productId],
-        rating
-      }
-    }));
-  };
-
-  const handleCommentChange = (productId, comment) => {
-    setReviews(prev => ({
-      ...prev,
-      [productId]: {
-        ...prev[productId],
-        comment
-      }
-    }));
-  };
-
-  const handleSubmitReview = async (productId) => {
-    const review = reviews[productId];
-    
-    if (!review || !review.rating) {
-      toast.error("Please select a rating");
+  const handleSubmit = async (formData) => {
+    if (rating === 0) {
+      toast.error("Please select a star rating.");
       return;
     }
 
-    setSubmitting(true);
-    
-    const formData = new FormData();
-    formData.append('orderId', order.id);
-    formData.append('productId', productId);
-    formData.append('rating', review.rating);
-    if (review.comment) {
-      formData.append('comment', review.comment);
-    }
+    // Append manual data
+    formData.append("rating", rating);
+    formData.append("orderId", orderId);
+    formData.append("productId", product.id);
 
-    const res = await createReview(formData);
-    
-    if (res.success) {
-      toast.success(res.message);
-      // Mark as submitted
-      setReviews(prev => ({
-        ...prev,
-        [productId]: {
-          ...prev[productId],
-          submitted: true
-        }
-      }));
-    } else {
-      toast.error(res.error);
-    }
-    
-    setSubmitting(false);
+    startTransition(async () => {
+      const res = await createReview(formData);
+      if (res.success) {
+        toast.success("Review Submitted! Thank you.");
+        router.push("/my-orders");
+      } else {
+        toast.error(res.error || "Failed to submit review");
+      }
+    });
   };
 
-  const allReviewsSubmitted = order.items.every(item => reviews[item.productId]?.submitted);
-
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="container mx-auto max-w-4xl">
-        <Link href="/my-orders">
-          <Button variant="ghost" className="mb-6">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Orders
-          </Button>
-        </Link>
+    <Card className="w-full max-w-lg shadow-xl border-green-100">
+      <CardHeader className="text-center pb-2">
+        <CardTitle className="text-2xl font-bold text-gray-900">Write a Review</CardTitle>
+        <p className="text-gray-500 text-sm">How was your experience with this product?</p>
+      </CardHeader>
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Write Reviews</h1>
-          <p className="text-gray-600">
-            Share your experience with the products from Order #{order.id.slice(-8).toUpperCase()}
-          </p>
-        </div>
+      <form action={handleSubmit}>
+        <CardContent className="space-y-6">
 
-        {allReviewsSubmitted ? (
-          <Card className="text-center py-16">
-            <CardContent>
-              <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h2>
-              <p className="text-gray-600 mb-6">All reviews have been submitted successfully.</p>
-              <Button onClick={() => router.push('/my-orders')} className="bg-green-600 hover:bg-green-700">
-                Back to Orders
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-6">
-            {order.items.map((item, index) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-3">
-                      <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                        {item.product.images[0] ? (
-                          <img 
-                            src={item.product.images[0]} 
-                            alt={item.product.productName}
-                            className="h-full w-full object-cover rounded-lg"
-                          />
-                        ) : (
-                          <span className="text-2xl">📦</span>
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold">{item.product.productName}</h3>
-                        <p className="text-sm text-gray-500 font-normal">
-                          Seller: {item.sellerName || (item.product.sellerType === 'farmer' 
-                            ? item.product.farmer?.name 
-                            : item.product.agent?.companyName)}
-                        </p>
-                      </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {reviews[item.productId]?.submitted ? (
-                      <div className="text-center py-8 bg-green-50 rounded-lg">
-                        <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-3" />
-                        <p className="text-green-700 font-medium">Review submitted!</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {/* Rating */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-900 mb-3">
-                            Rate this product *
-                          </label>
-                          <div className="flex gap-2">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <button
-                                key={star}
-                                type="button"
-                                onClick={() => handleRatingChange(item.productId, star)}
-                                className="transition-transform hover:scale-110 active:scale-95"
-                              >
-                                {reviews[item.productId]?.rating >= star ? (
-                                  <Star className="h-10 w-10 fill-yellow-400 text-yellow-400" />
-                                ) : (
-                                  <StarOff className="h-10 w-10 text-gray-300" />
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                          {reviews[item.productId]?.rating && (
-                            <p className="text-sm text-gray-600 mt-2">
-                              {reviews[item.productId].rating} out of 5 stars
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Comment */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-900 mb-2">
-                            Write your review (optional)
-                          </label>
-                          <Textarea
-                            placeholder="Tell us about your experience with this product..."
-                            rows={4}
-                            value={reviews[item.productId]?.comment || ""}
-                            onChange={(e) => handleCommentChange(item.productId, e.target.value)}
-                            className="resize-none"
-                          />
-                        </div>
-
-                        {/* Submit Button */}
-                        <Button
-                          onClick={() => handleSubmitReview(item.productId)}
-                          disabled={!reviews[item.productId]?.rating || submitting}
-                          className="w-full bg-green-600 hover:bg-green-700"
-                        >
-                          {submitting ? 'Submitting...' : 'Submit Review'}
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+          {/* Product Preview */}
+          <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+            <div className="relative w-16 h-16 bg-white rounded-md overflow-hidden border border-gray-200 shrink-0">
+              {product.images?.[0] ? (
+                <Image src={product.images[0]} alt="Product" fill className="object-cover" />
+              ) : <div className="w-full h-full bg-gray-200" />}
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 line-clamp-1">{product.productName}</h4>
+              <p className="text-xs text-gray-500">Unit Price: ₹{product.pricePerUnit}</p>
+            </div>
           </div>
-        )}
-      </div>
-    </div>
+
+          {/* Star Rating */}
+          <div className="flex flex-col items-center gap-2">
+            <label className="text-sm font-semibold text-gray-700">Overall Rating</label>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  onClick={() => setRating(star)}
+                  className="p-1 transition-transform hover:scale-110 focus:outline-none"
+                >
+                  <Star
+                    className={`h-8 w-8 ${star <= (hoverRating || rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
+                  />
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-green-600 font-medium h-4">
+              {rating === 5 ? "Excellent!" : rating === 4 ? "Good" : rating === 3 ? "Average" : rating > 0 ? "Poor" : ""}
+            </p>
+          </div>
+
+          {/* Comment */}
+          <div className="space-y-2">
+            <label htmlFor="comment" className="text-sm font-semibold text-gray-700">Your Review</label>
+            <Textarea
+              id="comment"
+              name="comment"
+              placeholder="What did you like or dislike about the produce quality or delivery?"
+              className="min-h-[100px] resize-y"
+            />
+          </div>
+
+        </CardContent>
+
+        <CardFooter className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="ghost" onClick={() => router.back()}>Cancel</Button>
+          <Button type="submit" disabled={isPending} className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]">
+            {isPending ? "Submitting..." : "Submit Review"}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
   );
 }
-
