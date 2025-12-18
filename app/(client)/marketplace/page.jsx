@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/prisma";
 import { getMarketplaceListings } from "@/actions/products";
+import { getRecentlyViewedProducts } from "@/actions/products-enhanced";
 import MarketplaceClient from "./_components/MarketPlaceClient";
 
 export const dynamic = 'force-dynamic'; // Ensure fresh data
@@ -23,10 +24,15 @@ export default async function MarketplacePage() {
 
   // 3. Fetch Data
   const { data: listings, success } = await getMarketplaceListings();
+  const { data: recentlyViewed } = await getRecentlyViewedProducts();
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-      <MarketplaceClient initialListings={success ? listings : []} userRole={dbUser.role} />
+      <MarketplaceClient 
+        initialListings={success ? listings : []} 
+        userRole={dbUser.role}
+        recentlyViewed={recentlyViewed || []}
+      />
     </div>
   );
 }

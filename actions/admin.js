@@ -30,13 +30,19 @@ export async function getAdminStats() {
       .filter(o => o.payoutStatus === "SETTLED")
       .reduce((s, o) => s + (o.sellerAmount || 0), 0);
 
+    // Count open disputes
+    const openDisputes = await db.order.count({
+      where: { disputeStatus: 'OPEN' }
+    });
+
     return {
       success: true,
       data: {
         totalGMV,
         totalPlatformRevenue,
         pendingPayouts,
-        settledPayouts
+        settledPayouts,
+        openDisputes
       }
     };
   } catch (err) {

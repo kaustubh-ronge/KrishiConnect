@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { motion } from "framer-motion";
 import InquiryModal from "../../_components/InquiryModal";
 import { useCartStore } from "@/store/useCartStore";
 import { toast } from "sonner";
+import { trackProductView } from "@/actions/products-enhanced";
 
 export default function ProductDetailClient({ product }) {
   const router = useRouter();
@@ -23,6 +24,11 @@ export default function ProductDetailClient({ product }) {
   const [isAdding, setIsAdding] = useState(false);
   
   const { addItem } = useCartStore();
+
+  // Track product view
+  useEffect(() => {
+    trackProductView(product.id);
+  }, [product.id]);
 
   const isFarmer = product.sellerType === 'farmer';
   const seller = isFarmer ? product.farmer : product.agent;

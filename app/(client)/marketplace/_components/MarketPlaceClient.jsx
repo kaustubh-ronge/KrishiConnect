@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, X, Sprout, Briefcase, ArrowUpDown } from "lucide-react";
+import { Search, Filter, X, Sprout, Briefcase, ArrowUpDown, MapPin } from "lucide-react";
 import ProductCard from "./ProductCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export default function MarketplaceClient({ initialListings, userRole }) {
+export default function MarketplaceClient({ initialListings, userRole, recentlyViewed }) {
   const [searchQuery, setSearchQuery] = useState("");
 
   // --- Filter States ---
@@ -21,6 +21,10 @@ export default function MarketplaceClient({ initialListings, userRole }) {
   const [priceRange, setPriceRange] = useState({ min: "", max: "" });
   const [showOutOfStock, setShowOutOfStock] = useState(false);
   const [sortBy, setSortBy] = useState("newest");
+  
+  // Enhanced filters
+  const [locationFilter, setLocationFilter] = useState("");
+  const [freshnessFilter, setFreshnessFilter] = useState("all"); // all, week, month
 
   // --- 1. Dynamic Categories ---
   // Automatically extract unique product names from the listings
@@ -52,11 +56,37 @@ export default function MarketplaceClient({ initialListings, userRole }) {
     // Availability
     const matchesStock = showOutOfStock ? true : item.availableStock > 0;
 
-    return matchesSearch && matchesCategory && matchesTab && matchesPrice && matchesStock;
+    // Location Filter
+    const sellerLocation = item.sellerType === 'farmer' 
+      ? (item.farmer?.region || item.farmer?.district || '').toLowerCase()
+      : (item.agent?.region || item.agent?.district || '').toLowerCase();
+    const matchesLocation = !locationFilter || sellerLocation.includes(locationFilter.toLowerCase());
+
+    // Freshness Filter
+    let matchesFreshness = true;
+    if (freshnessFilter !== 'all' && item.harvestDate) {
+      const harvestDate = new Date(item.harvestDate);
+      const now = new Date();
+      const daysDiff = (now - harvestDate) / (1000 * 60 * 60 * 24);
+      
+      if (freshnessFilter === 'week') {
+        matchesFreshness = daysDiff <= 7;
+      } else if (freshnessFilter === 'month') {
+        matchesFreshness = daysDiff <= 30;
+      }
+    }
+
+    return matchesSearch && matchesCategory && matchesTab && matchesPrice && matchesStock && matchesLocation && matchesFreshness;
   }).sort((a, b) => {
     // Sorting Logic
     if (sortBy === "price_low") return a.pricePerUnit - b.pricePerUnit;
     if (sortBy === "price_high") return b.pricePerUnit - a.pricePerUnit;
+    if (sortBy === "rating") return (b.averageRating || 0) - (a.averageRating || 0);
+    if (sortBy === "harvest") {
+      if (!a.harvestDate) return 1;
+      if (!b.harvestDate) return -1;
+      return new Date(b.harvestDate) - new Date(a.harvestDate);
+    }
     if (sortBy === "newest") return new Date(b.createdAt) - new Date(a.createdAt);
     return 0;
   });
@@ -67,6 +97,8 @@ export default function MarketplaceClient({ initialListings, userRole }) {
     setSelectedCategory("All");
     setPriceRange({ min: "", max: "" });
     setSortBy("newest");
+    setLocationFilter("");
+    setFreshnessFilter("all");
   };
 
   return (
@@ -92,6 +124,8 @@ export default function MarketplaceClient({ initialListings, userRole }) {
                 <SelectItem value="newest">Newest First</SelectItem>
                 <SelectItem value="price_low">Price: Low to High</SelectItem>
                 <SelectItem value="price_high">Price: High to Low</SelectItem>
+                <SelectItem value="rating">Highest Rated</SelectItem>
+                <SelectItem value="harvest">Freshest Harvest</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -118,6 +152,8 @@ export default function MarketplaceClient({ initialListings, userRole }) {
                   selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory}
                   priceRange={priceRange} setPriceRange={setPriceRange}
                   showOutOfStock={showOutOfStock} setShowOutOfStock={setShowOutOfStock}
+                  locationFilter={locationFilter} setLocationFilter={setLocationFilter}
+                  freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter}
                 />
               </SheetContent>
             </Sheet>
@@ -154,12 +190,27 @@ export default function MarketplaceClient({ initialListings, userRole }) {
               selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory}
               priceRange={priceRange} setPriceRange={setPriceRange}
               showOutOfStock={showOutOfStock} setShowOutOfStock={setShowOutOfStock}
+              locationFilter={locationFilter} setLocationFilter={setLocationFilter}
+              freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter}
             />
           </div>
         </div>
 
         {/* --- RIGHT: Product Grid --- */}
         <div className="flex-grow">
+          {/* Recently Viewed Section */}
+          {recentlyViewed && recentlyViewed.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Recently Viewed</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {recentlyViewed.slice(0, 3).map((product) => (
+                  <ProductCard key={product.id} product={product} index={0} />
+                ))}
+              </div>
+              <div className="border-t mt-6 pt-6"></div>
+            </div>
+          )}
+
           {filteredListings.length > 0 ? (
             <>
               <p className="text-sm text-gray-500 mb-4">Showing {filteredListings.length} results</p>
@@ -189,9 +240,44 @@ export default function MarketplaceClient({ initialListings, userRole }) {
 }
 
 // --- Filter Component (Reusable) ---
-function FilterSidebar({ categories, selectedCategory, setSelectedCategory, priceRange, setPriceRange, showOutOfStock, setShowOutOfStock }) {
+function FilterSidebar({ categories, selectedCategory, setSelectedCategory, priceRange, setPriceRange, showOutOfStock, setShowOutOfStock, locationFilter, setLocationFilter, freshnessFilter, setFreshnessFilter }) {
   return (
     <div className="space-y-8">
+
+      {/* Location Filter */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+          <MapPin className="h-4 w-4" /> Location
+        </h4>
+        <Input
+          type="text"
+          placeholder="Search by region/district"
+          className="h-9"
+          value={locationFilter}
+          onChange={(e) => setLocationFilter(e.target.value)}
+        />
+        <p className="text-xs text-gray-500">Find farmers/agents near you</p>
+      </div>
+
+      {/* Freshness Filter */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Freshness</h4>
+        <div className="space-y-2">
+          {[
+            { value: 'all', label: 'All Products' },
+            { value: 'week', label: 'Harvested this week' },
+            { value: 'month', label: 'Harvested this month' }
+          ].map(option => (
+            <button
+              key={option.value}
+              onClick={() => setFreshnessFilter(option.value)}
+              className={`block text-sm w-full text-left px-3 py-2 rounded-md transition-all ${freshnessFilter === option.value ? "bg-green-50 text-green-700 font-medium border-l-4 border-green-600 shadow-sm" : "text-gray-600 hover:bg-gray-50"}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Availability */}
       <div className="space-y-3">

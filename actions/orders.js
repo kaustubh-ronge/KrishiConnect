@@ -63,12 +63,22 @@ export async function getBuyerOrders() {
     const orders = await db.order.findMany({
       where: { buyerId: user.id },
       include: {
+        buyerUser: {
+          include: {
+            farmerProfile: {
+              select: { name: true, phone: true, address: true }
+            },
+            agentProfile: {
+              select: { name: true, phone: true, companyName: true }
+            }
+          }
+        },
         items: {
           include: {
             product: {
               include: {
-                 farmer: { select: { name: true, phone: true } },
-                 agent: { select: { name: true, phone: true } }
+                 farmer: { select: { name: true, phone: true, address: true } },
+                 agent: { select: { name: true, phone: true, companyName: true } }
               }
             }
           }
@@ -134,8 +144,35 @@ export async function initiateCheckout() {
         }
       });
 
-      // Create items
+      // Create items with seller info
       for (const it of cart.items) {
+        // Fetch seller details
+        let sellerId = null;
+        let sellerType = null;
+        let sellerName = null;
+
+        if (it.product.sellerType === 'farmer' && it.product.farmerId) {
+          const farmer = await tx.farmerProfile.findUnique({
+            where: { id: it.product.farmerId },
+            select: { id: true, name: true }
+          });
+          if (farmer) {
+            sellerId = farmer.id;
+            sellerType = 'farmer';
+            sellerName = farmer.name;
+          }
+        } else if (it.product.sellerType === 'agent' && it.product.agentId) {
+          const agent = await tx.agentProfile.findUnique({
+            where: { id: it.product.agentId },
+            select: { id: true, name: true, companyName: true }
+          });
+          if (agent) {
+            sellerId = agent.id;
+            sellerType = 'agent';
+            sellerName = agent.companyName || agent.name;
+          }
+        }
+
         await tx.orderItem.create({
           data: {
             orderId: newOrder.id,
@@ -143,7 +180,10 @@ export async function initiateCheckout() {
             quantity: it.quantity,
             priceAtPurchase: it.product.pricePerUnit,
             deliveryChargeAtPurchase: it.product.deliveryCharge || 0,
-            deliveryChargeTypeAtPurchase: it.product.deliveryChargeType || 'per_unit'
+            deliveryChargeTypeAtPurchase: it.product.deliveryChargeType || 'per_unit',
+            sellerId,
+            sellerType,
+            sellerName
           }
         });
       }
@@ -225,13 +265,69 @@ export async function confirmOrderPayment({ orderId, razorpayPaymentId, razorpay
       }
     }
 
-    // Mark order PAID and COMPLETED
-    await db.order.update({ where: { id: orderId }, data: { paymentStatus: 'PAID', orderStatus: 'COMPLETED', razorpayOrderId } });
+    // Generate invoice number
+    const { generateInvoiceNumber } = await import('@/lib/invoice-generator');
+    const invoiceNumber = generateInvoiceNumber(orderId);
+
+    // Mark order PAID and PROCESSING (not completed - needs fulfillment)
+    await db.order.update({ 
+      where: { id: orderId }, 
+      data: { 
+        paymentStatus: 'PAID', 
+        orderStatus: 'PROCESSING',
+        invoiceNumber,
+        razorpayOrderId 
+      } 
+    });
 
     // Clear cart for the buyer
     const cart = await db.cart.findUnique({ where: { userId: user.id } });
     if (cart) {
       await db.cartItem.deleteMany({ where: { cartId: cart.id } });
+    }
+
+    // Send notifications to sellers
+    const { createNotification } = await import('./notifications');
+    const orderWithItems = await db.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: {
+                farmer: true,
+                agent: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Notify all unique sellers
+    const notifiedSellers = new Set();
+    for (const item of orderWithItems.items) {
+      let sellerUserId = null;
+      let dashboardUrl = '';
+
+      if (item.product.sellerType === 'farmer' && item.product.farmer) {
+        sellerUserId = item.product.farmer.userId;
+        dashboardUrl = '/farmer-dashboard/sales';
+      } else if (item.product.sellerType === 'agent' && item.product.agent) {
+        sellerUserId = item.product.agent.userId;
+        dashboardUrl = '/agent-dashboard/sales';
+      }
+
+      if (sellerUserId && !notifiedSellers.has(sellerUserId)) {
+        notifiedSellers.add(sellerUserId);
+        await createNotification({
+          userId: sellerUserId,
+          type: 'ORDER_RECEIVED',
+          title: 'New Order Received!',
+          message: `You have a new order #${orderId.slice(-8)}. Please process it.`,
+          linkUrl: dashboardUrl
+        });
+      }
     }
 
     // Revalidate cart and orders pages

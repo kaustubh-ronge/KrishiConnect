@@ -17,7 +17,8 @@ import {
   ArrowRight, X, TrendingUp,
   ShoppingBag,
   Store,
-  Search
+  Search,
+  Truck
 } from "lucide-react";
 import Link from 'next/link';
 
@@ -272,6 +273,13 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
               </Button>
             </DashboardCard>
 
+            {/* Manage Orders */}
+            <DashboardCard icon={Truck} title="Manage Orders" description="Update order status and add tracking details." color="orange">
+              <Button variant="outline" onClick={() => router.push('/farmer-dashboard/manage-orders')} className="w-full border-orange-200 text-orange-700 hover:bg-orange-50">
+                Manage Orders
+              </Button>
+            </DashboardCard>
+
             {/* Sales Page */}
             <DashboardCard icon={TrendingUp} title="Sales" description="See sold items and revenue." color="purple">
               <Button variant="outline" onClick={() => router.push('/farmer-dashboard/sales')} className="w-full border-purple-200 text-purple-700 hover:bg-purple-50">
@@ -302,6 +310,7 @@ function DashboardCard({ icon: Icon, title, description, children, color = "gree
     blue: "bg-blue-100 text-blue-600",
     purple: "bg-purple-100 text-purple-600",
     yellow: "bg-yellow-100 text-yellow-600",
+    orange: "bg-orange-100 text-orange-600",
     gray: "bg-gray-100 text-gray-600",
   };
 

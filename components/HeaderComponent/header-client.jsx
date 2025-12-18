@@ -24,7 +24,8 @@ import {
   DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { useCartStore } from "@/store/useCartStore"; 
+import { useCartStore } from "@/store/useCartStore";
+import NotificationCenter from "@/components/NotificationCenter"; 
 
 const supportedLanguages = [
   { name: "English", code: "en" },
@@ -135,16 +136,19 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Desktop Cart */}
+            {/* Desktop Notifications & Cart */}
             {isLoggedIn && (
-               <Link href="/cart" className="relative p-2 text-gray-600 hover:text-green-600 transition-colors group">
+              <>
+                <NotificationCenter />
+                <Link href="/cart" className="relative p-2 text-gray-600 hover:text-green-600 transition-colors group">
                   <ShoppingCart className="h-6 w-6 group-hover:scale-105 transition-transform" />
                   {cartCount > 0 && (
                     <span className="absolute top-0 right-0 bg-red-600 text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                        {cartCount}
                     </span>
                   )}
-               </Link>
+                </Link>
+              </>
             )}
 
             {/* Desktop Auth */}
@@ -173,16 +177,19 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
           {/* --- RIGHT: MOBILE CONTROLS --- */}
           <div className="md:hidden flex items-center gap-2">
             
-            {/* 1. Mobile Cart */}
+            {/* 1. Mobile Notifications & Cart */}
             {isLoggedIn && (
-               <Link href="/cart" className="relative p-2 text-gray-700 hover:text-green-600 active:scale-95 transition-transform">
+              <>
+                <NotificationCenter />
+                <Link href="/cart" className="relative p-2 text-gray-700 hover:text-green-600 active:scale-95 transition-transform">
                   <ShoppingCart className="h-6 w-6" />
                   {cartCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-white">
                        {cartCount}
                     </span>
                   )}
-               </Link>
+                </Link>
+              </>
             )}
 
             {/* 2. User Avatar (Outside Sheet) */}

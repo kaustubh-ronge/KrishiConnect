@@ -11,7 +11,7 @@ import { createAgentProfile, updateAgentProfile } from '@/actions/agent-profile'
 import { motion, AnimatePresence } from "framer-motion"; // Added AnimatePresence
 import {
   Store, User, Phone, Briefcase, CheckCircle2, MapPin,
-  ShoppingBag, Search, TrendingUp, ArrowRight, Plus, Package, Settings
+  ShoppingBag, Search, TrendingUp, ArrowRight, Plus, Package, Settings, Truck
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from 'next/link';
@@ -229,6 +229,13 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
               </Link>
             </DashboardCard>
 
+            {/* Card: Manage Orders */}
+            <DashboardCard icon={Truck} title="Manage Orders" description="Update order status and add tracking details." color="orange">
+              <Button variant="outline" onClick={() => router.push('/agent-dashboard/manage-orders')} className="w-full border-orange-200 text-orange-700 hover:bg-orange-50">
+                Manage Orders
+              </Button>
+            </DashboardCard>
+
             {/* Card: Sales */}
             <DashboardCard icon={TrendingUp} title="Sales" description="View your sold products and earnings." color="purple">
               <Button variant="outline" onClick={() => router.push('/agent-dashboard/sales')} className="w-full border-purple-200 text-purple-700 hover:bg-purple-50">
@@ -280,6 +287,7 @@ function DashboardCard({ icon: Icon, title, description, children, color }) {
     purple: "bg-purple-100 text-purple-600",
     indigo: "bg-indigo-100 text-indigo-600",
     emerald: "bg-emerald-100 text-emerald-600",
+    orange: "bg-orange-100 text-orange-600",
     gray: "bg-gray-100 text-gray-600",
   };
   return (

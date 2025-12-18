@@ -14,6 +14,7 @@ model User {
   email String @unique
   role  String // "farmer", "agent", or "admin"
   isDisabled Boolean @default(false)
+  name  String?
 
   farmerProfile FarmerProfile?
   agentProfile  AgentProfile?
@@ -24,6 +25,15 @@ model User {
   // Shopping (New)
   cart          Cart?
   wishlist      Wishlist[]
+  
+  // Reviews written by this user
+  reviews       Review[]
+  
+  // Notifications
+  notifications Notification[]
+  
+  // Recently viewed products (stored as IDs)
+  recentlyViewedProducts String[] @default([])
 
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
@@ -43,6 +53,12 @@ model FarmerProfile {
   phone             String?
   address           String?
   
+  // Enhanced location for geo-filtering
+  region            String?
+  district          String?
+  state             String?
+  pincode           String?
+  
   aadharNumber      String?   @unique
   farmSize          Float?
   primaryProduce    String[]
@@ -54,6 +70,10 @@ model FarmerProfile {
   ifscCode          String?
 
   listings          ProductListing[]
+  
+  // Reputation
+  averageRating     Float?   @default(0)
+  totalReviews      Int      @default(0)
 
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
@@ -69,7 +89,12 @@ model AgentProfile {
   name        String
   companyName String?
   phone       String?
+  
+  // Enhanced location for geo-filtering
   region      String?
+  district    String?
+  state       String?
+  pincode     String?
   
   agentType   String[] 
 
@@ -79,6 +104,10 @@ model AgentProfile {
   ifscCode          String?
 
   listings          ProductListing[]
+  
+  // Reputation
+  averageRating     Float?   @default(0)
+  totalReviews      Int      @default(0)
 
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -125,6 +154,11 @@ model ProductListing {
   // Relations for Cart/Wishlist (New)
   cartItems         CartItem[]
   wishlistItems     Wishlist[]
+  
+  // Reviews & Ratings
+  reviews           Review[]
+  averageRating     Float?   @default(0)
+  totalReviews      Int      @default(0)
 
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
@@ -196,6 +230,7 @@ model Order {
   paymentStatus   String      @default("PENDING")
   razorpayOrderId String?
   
+  // Enhanced order status: PROCESSING, PACKED, SHIPPED, IN_TRANSIT, DELIVERED, CANCELLED
   orderStatus     String      @default("PROCESSING")
 
   // Payout tracking (super admin manually settles payouts to sellers)
@@ -203,7 +238,21 @@ model Order {
   payoutSettledAt DateTime?
   payoutSettledBy String?
   
+  // Delivery/Shipping Information
+  shippingAddress String?
+  buyerPhone      String?
+  buyerName       String?
+  
+  // Dispute handling
+  disputeStatus   String?     // null, OPEN, RESOLVED, REJECTED
+  disputeReason   String?
+  disputeCreatedAt DateTime?
+  disputeResolvedAt DateTime?
+  
   items           OrderItem[]
+  tracking        OrderTracking[]
+  reviews         Review[]
+  invoiceNumber   String?     @unique
 
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
@@ -214,7 +263,7 @@ model Order {
 model OrderItem {
   id              String         @id @default(cuid())
   orderId         String
-  order           Order          @relation(fields: [orderId], references: [id])
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
   
   productId       String
   product         ProductListing @relation(fields: [productId], references: [id])
@@ -224,7 +273,91 @@ model OrderItem {
   // Delivery charge recorded at time of purchase (per unit)
   deliveryChargeAtPurchase Float @default(0)
   // Store delivery charge type at purchase time
-  deliveryChargeTypeAtPurchase String? 
+  deliveryChargeTypeAtPurchase String?
+  
+  // Seller information (denormalized for easier access)
+  sellerId        String?
+  sellerType      String?        // 'farmer' or 'agent'
+  sellerName      String?
 
   @@map("order_items")
+}
+
+// --- ORDER TRACKING & LOGISTICS ---
+
+model OrderTracking {
+  id              String   @id @default(cuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  status          String   // PROCESSING, PACKED, SHIPPED, IN_TRANSIT, DELIVERED
+  notes           String?
+  
+  // Logistics Details
+  transportProvider String?
+  vehicleNumber     String?
+  driverName        String?
+  driverPhone       String?
+  estimatedDelivery DateTime?
+  
+  // Location tracking
+  currentLocation   String?
+  
+  updatedBy       String?  // User ID who made the update
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("order_tracking")
+}
+
+// --- REVIEWS & RATINGS ---
+
+model Review {
+  id              String   @id @default(cuid())
+  
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId       String
+  product         ProductListing @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  rating          Int      // 1-5 stars
+  comment         String?
+  
+  // Only allow review after delivery
+  isVerifiedPurchase Boolean @default(true)
+  
+  // Moderation
+  isHidden        Boolean  @default(false)
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  @@unique([orderId, productId, userId]) // One review per user per product per order
+  @@map("reviews")
+}
+
+// --- NOTIFICATION SYSTEM ---
+
+model Notification {
+  id          String   @id @default(cuid())
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type        String   // ORDER_RECEIVED, ORDER_SHIPPED, ORDER_DELIVERED, PAYOUT_PROCESSED, REVIEW_RECEIVED, etc.
+  title       String
+  message     String
+  
+  // Optional link to relevant resource
+  linkUrl     String?
+  
+  isRead      Boolean  @default(false)
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+  @@index([userId, isRead])
 }
