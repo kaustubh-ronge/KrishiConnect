@@ -34,7 +34,7 @@ export default async function MyOrdersPage() {
 
   return (
     // Beautiful Gradient Background
-    <div className="min-h-screen bg-linear-to-br from-green-100 via-green-50 to-emerald-100">
+    <div className="min-h-screen bg-linear-to-br from-green-50 via-white to-emerald-100">
       <EnhancedOrdersClient initialOrders={success ? orders : []} />
     </div>
   );
