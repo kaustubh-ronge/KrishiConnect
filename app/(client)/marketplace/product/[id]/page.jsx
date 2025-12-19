@@ -1,5 +1,5 @@
 import { getProductDetail } from "@/actions/products";
-import ProductDetailClient from "./ProductDetailClient";
+import ProductDetailClient from "./_components/ProductDetailClient";
 import { redirect } from "next/navigation";
 
 export default async function ProductPage({ params }) {

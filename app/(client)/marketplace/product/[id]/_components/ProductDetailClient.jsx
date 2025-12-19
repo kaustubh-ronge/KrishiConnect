@@ -9,7 +9,7 @@ import { ArrowLeft, MapPin, Scale, Info, MessageCircle, ShieldCheck, Truck, User
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import InquiryModal from "../../_components/InquiryModal";
+import InquiryModal from "../../../_components/InquiryModal";
 import { useCartStore } from "@/store/useCartStore";
 import { toast } from "sonner";
 import { trackProductView } from "@/actions/products-enhanced";
