@@ -1,7 +1,7 @@
 import { getUserWithProfileStatus } from '@/lib/getUserWithProfileStatus';
-import AgentEditForm from './_components/AgentEditFormgentEditForm'; // Ensure this path is correct
 import { redirect } from 'next/navigation';
 import { currentUser } from "@clerk/nextjs/server";
+import AgentEditForm from './_components/AgentEditForm';
 
 export default async function AgentEditPage() {
   const user = await currentUser();
@@ -14,7 +14,7 @@ export default async function AgentEditPage() {
     redirect('/sign-in');
   }
 
-  // If they somehow got here without a profile, redirect to dashboard to trigger the setup modal
+  
   if (!profileExists) {
     redirect('/agent-dashboard');
   }
