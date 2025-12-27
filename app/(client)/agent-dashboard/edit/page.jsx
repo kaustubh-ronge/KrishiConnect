@@ -1,5 +1,5 @@
 import { getUserWithProfileStatus } from '@/lib/getUserWithProfileStatus';
-import AgentEditForm from './_components/AgentEditForm'; // Ensure this path is correct
+import AgentEditForm from './_components/AgentEditFormgentEditForm'; // Ensure this path is correct
 import { redirect } from 'next/navigation';
 import { currentUser } from "@clerk/nextjs/server";
 

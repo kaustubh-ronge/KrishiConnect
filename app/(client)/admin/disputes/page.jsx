@@ -1,7 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import DisputesClient from "./_components/DisputesClient";
-import { getAllDisputes } from "@/actions/disputes";
 
 export default async function AdminDisputesPage() {
   const user = await currentUser();
