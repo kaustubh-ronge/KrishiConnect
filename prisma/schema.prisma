@@ -112,6 +112,7 @@ model FarmerProfile {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([lat, lng])
   @@map("farmer_profiles")
 }
 
@@ -159,6 +160,7 @@ model AgentProfile {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([lat, lng])
   @@map("agent_profiles")
 }
 
@@ -248,6 +250,7 @@ model CartItem {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([cartId, productId]) // Prevent duplicate items in same cart
+  @@index([cartId])
   @@map("cart_items")
 }
 
@@ -361,6 +364,8 @@ model OrderItem {
   payoutSettledAt DateTime?
   payoutSettledBy String?
 
+  @@index([orderId])
+  @@index([productId])
   @@map("order_items")
 }
 
@@ -387,6 +392,7 @@ model OrderTracking {
   updatedBy String? // User ID who made the update
   createdAt DateTime @default(now()) @map("created_at")
 
+  @@index([orderId])
   @@map("order_tracking")
 }
 
@@ -507,6 +513,8 @@ model DeliveryJob {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([orderId, deliveryBoyId])
+  @@index([orderId])
+  @@index([deliveryBoyId])
   @@map("delivery_jobs")
 }
 

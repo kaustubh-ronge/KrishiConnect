@@ -1,7 +1,7 @@
 "use server";
 
 import { currentUser } from "@clerk/nextjs/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, unstable_cache } from "next/cache";
 import { db } from "@/lib/prisma";
 import { sanitizeContent } from "@/lib/utils";
 
@@ -302,62 +302,129 @@ export async function deleteListing(listingId) {
 /**
  * 6. GET MARKETPLACE LISTINGS (Public Feed for Agents/Farmers)
  */
-export async function getMarketplaceListings() {
+export async function getMarketplaceListings({ 
+  page = 1, 
+  limit = 12, 
+  search = "", 
+  category = "All", 
+  sellerType = "all",
+  sortBy = "newest",
+  region = "",
+  district = ""
+} = {}) {
   const user = await currentUser();
   
-  try {
-    let whereClause = {
-      isAvailable: true,
-      availableStock: { gt: 0 }
-    };
+  // Use a cache key that depends on the filters
+  const cacheKey = `marketplace-${page}-${limit}-${search}-${category}-${sellerType}-${sortBy}-${region}-${district}-${user?.id || 'public'}`;
+  
+  return await unstable_cache(
+    async () => {
+      try {
+        const skip = (page - 1) * limit;
+        
+        let whereClause = {
+          isAvailable: true,
+          availableStock: { gt: 0 }
+        };
 
-    if (user) {
-      const dbUser = await db.user.findUnique({
-        where: { id: user.id },
-        include: { farmerProfile: true, agentProfile: true }
-      });
+        if (search) {
+          whereClause.OR = [
+            { productName: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } }
+          ];
+        }
 
-      if (dbUser) {
-        if (dbUser.farmerProfile) {
+        if (category !== "All") {
+          whereClause.category = category;
+        }
+
+        if (sellerType !== "all") {
+          whereClause.sellerType = sellerType === 'farmers' ? 'farmer' : 'agent';
+        }
+
+        // Region/District filtering
+        if (region || district) {
+          const geoConditions = [];
+          if (region) {
+            geoConditions.push({ farmer: { region: { contains: region, mode: 'insensitive' } } });
+            geoConditions.push({ agent: { region: { contains: region, mode: 'insensitive' } } });
+          }
+          if (district) {
+            geoConditions.push({ farmer: { district: { contains: district, mode: 'insensitive' } } });
+            geoConditions.push({ agent: { district: { contains: district, mode: 'insensitive' } } });
+          }
           whereClause.AND = whereClause.AND || [];
-          whereClause.AND.push({
-            OR: [
-              { farmerId: { not: dbUser.farmerProfile.id } },
-              { farmerId: null }
-            ]
-          });
+          whereClause.AND.push({ OR: geoConditions });
         }
-        if (dbUser.agentProfile) {
-          whereClause.AND = whereClause.AND || [];
-          whereClause.AND.push({
-            OR: [
-              { agentId: { not: dbUser.agentProfile.id } },
-              { agentId: null }
-            ]
-          });
-        }
-      }
-    }
 
-    const listings = await db.productListing.findMany({
-      where: whereClause,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        farmer: {
-          select: { name: true, address: true, farmName: true, region: true, district: true }
-        },
-        agent: {
-          select: { name: true, companyName: true, region: true, district: true }
-        }
-      }
-    });
+        if (user) {
+          const dbUser = await db.user.findUnique({
+            where: { id: user.id },
+            select: { 
+              farmerProfile: { select: { id: true } }, 
+              agentProfile: { select: { id: true } } 
+            }
+          });
 
-    console.log(`Found ${listings.length} listings. Farmers: ${listings.filter(l => l.sellerType === 'farmer').length}, Agents: ${listings.filter(l => l.sellerType === 'agent').length}`);
-    return { success: true, data: listings };
-  } catch (err) {
-    console.error("Marketplace Error:", err);
-    return { success: false, error: "Failed to load marketplace." };
-  }
+          if (dbUser) {
+            whereClause.AND = whereClause.AND || [];
+            if (dbUser.farmerProfile) {
+              whereClause.AND.push({
+                OR: [
+                  { farmerId: { not: dbUser.farmerProfile.id } },
+                  { farmerId: null }
+                ]
+              });
+            }
+            if (dbUser.agentProfile) {
+              whereClause.AND.push({
+                OR: [
+                  { agentId: { not: dbUser.agentProfile.id } },
+                  { agentId: null }
+                ]
+              });
+            }
+          }
+        }
+
+        const [listings, totalCount] = await Promise.all([
+          db.productListing.findMany({
+            where: whereClause,
+            skip,
+            take: limit,
+            orderBy: sortBy === "price_low" ? { pricePerUnit: 'asc' } :
+                     sortBy === "price_high" ? { pricePerUnit: 'desc' } :
+                     sortBy === "rating" ? { averageRating: 'desc' } :
+                     { createdAt: 'desc' },
+            include: {
+              farmer: {
+                select: { name: true, farmName: true, region: true, district: true, averageRating: true }
+              },
+              agent: {
+                select: { name: true, companyName: true, region: true, district: true, averageRating: true }
+              }
+            }
+          }),
+          db.productListing.count({ where: whereClause })
+        ]);
+
+        return { 
+          success: true, 
+          data: listings, 
+          pagination: {
+            total: totalCount,
+            pages: Math.ceil(totalCount / limit),
+            currentPage: page
+          }
+        };
+      } catch (err) {
+        console.error("Marketplace Error:", err);
+        return { success: false, error: "Failed to load marketplace." };
+      }
+    },
+    [cacheKey],
+    { revalidate: 60, tags: ['marketplace'] }
+  )();
 }
 
 /**
