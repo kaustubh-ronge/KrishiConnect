@@ -1,0 +1,534 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  farmer
+  agent
+  delivery
+  admin
+  none
+}
+
+enum UsagePurpose {
+  buy
+  buy_and_sell
+}
+
+enum SellingStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// --- USER MANAGEMENT ---
+
+model User {
+  id         String   @id @unique // Clerk User ID
+  email      String   @unique
+  role       UserRole @default(none) // "farmer", "agent", or "admin"
+  isDisabled Boolean  @default(false)
+  adminNotes String?   // Internal notes for the admin team
+  name       String?
+
+  farmerProfile FarmerProfile?
+  agentProfile  AgentProfile?
+  deliveryProfile DeliveryProfile?
+
+  // Buying History
+  orders Order[] @relation("BuyerOrders")
+
+  // Shopping (New)
+  cart     Cart?
+  wishlist Wishlist[]
+
+  // Reviews written by this user
+  reviews Review[]
+
+  // Notifications
+  notifications Notification[]
+
+  // Recently viewed products (stored as IDs)
+  recentlyViewedProducts String[] @default([])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+// --- PROFILES ---
+
+model FarmerProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name     String
+  farmName String?
+  phone    String?
+  address  String?
+
+  // Enhanced location for geo-filtering
+  country  String? @default("IN")
+  region   String?
+  district String?
+  state    String?
+  city     String? 
+
+  pincode String?
+  lat     Float?
+  lng     Float?
+
+  aadharNumber      String?  @unique
+  aadharFront       String?  // URL to image
+  aadharBack        String?  // URL to image
+  farmSize          Float?
+  primaryProduce    String[]
+  farmingExperience Int?
+
+  upiId         String?
+  bankName      String?
+  accountNumber String?
+  ifscCode      String?
+
+  listings ProductListing[]
+
+  // Reputation
+  averageRating Float? @default(0)
+  totalReviews  Int    @default(0)
+
+  // Profile Approval & Usage
+  usagePurpose  UsagePurpose  @default(buy)
+  sellingStatus SellingStatus @default(NONE)
+  deliveryPricePerKm Float? @default(10)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("farmer_profiles")
+}
+
+model AgentProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  companyName String?
+  phone       String?
+  address     String?
+
+  // Enhanced location for geo-filtering
+  country  String? @default("IN")
+  region   String?
+  district String?
+  state    String?
+  city     String?
+  pincode  String?
+  lat      Float?
+  lng      Float?
+
+  agentType    String[]
+  aadharNumber String?  @unique
+  aadharFront  String?  // URL to image
+  aadharBack   String?  // URL to image
+
+  upiId         String?
+  bankName      String?
+  accountNumber String?
+  ifscCode      String?
+
+  listings ProductListing[]
+
+  // Reputation
+  averageRating Float? @default(0)
+  totalReviews  Int    @default(0)
+
+  // Profile Approval & Usage
+  usagePurpose  UsagePurpose  @default(buy)
+  sellingStatus SellingStatus @default(NONE)
+  deliveryPricePerKm Float? @default(12)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("agent_profiles")
+}
+
+// --- MARKETPLACE & COMMERCE ---
+
+model ProductListing {
+  id String @id @default(cuid())
+
+  productName String
+  description String?
+  category    String @default("General") // New field for categorization
+  images      String[]
+
+  quantityLabel      String
+  availableStock     Float
+  unit               String
+  pricePerUnit       Float
+  // Delivery charge per unit (can be 0)
+  deliveryCharge     Float  @default(0)
+  // 'per_unit' or 'flat' (flat = once per listing in cart)
+  deliveryChargeType String @default("per_unit")
+  minOrderQuantity   Float?
+
+  harvestDate        DateTime?
+  shelfLifeStartDate DateTime?
+  qualityGrade       String?
+  shelfLife          String?
+  whatsappNumber     String?
+  variety            String?
+
+  isAvailable Boolean @default(true)
+
+  sellerType String
+  farmerId   String?
+  farmer     FarmerProfile? @relation(fields: [farmerId], references: [id])
+  agentId    String?
+  agent      AgentProfile?  @relation(fields: [agentId], references: [id])
+
+  orderItems OrderItem[]
+
+  // Relations for Cart/Wishlist (New)
+  cartItems     CartItem[]
+  wishlistItems Wishlist[]
+
+  // Reviews & Ratings
+  reviews       Review[]
+  averageRating Float?   @default(0)
+  totalReviews  Int      @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isAvailable, availableStock])
+  @@index([productName])
+  @@index([category])
+  @@index([farmerId])
+  @@index([agentId])
+  @@map("product_listings")
+}
+
+// --- SHOPPING CART (New) ---
+
+model Cart {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items CartItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("carts")
+}
+
+model CartItem {
+  id     String @id @default(cuid())
+  cartId String
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   ProductListing @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  quantity Float // How much they want to buy
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([cartId, productId]) // Prevent duplicate items in same cart
+  @@map("cart_items")
+}
+
+// --- WISHLIST (New) ---
+
+model Wishlist {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   ProductListing @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, productId]) // Prevent adding same item twice
+  @@map("wishlists")
+}
+
+// --- ORDERS ---
+
+
+model Order {
+  id String @id @default(cuid())
+
+  buyerId   String
+  buyerUser User   @relation("BuyerOrders", fields: [buyerId], references: [id])
+
+  totalAmount  Float
+  platformFee  Float
+  deliveryFee  Float   @default(0) // New field to fix math mismatch
+  sellerAmount Float
+  expiresAt    DateTime? // For stock reclamation (abandoned checkouts)
+
+  paymentStatus    String  @default("PENDING")
+  razorpayOrderId String?
+  razorpayPaymentId String?
+
+  // Enhanced order status: PROCESSING, PACKED, SHIPPED, IN_TRANSIT, DELIVERED, CANCELLED
+  orderStatus String @default("PROCESSING")
+
+  // Payout tracking (super admin manually settles payouts to sellers)
+  payoutStatus    String    @default("PENDING")
+  payoutSettledAt DateTime?
+  payoutSettledBy String?
+  deliveredAt     DateTime? // Dedicated field for 48h dispute window enforcement
+
+  paymentMethod   String  @default("ONLINE") // ONLINE or COD
+  
+  // Delivery/Shipping Information
+  shippingAddress String?
+  lat             Float?
+  lng             Float?
+  buyerPhone      String?
+  buyerName       String?
+  selfDeliveryOtp String? // Secure OTP for self-delivery verification
+
+  // Self Delivery Tracking
+  selfDeliveryStartLat  Float?
+  selfDeliveryStartLng  Float?
+  selfDeliveryEndLat    Float?
+  selfDeliveryEndLng    Float?
+  selfDeliveryDistance Float?
+  selfDeliveryCost     Float?
+
+  // Dispute handling
+  disputeStatus     String? // null, OPEN, RESOLVED, REJECTED
+  disputeReason     String?
+  disputeCreatedAt  DateTime?
+  disputeResolvedAt DateTime?
+
+  items         OrderItem[]
+  tracking      OrderTracking[]
+  reviews       Review[]
+  invoiceNumber String?         @unique
+
+  // Delivery Job Link
+  deliveryJobs  DeliveryJob[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([buyerId])
+  @@index([paymentStatus])
+  @@map("orders")
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   ProductListing @relation(fields: [productId], references: [id])
+
+  quantity                     Float
+  priceAtPurchase              Float
+  // Delivery charge recorded at time of purchase (per unit)
+  deliveryChargeAtPurchase     Float   @default(0)
+  // Store delivery charge type at purchase time
+  deliveryChargeTypeAtPurchase String?
+
+  // Seller information (denormalized for easier access)
+  sellerId   String?
+  sellerType String? // 'farmer' or 'agent'
+  sellerName String?
+  
+  // Payout tracking per seller item
+  payoutStatus    String    @default("PENDING")
+  payoutSettledAt DateTime?
+  payoutSettledBy String?
+
+  @@map("order_items")
+}
+
+// --- ORDER TRACKING & LOGISTICS ---
+
+model OrderTracking {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  status String // PROCESSING, PACKED, SHIPPED, IN_TRANSIT, DELIVERED
+  notes  String?
+
+  // Logistics Details
+  transportProvider String?
+  vehicleNumber     String?
+  driverName        String?
+  driverPhone       String?
+  estimatedDelivery DateTime?
+
+  // Location tracking
+  currentLocation String?
+
+  updatedBy String? // User ID who made the update
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("order_tracking")
+}
+
+// --- REVIEWS & RATINGS ---
+
+model Review {
+  id String @id @default(cuid())
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   ProductListing @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  rating  Int // 1-5 stars
+  comment String?
+
+  // Only allow review after delivery
+  isVerifiedPurchase Boolean @default(true)
+
+  // Moderation
+  isHidden Boolean @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([orderId, productId, userId]) // One review per user per product per order
+  @@map("reviews")
+}
+
+model DeliveryProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name         String
+  phone        String
+  address      String?
+  vehicleType  String? // Bicycle, Bike, Mini-truck, etc.
+  vehicleNumber String?
+  licenseNumber String?
+  licenseImage  String?  // URL to image
+  aadharNumber  String?  @unique
+  aadharFront   String?  // URL to image
+  aadharBack    String?  // URL to image
+
+  upiId         String?
+  bankName      String?
+  accountNumber String?
+  ifscCode      String?
+
+  // Location & Service Area
+  country  String? @default("IN")
+  state    String?
+  city     String?
+  pincode  String?
+  lat      Float?
+  lng      Float?
+  radius   Float   @default(10) // Range of traveling in KM
+  pricePerKm Float @default(5)  // Pricing
+
+  // Status & Approval
+  isOnline      Boolean       @default(true)
+  approvalStatus SellingStatus @default(PENDING) 
+
+  jobs DeliveryJob[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("delivery_profiles")
+}
+
+model DeliveryJob {
+  id String @id @default(cuid())
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  deliveryBoyId String
+  deliveryBoy   DeliveryProfile @relation(fields: [deliveryBoyId], references: [id], onDelete: Cascade)
+
+  // Status: REQUESTED, ACCEPTED, REJECTED, PICKED_UP, IN_TRANSIT, DELIVERED, CANCELLED
+  status String @default("REQUESTED")
+
+  // Calculated at hiring
+  distance    Float?
+  totalPrice  Float?
+  
+  otp         String? // Security OTP for delivery
+  
+  notes       String?
+
+  // Live Tracking
+  currentLat  Float?
+  currentLng  Float?
+
+  // Start & End points for final payment determination
+  startLat    Float?
+  startLng    Float?
+  endLat      Float?
+  endLng      Float?
+  actualDistance Float?
+
+  // Payout tracking for the delivery partner
+  payoutStatus    String    @default("PENDING")
+  payoutSettledAt DateTime?
+  payoutSettledBy String?
+
+  // Partner verification of receipt
+  partnerPaymentReceived   Boolean   @default(false)
+  partnerPaymentReceivedAt DateTime?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([orderId, deliveryBoyId])
+  @@map("delivery_jobs")
+}
+
+// --- NOTIFICATION SYSTEM ---
+
+model Notification {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type    String // ORDER_RECEIVED, ORDER_SHIPPED, ORDER_DELIVERED, PAYOUT_PROCESSED, REVIEW_RECEIVED, etc.
+  title   String
+  message String
+
+  // Optional link to relevant resource
+  linkUrl String?
+
+  isRead Boolean @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
