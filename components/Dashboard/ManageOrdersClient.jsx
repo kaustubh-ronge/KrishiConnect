@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,11 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
   const [newStatus, setNewStatus] = useState("");
   const [viewMode, setViewMode] = useState("table");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleUpdateStatus = async (formData) => {
     setUpdating(true);
@@ -348,10 +353,10 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                       <TableCell className="py-5">
                         <div className="space-y-0.5">
                           <p className="text-sm font-bold text-gray-900">
-                            {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {mounted ? new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '---'}
                           </p>
                           <p className="text-xs text-gray-400 font-medium">
-                            {new Date(order.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                            {mounted ? new Date(order.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                           </p>
                         </div>
                       </TableCell>
@@ -397,7 +402,7 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                       </TableCell>
                       <TableCell className="py-5 text-right">
                         <div className="flex flex-col items-end">
-                          <span className="text-lg font-black text-gray-900">₹{order.totalAmount.toLocaleString('en-IN')}</span>
+                          <span className="text-lg font-black text-gray-900">₹{mounted ? order.totalAmount.toLocaleString('en-IN') : '---'}</span>
                           <span className="text-[10px] font-bold text-gray-400 uppercase">Total Bill</span>
                         </div>
                       </TableCell>
@@ -465,7 +470,7 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                     <div className="flex flex-col items-end gap-2">
                       <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Total Amount</p>
                       <div className="flex items-center gap-3">
-                        <p className="text-2xl font-black text-gray-900">₹{order.totalAmount.toLocaleString('en-IN')}</p>
+                        <p className="text-2xl font-black text-gray-900">₹{mounted ? order.totalAmount.toLocaleString('en-IN') : '---'}</p>
                         <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                           <Button size="icon" className="h-10 w-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 transition-all">
                             <Eye className="h-5 w-5" />
@@ -684,7 +689,7 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
               </div>
               <DialogTitle className="text-4xl font-black mb-1">Order Details</DialogTitle>
               <DialogDescription className="text-green-50 font-medium">
-                Placed on {selectedOrder && new Date(selectedOrder.createdAt).toLocaleDateString('en-IN', { month: 'long', day: 'numeric', year: 'numeric' })}
+                Placed on {selectedOrder && mounted ? new Date(selectedOrder.createdAt).toLocaleDateString('en-IN', { month: 'long', day: 'numeric', year: 'numeric' }) : '---'}
               </DialogDescription>
             </motion.div>
             <Package className="absolute -right-10 -bottom-10 h-64 w-64 text-white/10 rotate-12" />
@@ -722,7 +727,7 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                         <Badge className={`border-0 font-bold uppercase text-xs mb-3 ${selectedOrder.paymentStatus === 'PAID' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
                           {selectedOrder.paymentStatus === 'PAID' ? 'PAID' : 'UNPAID'}
                         </Badge>
-                        <p className="text-3xl font-black">₹{selectedOrder.totalAmount.toLocaleString('en-IN')}</p>
+                        <p className="text-3xl font-black">₹{mounted ? selectedOrder.totalAmount.toLocaleString('en-IN') : '---'}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-gray-400 uppercase font-bold">Method</p>
@@ -749,10 +754,10 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                         <div className="flex-1">
                           <h5 className="text-lg font-black text-gray-900">{item.product.productName}</h5>
                           <p className="text-sm font-bold text-gray-500">
-                            {item.quantity} {item.product.unit} × ₹{item.priceAtPurchase.toLocaleString('en-IN')}
+                            {item.quantity} {item.product.unit} × ₹{mounted ? item.priceAtPurchase.toLocaleString('en-IN') : '---'}
                           </p>
                         </div>
-                        <p className="text-xl font-black text-emerald-600">₹{(item.quantity * item.priceAtPurchase).toLocaleString('en-IN')}</p>
+                        <p className="text-xl font-black text-emerald-600">₹{mounted ? (item.quantity * item.priceAtPurchase).toLocaleString('en-IN') : '---'}</p>
                       </div>
                     ))}
                   </div>
@@ -769,7 +774,7 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                           <CheckCircle2 className={`h-5 w-5 mt-0.5 ${i === 0 ? 'text-emerald-500' : 'text-gray-400'}`} />
                           <div>
                             <p className="text-gray-900 font-bold">{track.status}</p>
-                            <p className="text-gray-500 text-sm">{new Date(track.createdAt).toLocaleString('en-IN')}</p>
+                            <p className="text-gray-500 text-sm">{mounted ? new Date(track.createdAt).toLocaleString('en-IN') : '---'}</p>
                             {track.notes && <p className="text-gray-600 text-sm mt-1 bg-gray-50 p-2 rounded-lg">{track.notes}</p>}
                           </div>
                         </div>

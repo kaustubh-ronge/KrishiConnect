@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createProductListing } from "@/actions/products";
 import { useFetch } from "@/hooks/use-fetch";
@@ -98,6 +98,11 @@ export default function CreateListingPage() {
 
   // Form progress tracking
   const [formProgress, setFormProgress] = useState(0);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isPerishable = !["Cotton", "Other"].includes(selectedCategory);
 
@@ -226,8 +231,8 @@ export default function CreateListingPage() {
       });
       router.push("/farmer-dashboard/my-listings");
     } else {
-      toast.error("Listing Failed", {
-        description: result?.error,
+      toast.error("Publishing Failed", {
+        description: result?.error || "Please try again later",
         icon: <AlertCircle className="h-5 w-5" />
       });
     }
@@ -855,7 +860,7 @@ export default function CreateListingPage() {
                               <div>
                                 <p className="text-sm font-medium text-blue-100">Estimated Total Stock Value</p>
                                 <p className="text-4xl font-bold mt-1">
-                                  ₹ {totalValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                  ₹ {mounted ? totalValue.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '0'}
                                 </p>
                                 <div className="flex items-center gap-3 mt-3 text-sm text-blue-100">
                                   <span className="flex items-center gap-1">
@@ -1002,7 +1007,7 @@ export default function CreateListingPage() {
                             <div className="space-y-1">
                               <span className="text-gray-500">Product</span>
                               <p className="font-semibold text-gray-800">
-                                {selectedProduct === "Other" ? customProduct || "—" : selectedProduct || "—"}
+                                 {productName || "—"}
                               </p>
                             </div>
                             <div className="space-y-1">

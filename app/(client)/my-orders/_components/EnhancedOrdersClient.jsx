@@ -62,6 +62,8 @@ export default function EnhancedOrdersClient({ initialOrders }) {
         setMounted(true);
     }, []);
 
+    if (!mounted) return <div className="min-h-screen bg-gray-50/50" />;
+
     const filteredOrders = initialOrders?.filter(order => {
         if (activeFilter === "all") return true;
         if (activeFilter === "active") return !['DELIVERED', 'CANCELLED'].includes(order.orderStatus);
@@ -326,10 +328,10 @@ export default function EnhancedOrdersClient({ initialOrders }) {
                                                     <ShadcnTableCell className="py-5">
                                                         <div className="space-y-0.5">
                                                             <p className="text-sm font-bold text-gray-900">
-                                                                {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                                {mounted ? new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '---'}
                                                             </p>
                                                             <p className="text-xs text-gray-400 font-medium">
-                                                                {new Date(order.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                                                {mounted ? new Date(order.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                                                             </p>
                                                         </div>
                                                     </ShadcnTableCell>
@@ -493,7 +495,7 @@ export default function EnhancedOrdersClient({ initialOrders }) {
                                                         : order.items[0]?.product?.agent?.companyName || 'Seller'}
                                                 </p>
                                                 <p className="text-sm text-gray-500">
-                                                    {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                    {mounted ? new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '---'}
                                                 </p>
                                             </div>
                                         </div>
@@ -527,7 +529,7 @@ export default function EnhancedOrdersClient({ initialOrders }) {
                             </Badge>
                             <DialogTitle className="text-3xl font-black">Order Summary</DialogTitle>
                             <p className="text-green-50 font-medium mt-1">
-                                Placed on {selectedOrder && new Date(selectedOrder.createdAt).toLocaleDateString('en-IN', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                Placed on {selectedOrder && mounted ? new Date(selectedOrder.createdAt).toLocaleDateString('en-IN', { month: 'long', day: 'numeric', year: 'numeric' }) : '---'}
                             </p>
                         </motion.div>
                         <div className="absolute top-0 right-0 p-8 opacity-20">

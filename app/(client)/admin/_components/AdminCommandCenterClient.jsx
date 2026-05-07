@@ -595,7 +595,7 @@ export default function AdminCommandCenterClient({
                                               {getFriendlyStatus(item.orderStatus)}
                                            </Badge>
                                         ) : (
-                                           item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'
+                                           item.createdAt && mounted ? new Date(item.createdAt).toLocaleDateString() : '—'
                                         )}</TableCell>
                                     <TableCell>{activeView === 'orders' || activeView === 'disputes' ? (
                                            <span className="text-[10px] font-black text-slate-600 uppercase">{item.paymentMethod}</span>

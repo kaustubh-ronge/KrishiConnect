@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { deleteListing } from "@/actions/products";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,11 @@ export default function ListingsClient({ initialListings }) {
   const router = useRouter();
   const [listings, setListings] = useState(initialListings);
   const [isPending, startTransition] = useTransition();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleDelete = async (id) => {
     // Optimistic UI Update
@@ -177,7 +182,7 @@ export default function ListingsClient({ initialListings }) {
                     <div>
                       <p className="text-xs text-gray-500 font-medium">Harvest</p>
                       <p className="font-semibold text-gray-900">
-                        {product.harvestDate ? new Date(product.harvestDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : "N/A"}
+                        {product.harvestDate && mounted ? new Date(product.harvestDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : product.harvestDate ? "---" : "N/A"}
                       </p>
                     </div>
                   </div>

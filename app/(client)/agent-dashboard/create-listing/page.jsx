@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createProductListing } from "@/actions/products";
 import { useFetch } from "@/hooks/use-fetch";
@@ -66,6 +66,11 @@ export default function AgentCreateListingPage() {
   const [shelfLifeStartDate, setShelfLifeStartDate] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [formProgress, setFormProgress] = useState(10);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isPerishable = ["Seeds", "Nursery Plants", "Vegetables (Bulk Trade)", "Fruits (Bulk Trade)", "Grains & Pulses", "Animal Feed"].includes(selectedCategory);
 
@@ -90,6 +95,8 @@ export default function AgentCreateListingPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    
     const category = selectedCategory === "Other" ? customCategory.trim() : selectedCategory;
     if (!productName || productName.length < 3) { toast.error("Valid product name required"); return; }
     if (!category) { toast.error("Category required"); return; }
@@ -221,7 +228,7 @@ export default function AgentCreateListingPage() {
                     </div>
                     {stock && price && (
                       <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 rounded-2xl text-white flex justify-between items-center shadow-xl">
-                        <div><p className="text-blue-100 text-xs font-bold">Total Value</p><p className="text-4xl font-black">₹{totalValue.toLocaleString()}</p></div>
+                        <div><p className="text-blue-100 text-xs font-bold">Total Value</p><p className="text-4xl font-black">₹{mounted ? totalValue.toLocaleString('en-IN') : '0'}</p></div>
                         <Calculator className="h-12 w-12 text-white/20" />
                       </div>
                     )}

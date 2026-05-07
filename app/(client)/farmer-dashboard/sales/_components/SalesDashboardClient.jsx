@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,11 @@ import { DASHBOARD_THEMES } from "@/data/DashboardData/constants";
 
 export default function SalesDashboardClient({ sales, userType = "farmer" }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   const theme = DASHBOARD_THEMES[userType] || DASHBOARD_THEMES.farmer;
   const isFarmer = userType === "farmer";
@@ -67,6 +72,12 @@ export default function SalesDashboardClient({ sales, userType = "farmer" }) {
      sale.product.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
      (sale.order.buyerUser?.farmerProfile?.name || sale.order.buyerUser?.agentProfile?.name || "User").toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (!mounted) {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-green-600" />
+    </div>;
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl space-y-8">
@@ -222,7 +233,7 @@ export default function SalesDashboardClient({ sales, userType = "farmer" }) {
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 text-gray-500">
-                                    {new Date(sale.order.createdAt).toLocaleDateString()}
+                                    {mounted ? new Date(sale.order.createdAt).toLocaleDateString('en-IN') : '---'}
                                 </td>
                                 <td className="px-6 py-4 text-right text-gray-600">
                                     {sale.quantity} {sale.product.unit}
