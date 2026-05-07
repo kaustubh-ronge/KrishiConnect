@@ -36,6 +36,11 @@ export default function MarketplaceClient({ initialListings, userRole, recentlyV
   const [locationFilter, setLocationFilter] = useState("");
   const [freshnessFilter, setFreshnessFilter] = useState("all");
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // --- Dynamic Categories ---
   const categories = useMemo(() => {
     const uniqueNames = new Set(initialListings.map(item => item.productName));
@@ -105,6 +110,8 @@ export default function MarketplaceClient({ initialListings, userRole, recentlyV
     freshnessFilter !== "all",
     showOutOfStock
   ].filter(Boolean).length;
+
+  if (!mounted) return <div className="min-h-screen bg-slate-50" />;
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-emerald-50/20 to-teal-50/30">

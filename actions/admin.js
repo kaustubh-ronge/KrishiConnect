@@ -509,34 +509,44 @@ export async function bulkApproveProfiles(profileIds) {
   try {
     await ensureAdmin(user.id);
 
-    // Filter by role manually to handle different status fields
     const farmerUserIds = profileIds.filter(p => p.role === 'farmer').map(p => p.userId);
     const agentUserIds = profileIds.filter(p => p.role === 'agent').map(p => p.userId);
     const deliveryUserIds = profileIds.filter(p => p.role === 'delivery').map(p => p.userId);
 
+    // 1. Fetch only those that are currently PENDING to ensure atomicity and prevent duplicate emails
+    const [pendingFarmers, pendingAgents, pendingDelivery] = await Promise.all([
+      db.farmerProfile.findMany({ where: { userId: { in: farmerUserIds }, sellingStatus: 'PENDING' }, select: { userId: true, user: { select: { email: true } } } }),
+      db.agentProfile.findMany({ where: { userId: { in: agentUserIds }, sellingStatus: 'PENDING' }, select: { userId: true, user: { select: { email: true } } } }),
+      db.deliveryProfile.findMany({ where: { userId: { in: deliveryUserIds }, approvalStatus: 'PENDING' }, select: { userId: true, user: { select: { email: true } } } })
+    ]);
+
+    const actualFarmerIds = pendingFarmers.map(p => p.userId);
+    const actualAgentIds = pendingAgents.map(p => p.userId);
+    const actualDeliveryIds = pendingDelivery.map(p => p.userId);
+
+    if (actualFarmerIds.length === 0 && actualAgentIds.length === 0 && actualDeliveryIds.length === 0) {
+      return { success: true, message: "No pending profiles found in selection." };
+    }
+
     await db.$transaction([
-      db.user.updateMany({ where: { id: { in: farmerUserIds } }, data: { role: 'farmer' } }),
-      db.user.updateMany({ where: { id: { in: agentUserIds } }, data: { role: 'agent' } }),
-      db.user.updateMany({ where: { id: { in: deliveryUserIds } }, data: { role: 'delivery' } }),
-      db.farmerProfile.updateMany({ where: { userId: { in: farmerUserIds } }, data: { sellingStatus: 'APPROVED' } }),
-      db.agentProfile.updateMany({ where: { userId: { in: agentUserIds } }, data: { sellingStatus: 'APPROVED' } }),
-      db.deliveryProfile.updateMany({ where: { userId: { in: deliveryUserIds } }, data: { approvalStatus: 'APPROVED' } })
+      db.user.updateMany({ where: { id: { in: actualFarmerIds } }, data: { role: 'farmer' } }),
+      db.user.updateMany({ where: { id: { in: actualAgentIds } }, data: { role: 'agent' } }),
+      db.user.updateMany({ where: { id: { in: actualDeliveryIds } }, data: { role: 'delivery' } }),
+      db.farmerProfile.updateMany({ where: { userId: { in: actualFarmerIds }, sellingStatus: 'PENDING' }, data: { sellingStatus: 'APPROVED' } }),
+      db.agentProfile.updateMany({ where: { userId: { in: actualAgentIds }, sellingStatus: 'PENDING' }, data: { sellingStatus: 'APPROVED' } }),
+      db.deliveryProfile.updateMany({ where: { userId: { in: actualDeliveryIds }, approvalStatus: 'PENDING' }, data: { approvalStatus: 'APPROVED' } })
     ]);
 
     // Send emails (Truly in Background using after)
     after(async () => {
-      const farmerEmails = await db.user.findMany({ where: { id: { in: farmerUserIds } }, select: { email: true } });
-      const agentEmails = await db.user.findMany({ where: { id: { in: agentUserIds } }, select: { email: true } });
-      const deliveryEmails = await db.user.findMany({ where: { id: { in: deliveryUserIds } }, select: { email: true } });
-
       await Promise.all([
-        ...farmerEmails.map(u => sendProfileApprovalEmail(u.email, 'farmer')),
-        ...agentEmails.map(u => sendProfileApprovalEmail(u.email, 'agent')),
-        ...deliveryEmails.map(u => sendDeliveryProfileApprovalEmail(u.email))
+        ...pendingFarmers.map(p => sendProfileApprovalEmail(p.user.email, 'farmer')),
+        ...pendingAgents.map(p => sendProfileApprovalEmail(p.user.email, 'agent')),
+        ...pendingDelivery.map(p => sendDeliveryProfileApprovalEmail(p.user.email))
       ]);
     });
 
-    return { success: true, message: `Successfully approved ${profileIds.length} members.` };
+    return { success: true, message: `Successfully approved ${actualFarmerIds.length + actualAgentIds.length + actualDeliveryIds.length} members.` };
   } catch (err) {
     console.error("Bulk Approve Error:", err);
     return { success: false, error: err.message };

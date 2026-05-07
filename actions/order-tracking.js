@@ -84,76 +84,82 @@ export async function updateOrderStatus(formData) {
       return apiResponse.error("Unauthorized", 403);
     }
 
-    // CRITICAL: Status Transition State Machine Guard
-    const validTransitions = {
-      "PROCESSING": ["PACKED", "SHIPPED", "CANCELLED"],
-      "PACKED": ["SHIPPED", "CANCELLED"],
-      "SHIPPED": ["IN_TRANSIT", "DELIVERED", "CANCELLED"],
-      "IN_TRANSIT": ["DELIVERED", "CANCELLED"],
-    };
+    // ─── ATOMIC TRANSACTION START ───
+    await db.$transaction(async (tx) => {
+      // 1. Re-fetch inside TX to get the freshest state
+      const currentOrder = await tx.order.findUnique({
+        where: { id: orderId }
+      });
+      if (!currentOrder) throw new Error("Order not found");
 
-    if (status !== order.orderStatus && status !== "CANCELLED") {
-       if (!validTransitions[order.orderStatus]?.includes(status)) {
-         return apiResponse.error(`Invalid transition from ${order.orderStatus} to ${status}`);
-       }
-    }
+      // 2. Status Transition State Machine Guard
+      const validTransitions = {
+        "PROCESSING": ["PACKED", "SHIPPED", "CANCELLED"],
+        "PACKED": ["SHIPPED", "CANCELLED"],
+        "SHIPPED": ["IN_TRANSIT", "DELIVERED", "CANCELLED"],
+        "IN_TRANSIT": ["DELIVERED", "CANCELLED"],
+      };
 
-    // CRITICAL: Block status updates for UNPAID online orders (except cancellation)
-    if (order.paymentMethod === 'ONLINE' && order.paymentStatus !== 'PAID' && status !== 'CANCELLED') {
-        return apiResponse.error("Cannot process shipping for an unpaid online order.");
-    }
-
-    // Create tracking entry
-    await db.orderTracking.create({
-      data: {
-        orderId,
-        status,
-        notes: sanitizeContent(notes),
-        transportProvider,
-        vehicleNumber,
-        driverName,
-        driverPhone,
-        currentLocation,
-        estimatedDelivery,
-        updatedBy: user.id
+      if (status !== currentOrder.orderStatus && status !== "CANCELLED") {
+         if (!validTransitions[currentOrder.orderStatus]?.includes(status)) {
+           throw new Error(`Invalid transition from ${currentOrder.orderStatus} to ${status}`);
+         }
       }
-    });
 
-    // NEW Logic: Capture Self-Delivery Coordinates & Calculate Distance
-    const updateData = { orderStatus: status };
-    
-    if (status === 'SHIPPED' && lat && lng) {
-      updateData.selfDeliveryStartLat = lat;
-      updateData.selfDeliveryStartLng = lng;
-    } else if (status === 'DELIVERED' && lat && lng) {
-      updateData.selfDeliveryEndLat = lat;
-      updateData.selfDeliveryEndLng = lng;
+      // 3. Block updates for UNPAID online orders
+      if (currentOrder.paymentMethod === 'ONLINE' && currentOrder.paymentStatus !== 'PAID' && status !== 'CANCELLED') {
+          throw new Error("Cannot process shipping for an unpaid online order.");
+      }
+
+      // 4. Create tracking entry
+      await tx.orderTracking.create({
+        data: {
+          orderId,
+          status,
+          notes: sanitizeContent(notes),
+          transportProvider,
+          vehicleNumber,
+          driverName,
+          driverPhone,
+          currentLocation,
+          estimatedDelivery,
+          updatedBy: user.id
+        }
+      });
+
+      const updateData = { orderStatus: status };
       
-      // Calculate final distance if start was captured
-      if (order.selfDeliveryStartLat && order.selfDeliveryStartLng) {
-        const roadDist = await getOSRMDistance(
-          order.selfDeliveryStartLat, 
-          order.selfDeliveryStartLng, 
-          lat, 
-          lng
-        );
-        updateData.selfDeliveryDistance = roadDist;
+      if (status === 'SHIPPED' && lat && lng) {
+        updateData.selfDeliveryStartLat = lat;
+        updateData.selfDeliveryStartLng = lng;
+      } else if (status === 'DELIVERED' && lat && lng) {
+        updateData.selfDeliveryEndLat = lat;
+        updateData.selfDeliveryEndLng = lng;
         
-        // Calculate cost based on seller's rate
-        const rate = sellerProfile?.deliveryPricePerKm || (isFarmer ? 10 : 12);
-        updateData.selfDeliveryCost = roadDist * rate;
+        if (currentOrder.selfDeliveryStartLat && currentOrder.selfDeliveryStartLng) {
+          const roadDist = await getOSRMDistance(
+            currentOrder.selfDeliveryStartLat, 
+            currentOrder.selfDeliveryStartLng, 
+            lat, 
+            lng
+          );
+          updateData.selfDeliveryDistance = roadDist;
+          const rate = sellerProfile?.deliveryPricePerKm || (isFarmer ? 10 : 12);
+          updateData.selfDeliveryCost = roadDist * rate;
+        }
       }
-    }
 
-    if (status === 'DELIVERED') {
-      updateData.deliveredAt = new Date();
-    }
+      if (status === 'DELIVERED') {
+        updateData.deliveredAt = new Date();
+      }
 
-    // Update order status
-    await db.order.update({
-      where: { id: orderId },
-      data: updateData
+      // 5. Update order status
+      await tx.order.update({
+        where: { id: orderId },
+        data: updateData
+      });
     });
+    // ─── ATOMIC TRANSACTION END ───
 
     // NEW: Sync with Delivery Jobs if applicable
     const activeDeliveryJob = await db.deliveryJob.findFirst({

@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +53,7 @@ export default function ProductCard({ product, index }) {
         <Card className="group h-full flex flex-col overflow-hidden border-2 border-gray-100 bg-white/80 backdrop-blur-sm hover:border-emerald-200 transition-all duration-500 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-1">
 
           {/* Image Section */}
-          <div className="relative h-52 w-full bg-linear-to-br from-gray-100 to-gray-50 overflow-hidden">
+          <div className="relative h-52 w-full bg-gradient-to-br from-gray-100 to-gray-50 overflow-hidden">
             {product.images && product.images.length > 0 ? (
               <>
                 <Image
@@ -66,7 +66,7 @@ export default function ProductCard({ product, index }) {
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: isHovered ? 1 : 0 }}
-                  className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent"
+                  className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"
                 />
               </>
             ) : (
@@ -82,7 +82,7 @@ export default function ProductCard({ product, index }) {
 
             {/* Top Badges */}
             <div className="absolute top-3 left-3 flex gap-2 z-10">
-              <Badge className={`bg-linear-to-r ${themeGradient} text-white border-0 shadow-lg px-3 py-1 text-xs font-semibold`}>
+              <Badge className={`bg-gradient-to-r ${themeGradient} text-white border-0 shadow-lg px-3 py-1 text-xs font-semibold`}>
                 <Leaf className="h-3 w-3 mr-1" />
                 {isFarmer ? "Farm Fresh" : "Verified"}
               </Badge>
@@ -119,7 +119,7 @@ export default function ProductCard({ product, index }) {
             </motion.button>
 
             {/* Stock Info Overlay */}
-            <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent p-4 flex justify-between items-end text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 flex justify-between items-end text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <div>
                 <p className="text-[10px] uppercase tracking-wider font-medium opacity-80">Available</p>
                 <p className="text-sm font-bold">{product.availableStock} {product.unit}</p>
@@ -211,7 +211,7 @@ export default function ProductCard({ product, index }) {
 
             <Button
               asChild
-              className={`w-full bg-linear-to-r ${themeGradient} hover:shadow-lg text-white h-11 text-sm font-semibold rounded-xl transition-all group/btn`}
+              className={`w-full bg-gradient-to-r ${themeGradient} hover:shadow-lg text-white h-11 text-sm font-semibold rounded-xl transition-all group/btn`}
             >
               <Link href={`/marketplace/product/${product.id}`} className="flex items-center justify-center gap-1.5">
                 <Eye className="h-4 w-4" /> View Details

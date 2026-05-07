@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +56,11 @@ export default function EnhancedOrdersClient({ initialOrders }) {
     const [activeFilter, setActiveFilter] = useState("all");
     const [searchTerm, setSearchTerm] = useState("");
     const [viewMode, setViewMode] = useState("table");
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const filteredOrders = initialOrders?.filter(order => {
         if (activeFilter === "all") return true;
@@ -119,6 +124,8 @@ export default function EnhancedOrdersClient({ initialOrders }) {
     const getCurrentStepIndex = (status) => {
         return TRACKING_STEPS.findIndex(step => step.id === status);
     };
+
+    if (!mounted) return <div className="min-h-screen bg-gray-50" />;
 
     if (!initialOrders || initialOrders.length === 0) {
         return (

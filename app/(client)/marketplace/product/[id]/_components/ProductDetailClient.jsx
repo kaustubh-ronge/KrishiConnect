@@ -81,18 +81,18 @@ export default function ProductDetailClient({ product, userRole }) {
   const totalPrice = (qty * product.pricePerUnit) + deliveryCost;
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-linear-to-br from-gray-50 via-emerald-50/30 to-teal-50/40">
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-gray-50 via-emerald-50/30 to-teal-50/40">
       {/* Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
           animate={{ x: [0, 100, 0], y: [0, -50, 0] }}
           transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="absolute top-0 right-0 w-125 h-125 bg-linear-to-br from-emerald-300/10 to-green-400/5 rounded-full blur-3xl"
+          className="absolute top-0 right-0 w-125 h-125 bg-gradient-to-br from-emerald-300/10 to-green-400/5 rounded-full blur-3xl"
         />
         <motion.div
           animate={{ x: [0, -80, 0], y: [0, 60, 0] }}
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          className="absolute bottom-0 left-0 w-150 h-150 bg-linear-to-tr from-blue-300/10 to-indigo-400/5 rounded-full blur-3xl"
+          className="absolute bottom-0 left-0 w-150 h-150 bg-gradient-to-tr from-blue-300/10 to-indigo-400/5 rounded-full blur-3xl"
         />
       </div>
 
@@ -137,7 +137,7 @@ export default function ProductDetailClient({ product, userRole }) {
 
                 {/* Image Overlay Badges */}
                 <div className="absolute top-4 left-4 flex gap-2">
-                  <Badge className={`bg-linear-to-r ${themeGradient} text-white border-0 px-4 py-2 shadow-lg text-sm font-semibold`}>
+                  <Badge className={`bg-gradient-to-r ${themeGradient} text-white border-0 px-4 py-2 shadow-lg text-sm font-semibold`}>
                     <Leaf className="h-4 w-4 mr-1.5" />
                     {isFarmer ? "Farm Fresh" : "Verified Stock"}
                   </Badge>
@@ -172,7 +172,7 @@ export default function ProductDetailClient({ product, userRole }) {
                 </div>
 
                 {/* Stock Indicator Bar */}
-                <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 via-black/40 to-transparent p-6 pt-12">
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-6 pt-12">
                   <div className="flex items-center justify-between text-white">
                     <div>
                       <p className="text-xs uppercase tracking-wider opacity-80">Available Stock</p>
@@ -214,7 +214,7 @@ export default function ProductDetailClient({ product, userRole }) {
               className="bg-white/80 backdrop-blur-sm p-8 rounded-3xl border-2 border-gray-100 shadow-xl"
             >
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2.5 rounded-xl bg-linear-to-br from-gray-100 to-gray-200">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200">
                   <Info className="h-6 w-6 text-gray-700" />
                 </div>
                 <div>
@@ -270,7 +270,7 @@ export default function ProductDetailClient({ product, userRole }) {
                       {product.variety.split(", ").map((tag, idx) => (
                         <Badge
                           key={idx}
-                          className="bg-linear-to-r from-emerald-50 to-green-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 text-sm font-medium"
+                          className="bg-gradient-to-r from-emerald-50 to-green-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 text-sm font-medium"
                         >
                           {tag}
                         </Badge>
@@ -292,7 +292,7 @@ export default function ProductDetailClient({ product, userRole }) {
             >
               <Card className="relative overflow-hidden border-0 shadow-2xl rounded-3xl bg-white/80 backdrop-blur-xl">
                 {/* Top Gradient */}
-                <div className={`absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r ${themeGradient}`} />
+                <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${themeGradient}`} />
 
                 <div className="p-8 space-y-6">
                   {/* Product Title & Price */}
@@ -318,7 +318,7 @@ export default function ProductDetailClient({ product, userRole }) {
                     <h1 className="text-3xl font-black text-gray-900 mb-3">{product.productName}</h1>
 
                     <div className="flex items-end gap-2">
-                      <p className={`text-5xl font-black bg-linear-to-r ${themeGradient} bg-clip-text text-transparent`}>
+                      <p className={`text-5xl font-black bg-gradient-to-r ${themeGradient} bg-clip-text text-transparent`}>
                         ₹{product.pricePerUnit}
                       </p>
                       <span className="text-gray-500 text-lg font-semibold mb-2">/ {product.unit}</span>
@@ -326,7 +326,7 @@ export default function ProductDetailClient({ product, userRole }) {
                   </div>
 
                   {/* Stock & Delivery Info */}
-                  <div className="bg-linear-to-br from-gray-50 to-emerald-50/50 rounded-2xl p-5 border border-gray-100 space-y-3">
+                  <div className="bg-gradient-to-br from-gray-50 to-emerald-50/50 rounded-2xl p-5 border border-gray-100 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-xl bg-blue-100">
@@ -415,7 +415,7 @@ export default function ProductDetailClient({ product, userRole }) {
                         onClick={handleAddToCart}
                         disabled={product.availableStock <= 0 || isAdding}
                         className={`w-full h-14 text-lg font-bold shadow-2xl transition-all duration-300 ${product.availableStock > 0
-                            ? `bg-linear-to-r ${themeGradient} hover:shadow-${themeColor}-500/50 text-white`
+                            ? `bg-gradient-to-r ${themeGradient} hover:shadow-${themeColor}-500/50 text-white`
                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           }`}
                       >
@@ -459,7 +459,7 @@ export default function ProductDetailClient({ product, userRole }) {
 
                   {/* Seller Info */}
                   <div className="flex items-center gap-4">
-                    <div className={`relative h-14 w-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl bg-linear-to-br ${themeGradient} shadow-lg`}>
+                    <div className={`relative h-14 w-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl bg-gradient-to-br ${themeGradient} shadow-lg`}>
                       {sellerName?.charAt(0)?.toUpperCase()}
                       <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1">
                         <CheckCircle2 className="h-3 w-3 text-white" />
