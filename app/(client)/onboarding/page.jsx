@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/prisma"; 
-import OnboardingClient from "./_components/OnboardinClient";
+import OnboardingClient from "./_components/OnboardingClient";
 
 export default async function OnboardingPage() {
   const user = await currentUser();
@@ -31,7 +31,7 @@ export default async function OnboardingPage() {
 
 // export const dynamic = 'force-dynamic';
 // import { redirect } from "next/navigation"; // ADD THIS
-// import OnboardingClient from "./_components/OnboardinClient";
+// import OnboardingClient from "./_components/OnboardingClient";
 // import { checkUser } from "@/lib/checkUser";
 
 // export default async function OnboardingPage() {

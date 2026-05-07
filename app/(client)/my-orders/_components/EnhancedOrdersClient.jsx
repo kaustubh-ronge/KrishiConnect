@@ -525,7 +525,7 @@ export default function EnhancedOrdersClient({ initialOrders }) {
                             <Badge className="bg-white/20 backdrop-blur-sm border-0 text-white font-bold px-4 py-2 rounded-full mb-3">
                                 #{selectedOrder?.id.slice(-8).toUpperCase()}
                             </Badge>
-                            <h2 className="text-3xl font-black">Order Summary</h2>
+                            <DialogTitle className="text-3xl font-black">Order Summary</DialogTitle>
                             <p className="text-green-50 font-medium mt-1">
                                 Placed on {selectedOrder && new Date(selectedOrder.createdAt).toLocaleDateString('en-IN', { month: 'long', day: 'numeric', year: 'numeric' })}
                             </p>

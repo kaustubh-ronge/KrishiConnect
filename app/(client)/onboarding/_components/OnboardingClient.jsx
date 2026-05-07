@@ -14,6 +14,11 @@ export default function OnboardingClient({ userRole }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (userRole === 'farmer') {
@@ -33,6 +38,8 @@ export default function OnboardingClient({ userRole }) {
       setTimeout(() => router.push('/delivery-dashboard'), 1500);
     }
   }, [userRole, router]);
+
+  if (!mounted) return null;
 
   const handleRoleSelect = async (role) => {
     if (isLoading) return;
