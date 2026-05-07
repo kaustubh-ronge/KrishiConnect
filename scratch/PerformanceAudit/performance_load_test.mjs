@@ -1,6 +1,5 @@
 
-import { PrismaClient } from '@prisma/client';
-const db = new PrismaClient();
+import { db } from '../../lib/prisma.js';
 
 async function runPerformanceLoadTest() {
     console.log("🚀 INITIATING PERFORMANCE LOAD TEST (500 Products)");

@@ -1,5 +1,5 @@
 
-import { db } from '../lib/prisma.js';
+import { db } from '../../lib/prisma.js';
 
 async function runSystemEndToEndTest() {
     console.log("🚀 STARTING KRISHICONNECT WHOLE-SYSTEM STRESS TEST\n");
