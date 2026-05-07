@@ -28,7 +28,7 @@ import { resendDeliveryOtp } from "@/actions/delivery-job";
 import { toast } from "sonner";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ORDER_STATUS_OPTIONS, DASHBOARD_THEMES } from "@/data/DashboardData/constants";
+import { ORDER_STATUS_OPTIONS, DASHBOARD_THEMES, getStatusBadgeConfig } from "@/data/DashboardData/constants";
 
 export default function ManageOrdersClient({ initialOrders, userType, total, hasMore, currentPage }) {
 
@@ -125,13 +125,11 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
   };
 
   const getStatusBadge = (status) => {
-    const config = ORDER_STATUS_OPTIONS.find(s => s.value === status);
-    return config ? (
+    const config = getStatusBadgeConfig(status, 'order');
+    return (
       <Badge className={`${config.color} shadow-sm font-semibold px-4 py-2 rounded-full border-0`}>
         {config.label}
       </Badge>
-    ) : (
-      <Badge className="font-semibold px-4 py-2 rounded-full">{status}</Badge>
     );
   };
 

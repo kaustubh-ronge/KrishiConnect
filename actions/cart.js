@@ -81,15 +81,10 @@ export async function addToCart(productId, quantity) {
         return { success: false, error: "You cannot purchase your own product." };
       }
     }
-    
-    // We don't decrement stock here, just check if it's currently available
-    if (product.availableStock < quantity) {
-      return { success: false, error: `Only ${product.availableStock} ${product.unit} available.` };
-    }
 
     // Min Quantity Check
     if (quantity < (product.minOrderQuantity || 1)) {
-        return { success: false, error: `${product.productName} requires a minimum order of ${product.minOrderQuantity || 1} ${product.unit}.` };
+      return { success: false, error: `${product.productName} requires a minimum order of ${product.minOrderQuantity || 1} ${product.unit}.` };
     }
 
     // 1. Atomic Cart Retrieval/Creation
@@ -99,7 +94,27 @@ export async function addToCart(productId, quantity) {
       create: { userId: user.id }
     });
 
-    // 2. Atomic Item Mutation (Prevents Race Conditions)
+    // 2. Check if item already exists to calculate cumulative quantity
+    const existingItem = await db.cartItem.findUnique({
+      where: {
+        cartId_productId: {
+          cartId: cart.id,
+          productId: productId
+        }
+      }
+    });
+
+    const currentQtyInCart = existingItem ? existingItem.quantity : 0;
+    const totalPotentialQty = currentQtyInCart + quantity;
+
+    if (product.availableStock < totalPotentialQty) {
+      return { 
+        success: false, 
+        error: `Cannot add more. You already have ${currentQtyInCart} in cart. Max available is ${product.availableStock}.` 
+      };
+    }
+
+    // 3. Atomic Item Mutation
     await db.cartItem.upsert({
       where: {
         cartId_productId: {

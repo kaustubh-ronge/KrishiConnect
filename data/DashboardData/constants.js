@@ -60,3 +60,8 @@ export const DASHBOARD_THEMES = {
     accentClass: "accent-blue-600"
   }
 };
+
+export const getStatusBadgeConfig = (status, type = 'order') => {
+  const options = type === 'order' ? ORDER_STATUS_OPTIONS : DELIVERY_STATUS_OPTIONS;
+  return options.find(s => s.value === status) || { label: status, color: 'bg-gray-100 text-gray-700' };
+};

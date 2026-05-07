@@ -297,10 +297,18 @@ export async function updateDeliveryJobStatus(jobId, status, notes = "", lat = n
           });
         }
 
-        await tx.deliveryJob.update({
-            where: { id: jobId },
+        // Use updateMany for atomic status-checked update
+        const updated = await tx.deliveryJob.updateMany({
+            where: { 
+                id: jobId,
+                status: job.status // Ensure it hasn't changed since we read it
+            },
             data: updateData
         });
+
+        if (updated.count === 0) {
+            throw new Error("Job status changed or already updated by another process.");
+        }
 
         // Sync status with Order if applicable
         let orderStatus = job.order.orderStatus;

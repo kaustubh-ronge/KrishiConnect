@@ -25,7 +25,15 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "**", // Allows rendering images from any URL (useful if you switch storage later)
+        hostname: "utfs.io",
+      },
+      {
+        protocol: "https",
+        hostname: "img.clerk.com",
+      },
+      {
+        protocol: "https",
+        hostname: "images.clerk.com",
       },
     ],
   },

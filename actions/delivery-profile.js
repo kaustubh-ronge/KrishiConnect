@@ -54,14 +54,18 @@ export async function createDeliveryProfile(formData) {
       approvalStatus: "PENDING",
     };
 
-    const profile = await db.deliveryProfile.create({
-      data,
-    });
+    const { profile } = await db.$transaction(async (tx) => {
+      const p = await tx.deliveryProfile.create({
+        data,
+      });
 
-    // Update user role
-    await db.user.update({
-      where: { id: clerkUser.id },
-      data: { role: "delivery" },
+      // Update user role
+      await tx.user.update({
+        where: { id: clerkUser.id },
+        data: { role: "delivery" },
+      });
+
+      return { profile: p };
     });
 
     revalidatePath("/delivery-dashboard");

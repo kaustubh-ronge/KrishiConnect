@@ -45,28 +45,29 @@ export async function selectRole(formData) {
   }
 
   try {
-    const client = await clerkClient();
-    await client.users.updateUserMetadata(userId, {
-      publicMetadata: { role: role },
-    });
-    // Clerk metadata update attempted
-  } catch (err) {
-    console.error(
-      "selectRole Error: Explicit clerkClient.users.updateUserMetadata failed -",
-      err
-    );
-    return { error: "Could not set role via Clerk API." };
-  }
-
-  try {
+    // 1. Update Database FIRST (Primary Source of Truth)
     await db.user.update({
       where: { id: userId },
       data: { role: role },
     });
-    // Database update successful: User role set.
   } catch (err) {
     console.error("selectRole Error: Database update failed -", err);
-    return { error: "Database error updating role." };
+    return { error: "Database error updating role. Please try again." };
+  }
+
+  try {
+    // 2. Synchronize with Clerk (Secondary)
+    const client = await clerkClient();
+    await client.users.updateUserMetadata(userId, {
+      publicMetadata: { role: role },
+    });
+  } catch (err) {
+    console.error(
+      "selectRole Error: Clerk metadata update failed (Sync Error) -",
+      err
+    );
+    // We don't block the user if only Clerk sync fails, 
+    // as the DB role is what drives the dashboard access.
   }
 
   revalidatePath("/", "layout");
