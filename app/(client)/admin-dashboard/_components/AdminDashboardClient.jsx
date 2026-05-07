@@ -162,7 +162,7 @@ export default function AdminDashboardClient({
   async function handleApproveProfile(userId, role) {
     if (!approveAction) return toast.error('Action not available');
     if (loadingId) return; // Prevent concurrent clicks
-    
+
     setLoadingId(`approve-${userId}`);
     const previous = pendingProfiles;
 
@@ -320,7 +320,7 @@ export default function AdminDashboardClient({
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-red-500 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/admin/disputes'}>
+              <Card className="border-l-4 border-l-red-500 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/admin-dashboard/disputes'}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Disputes</CardTitle>
                   <AlertCircle className="h-4 w-4 text-red-600" />
@@ -585,115 +585,115 @@ export default function AdminDashboardClient({
 
             <ScrollArea className="flex-grow bg-slate-50/20 custom-scrollbar">
               <div className="p-10 space-y-8 custom-scrollbar">
-              {bankDetails?.sellers?.map((item, idx) => (
-                <div key={idx} className="p-6 rounded-2xl border border-slate-200/80 bg-white shadow-sm space-y-5 hover:shadow-md hover:border-slate-300 transition-all relative overflow-hidden group">
-                  <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-300 group-hover:bg-indigo-400 transition-colors duration-300"></div>
+                {bankDetails?.sellers?.map((item, idx) => (
+                  <div key={idx} className="p-6 rounded-2xl border border-slate-200/80 bg-white shadow-sm space-y-5 hover:shadow-md hover:border-slate-300 transition-all relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-300 group-hover:bg-indigo-400 transition-colors duration-300"></div>
 
-                  <div className="flex justify-between items-start pb-4 border-b border-slate-100">
-                    <div>
-                      <p className="font-black text-slate-900 text-lg tracking-tight">{item.productName}</p>
-                      <Badge variant="secondary" className="mt-2 text-[10px] uppercase font-bold tracking-wider bg-slate-100 text-slate-600 border-none px-2.5 py-0.5">
-                        {item.sellerType}
-                      </Badge>
+                    <div className="flex justify-between items-start pb-4 border-b border-slate-100">
+                      <div>
+                        <p className="font-black text-slate-900 text-lg tracking-tight">{item.productName}</p>
+                        <Badge variant="secondary" className="mt-2 text-[10px] uppercase font-bold tracking-wider bg-slate-100 text-slate-600 border-none px-2.5 py-0.5">
+                          {item.sellerType}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3.5 text-sm">
+                      {item.sellerProfile ? (
+                        <>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Account Name</span>
+                            <span className="font-extrabold text-slate-900">{item.sellerProfile.name}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Bank Name</span>
+                            <span className="font-extrabold text-slate-900">{item.sellerProfile.bankName || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Account No</span>
+                            <span className="font-mono font-bold text-slate-800 bg-slate-50 px-2 py-1 rounded-md border border-slate-200 tracking-wider">
+                              {item.sellerProfile.accountNumber || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">IFSC Code</span>
+                            <span className="font-mono font-bold text-slate-800 tracking-wider">{item.sellerProfile.ifscCode || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between items-center pt-4 mt-2 border-t border-slate-100 border-dashed">
+                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">UPI ID</span>
+                            <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200/60 tracking-wider">
+                              {item.sellerProfile.upiId || 'N/A'}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-3 text-rose-700 bg-rose-50 border border-rose-200/60 p-4 rounded-xl text-sm font-bold">
+                          <AlertCircle className="h-5 w-5 shrink-0 text-rose-500" />
+                          No bank details linked for this seller.
+                        </div>
+                      )}
                     </div>
                   </div>
+                ))}
 
-                  <div className="space-y-3.5 text-sm">
-                    {item.sellerProfile ? (
-                      <>
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Account Name</span>
-                          <span className="font-extrabold text-slate-900">{item.sellerProfile.name}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Bank Name</span>
-                          <span className="font-extrabold text-slate-900">{item.sellerProfile.bankName || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Account No</span>
-                          <span className="font-mono font-bold text-slate-800 bg-slate-50 px-2 py-1 rounded-md border border-slate-200 tracking-wider">
-                            {item.sellerProfile.accountNumber || 'N/A'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">IFSC Code</span>
-                          <span className="font-mono font-bold text-slate-800 tracking-wider">{item.sellerProfile.ifscCode || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-4 mt-2 border-t border-slate-100 border-dashed">
-                          <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">UPI ID</span>
-                          <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200/60 tracking-wider">
-                            {item.sellerProfile.upiId || 'N/A'}
-                          </span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center gap-3 text-rose-700 bg-rose-50 border border-rose-200/60 p-4 rounded-xl text-sm font-bold">
-                        <AlertCircle className="h-5 w-5 shrink-0 text-rose-500" />
-                        No bank details linked for this seller.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                {/* Delivery Partners Section */}
+                {bankDetails?.deliveryPartners?.length > 0 && (
+                  <div className="mt-8 space-y-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Delivery Partners</h4>
+                    {bankDetails.deliveryPartners.map((partner, idx) => (
+                      <div key={idx} className="p-6 rounded-2xl border border-indigo-100 bg-indigo-50/30 shadow-sm space-y-5 hover:shadow-md transition-all relative overflow-hidden group">
+                        <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-400"></div>
 
-              {/* Delivery Partners Section */}
-              {bankDetails?.deliveryPartners?.length > 0 && (
-                <div className="mt-8 space-y-4">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Delivery Partners</h4>
-                  {bankDetails.deliveryPartners.map((partner, idx) => (
-                    <div key={idx} className="p-6 rounded-2xl border border-indigo-100 bg-indigo-50/30 shadow-sm space-y-5 hover:shadow-md transition-all relative overflow-hidden group">
-                      <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-400"></div>
-
-                      <div className="flex justify-between items-start pb-4 border-b border-indigo-100/50">
-                        <div>
-                          <p className="font-black text-slate-900 text-lg tracking-tight">{partner.partnerName}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider bg-indigo-100 text-indigo-700 border-none px-2.5 py-0.5">
-                              Delivery Partner
-                            </Badge>
-                            {partner.partnerPaymentReceived ? (
-                              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] uppercase font-bold px-2.5 py-0.5 flex items-center gap-1">
-                                <CheckCircle2 className="h-3 w-3" /> Partner Verified Receipt
+                        <div className="flex justify-between items-start pb-4 border-b border-indigo-100/50">
+                          <div>
+                            <p className="font-black text-slate-900 text-lg tracking-tight">{partner.partnerName}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider bg-indigo-100 text-indigo-700 border-none px-2.5 py-0.5">
+                                Delivery Partner
                               </Badge>
-                            ) : (
-                              <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 text-[10px] uppercase font-bold px-2.5 py-0.5 flex items-center gap-1">
-                                <Clock className="h-3 w-3" /> Awaiting Receipt Verification
-                              </Badge>
-                            )}
+                              {partner.partnerPaymentReceived ? (
+                                <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] uppercase font-bold px-2.5 py-0.5 flex items-center gap-1">
+                                  <CheckCircle2 className="h-3 w-3" /> Partner Verified Receipt
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 text-[10px] uppercase font-bold px-2.5 py-0.5 flex items-center gap-1">
+                                  <Clock className="h-3 w-3" /> Awaiting Receipt Verification
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payout Amount</p>
+                            <p className="text-xl font-black text-indigo-600">₹{partner.totalPrice?.toFixed(2)}</p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payout Amount</p>
-                          <p className="text-xl font-black text-indigo-600">₹{partner.totalPrice?.toFixed(2)}</p>
-                        </div>
-                      </div>
 
-                      <div className="space-y-3.5 text-sm">
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Bank Name</span>
-                          <span className="font-extrabold text-slate-900">{partner.bankDetails.bankName || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Account No</span>
-                          <span className="font-mono font-bold text-slate-800 bg-white/50 px-2 py-1 rounded-md border border-indigo-100 tracking-wider">
-                            {partner.bankDetails.accountNumber || 'N/A'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">IFSC Code</span>
-                          <span className="font-mono font-bold text-slate-800 tracking-wider">{partner.bankDetails.ifscCode || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-4 mt-2 border-t border-indigo-100/50 border-dashed">
-                          <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">UPI ID</span>
-                          <span className="font-mono font-bold text-indigo-700 bg-white px-3 py-1.5 rounded-lg border border-indigo-200/60 tracking-wider">
-                            {partner.bankDetails.upiId || 'N/A'}
-                          </span>
+                        <div className="space-y-3.5 text-sm">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Bank Name</span>
+                            <span className="font-extrabold text-slate-900">{partner.bankDetails.bankName || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Account No</span>
+                            <span className="font-mono font-bold text-slate-800 bg-white/50 px-2 py-1 rounded-md border border-indigo-100 tracking-wider">
+                              {partner.bankDetails.accountNumber || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">IFSC Code</span>
+                            <span className="font-mono font-bold text-slate-800 tracking-wider">{partner.bankDetails.ifscCode || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between items-center pt-4 mt-2 border-t border-indigo-100/50 border-dashed">
+                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">UPI ID</span>
+                            <span className="font-mono font-bold text-indigo-700 bg-white px-3 py-1.5 rounded-lg border border-indigo-200/60 tracking-wider">
+                              {partner.bankDetails.upiId || 'N/A'}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
               </div>
             </ScrollArea>
 
@@ -720,36 +720,36 @@ export default function AdminDashboardClient({
 
             <ScrollArea className="flex-grow bg-white custom-scrollbar">
               <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10 custom-scrollbar">
-              {selectedDocs?.aadharFront && (
-                <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase text-slate-500">Aadhar Front</p>
-                  <div className="relative aspect-[1.6/1] rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm">
-                    <img src={selectedDocs.aadharFront} alt="Aadhar Front" className="w-full h-full object-contain bg-slate-100" />
+                {selectedDocs?.aadharFront && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold uppercase text-slate-500">Aadhar Front</p>
+                    <div className="relative aspect-[1.6/1] rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm">
+                      <img src={selectedDocs.aadharFront} alt="Aadhar Front" className="w-full h-full object-contain bg-slate-100" />
+                    </div>
                   </div>
-                </div>
-              )}
-              {selectedDocs?.aadharBack && (
-                <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase text-slate-500">Aadhar Back</p>
-                  <div className="relative aspect-[1.6/1] rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm">
-                    <img src={selectedDocs.aadharBack} alt="Aadhar Back" className="w-full h-full object-contain bg-slate-100" />
+                )}
+                {selectedDocs?.aadharBack && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold uppercase text-slate-500">Aadhar Back</p>
+                    <div className="relative aspect-[1.6/1] rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm">
+                      <img src={selectedDocs.aadharBack} alt="Aadhar Back" className="w-full h-full object-contain bg-slate-100" />
+                    </div>
                   </div>
-                </div>
-              )}
-              {selectedDocs?.licenseImage && (
-                <div className="space-y-2 md:col-span-2">
-                  <p className="text-xs font-bold uppercase text-slate-500">Driving License</p>
-                  <div className="relative aspect-[1.6/1] rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm">
-                    <img src={selectedDocs.licenseImage} alt="License" className="w-full h-full object-contain bg-slate-100" />
+                )}
+                {selectedDocs?.licenseImage && (
+                  <div className="space-y-2 md:col-span-2">
+                    <p className="text-xs font-bold uppercase text-slate-500">Driving License</p>
+                    <div className="relative aspect-[1.6/1] rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm">
+                      <img src={selectedDocs.licenseImage} alt="License" className="w-full h-full object-contain bg-slate-100" />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {!selectedDocs?.aadharFront && !selectedDocs?.aadharBack && !selectedDocs?.licenseImage && (
-                <div className="md:col-span-2 py-10 text-center text-slate-400">
-                  No image documents uploaded for this profile.
-                </div>
-              )}
+                {!selectedDocs?.aadharFront && !selectedDocs?.aadharBack && !selectedDocs?.licenseImage && (
+                  <div className="md:col-span-2 py-10 text-center text-slate-400">
+                    No image documents uploaded for this profile.
+                  </div>
+                )}
               </div>
             </ScrollArea>
 

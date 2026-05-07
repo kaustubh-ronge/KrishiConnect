@@ -131,7 +131,7 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
 
             {/* Show Super Admin link only if Admin or Super Admin */}
             {isAdmin && (
-              <Link href="/admin" className="text-gray-600 hover:text-green-600 font-medium transition-colors">Super Admin</Link>
+              <Link href="/admin-dashboard" className="text-gray-600 hover:text-green-600 font-medium transition-colors">Super Admin</Link>
             )}
 
             {/* Language Selector Desktop */}
@@ -271,7 +271,7 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
                     )}
 
                     {isAdmin && (
-                      <MobileLink href="/admin" icon={ShieldCheck}>Super Admin</MobileLink>
+                      <MobileLink href="/admin-dashboard" icon={ShieldCheck}>Super Admin</MobileLink>
                     )}
 
                     <div className="my-4 border-t border-gray-100"></div>

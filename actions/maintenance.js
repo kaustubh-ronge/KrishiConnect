@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { currentUser } from "@clerk/nextjs/server";
 import { ensureAdmin } from "./admin";
 
+
 /**
  * Background-friendly action to reclaim stock from abandoned/expired checkouts.
  * Should be triggered by a cron job or admin periodically.
@@ -42,9 +43,9 @@ export async function reclaimAbandonedStock() {
             await db.$transaction(async (tx) => {
                 // ATOMIC GUARD: Only one process should succeed in flipping the status
                 const updateRes = await tx.order.updateMany({
-                    where: { 
+                    where: {
                         id: order.id,
-                        paymentStatus: "PENDING" 
+                        paymentStatus: "PENDING"
                     },
                     data: {
                         paymentStatus: "CANCELLED",

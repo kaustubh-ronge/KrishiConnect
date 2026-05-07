@@ -42,7 +42,7 @@ export async function createDispute(formData) {
       const deliveredAt = new Date(order.deliveredAt);
       const now = new Date();
       const diffInHours = (now - deliveredAt) / (1000 * 60 * 60);
-      
+
       if (diffInHours > 48) {
         return { success: false, error: "The 48-hour dispute window has expired. Please contact support for manual assistance." };
       }
@@ -167,39 +167,39 @@ export async function resolveDispute(formData) {
     }
 
     const result = await db.$transaction(async (tx) => {
-        // 1. Fetch order with items to know what to restore
-        const order = await tx.order.findUnique({
-          where: { id: orderId },
-          include: { items: true }
-        });
+      // 1. Fetch order with items to know what to restore
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true }
+      });
 
-        if (!order) throw new Error("Order not found");
+      if (!order) throw new Error("Order not found");
 
-        // 2. Perform Update
-        const updated = await tx.order.update({
-          where: { id: orderId },
-          data: {
-            disputeStatus: resolution,
-            disputeResolvedAt: new Date(),
-            payoutStatus: newPayoutStatus
-          }
-        });
-
-        // 3. Restore Stock if Buyer Wins (RESOLVED)
-        if (resolution === 'RESOLVED') {
-          console.log(`[Dispute] Restoring stock for order ${orderId}`);
-          for (const item of order.items) {
-            await tx.productListing.update({
-              where: { id: item.productId },
-              data: {
-                availableStock: { increment: item.quantity },
-                isAvailable: true
-              }
-            });
-          }
+      // 2. Perform Update
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          disputeStatus: resolution,
+          disputeResolvedAt: new Date(),
+          payoutStatus: newPayoutStatus
         }
+      });
 
-        return updated;
+      // 3. Restore Stock if Buyer Wins (RESOLVED)
+      if (resolution === 'RESOLVED') {
+        console.log(`[Dispute] Restoring stock for order ${orderId}`);
+        for (const item of order.items) {
+          await tx.productListing.update({
+            where: { id: item.productId },
+            data: {
+              availableStock: { increment: item.quantity },
+              isAvailable: true
+            }
+          });
+        }
+      }
+
+      return updated;
     });
 
     // Notify Buyer
@@ -213,7 +213,7 @@ export async function resolveDispute(formData) {
       linkUrl: '/my-orders'
     });
 
-    revalidatePath('/admin/disputes');
+    revalidatePath('/admin-dashboard/disputes');
     return { success: true, message: `Dispute marked as ${resolution}` };
 
   } catch (error) {
