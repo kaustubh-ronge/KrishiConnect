@@ -1,5 +1,5 @@
 
-import { db } from '../lib/prisma.js';
+import { db } from '../../lib/prisma.js';
 
 async function testMultiSellerCalculations() {
     console.log("=== TESTING MULTI-SELLER PAYOUT CALCULATIONS ===\n");
