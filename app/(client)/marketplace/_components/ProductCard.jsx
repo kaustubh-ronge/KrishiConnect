@@ -7,9 +7,9 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  MapPin, Scale, IndianRupee, User, MessageCircle,
+  MapPin, Scale, User, MessageCircle, ImageIcon,
   Calendar, Truck, Star, Heart, Eye, ShoppingCart,
-  Leaf, Award, Zap, Flame
+  Leaf, Award, Zap, Flame, BadgeCheck
 } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -68,7 +68,7 @@ export default function ProductCard({ product, index }) {
               <div className="flex h-full items-center justify-center">
                 <div className="text-center">
                   <div className="w-16 h-16 bg-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-2">
-                    <Image className="h-8 w-8 text-gray-400" />
+                    <ImageIcon className="h-8 w-8 text-gray-400" />
                   </div>
                   <p className="text-sm text-gray-400">No Image Available</p>
                 </div>
@@ -140,7 +140,7 @@ export default function ProductCard({ product, index }) {
                     </Badge>
                   ) : (
                     <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-[10px]">
-                      <Verified className="h-3 w-3 mr-1" /> Trader
+                      <BadgeCheck className="h-3 w-3 mr-1" /> Trader
                     </Badge>
                   )}
                   <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-[10px]">

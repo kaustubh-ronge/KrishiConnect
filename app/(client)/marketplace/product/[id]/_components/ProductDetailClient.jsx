@@ -210,7 +210,7 @@ import {
   Truck, User, Calendar, ShoppingCart, CheckCircle2, Heart,
   Share2, Star, Award, Clock, Package, Leaf, Sparkles,
   ChevronRight, Minus, Plus, RotateCcw, Zap, TrendingUp,
-  Verified, Phone, Navigation, IndianRupee, AlertCircle
+  BadgeCheck, Phone, Navigation, IndianRupee, AlertCircle
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -501,7 +501,7 @@ export default function ProductDetailClient({ product, userRole }) {
                         </Badge>
                       ) : (
                         <Badge className="bg-blue-100 text-blue-700 border-blue-200">
-                          <Verified className="h-3 w-3 mr-1" /> Verified Trader
+                          <BadgeCheck className="h-3 w-3 mr-1" /> Verified Trader
                         </Badge>
                       )}
                       <Badge className="bg-orange-100 text-orange-700 border-orange-200">

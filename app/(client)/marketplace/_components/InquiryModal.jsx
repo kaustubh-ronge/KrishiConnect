@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   MessageCircle, Send, User, Box, Phone, Package,
   IndianRupee, Sparkles, ArrowRight, Leaf, Star,
-  MapPin, Shield, Clock, CheckCircle2
+  MapPin, Shield, Clock, CheckCircle2, AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
