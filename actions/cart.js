@@ -82,6 +82,11 @@ export async function addToCart(productId, quantity) {
       }
     }
 
+    // 0. Input Validation
+    if (isNaN(quantity) || quantity <= 0) {
+        return { success: false, error: "Invalid quantity. Please enter a positive number." };
+    }
+
     // Min Quantity Check
     if (quantity < (product.minOrderQuantity || 1)) {
       return { success: false, error: `${product.productName} requires a minimum order of ${product.minOrderQuantity || 1} ${product.unit}.` };
@@ -181,6 +186,9 @@ export async function updateCartItemQuantity(cartItemId, newQuantity) {
   if (!user) return { success: false, error: "Not logged in" };
 
   try {
+    if (isNaN(newQuantity) || newQuantity <= 0) {
+      return { success: false, error: "Quantity must be a positive number." };
+    }
     const item = await db.cartItem.findUnique({
       where: { id: cartItemId },
       include: { 

@@ -51,19 +51,19 @@ export async function getAvailableDeliveryBoys(lat, lng, orderId = null) {
     // Filter by radius and calculate distance
     const eligible = deliveryBoys.map(boy => {
       const distance = getHaversineDistance(lat, lng, boy.lat, boy.lng);
-      
+
       // Check if THIS specific boy has a request for THIS specific order
       const myRequestForThisOrder = existingRequests.find(r => r.deliveryBoyId === boy.id);
 
       // Advanced Availability Logic
       let availability = "AVAILABLE";
-      
+
       if (!boy.isOnline) {
         availability = "OFFLINE";
       } else {
         // Check active jobs for OTHER orders
         const activeJobs = boy.jobs.filter(j => j.orderId !== orderId);
-        
+
         if (activeJobs.length > 0) {
           // If they are already in transit, they will be free soon
           if (activeJobs.some(j => j.status === "IN_TRANSIT")) {
@@ -90,15 +90,15 @@ export async function getAvailableDeliveryBoys(lat, lng, orderId = null) {
     // 2. AVAILABLE -> AVAILABLE_SOON -> AVAILABLE_LATER -> OFFLINE
     // 3. Nearest first
     const priority = { "AVAILABLE": 0, "AVAILABLE_SOON": 1, "AVAILABLE_LATER": 2, "OFFLINE": 3 };
-    
+
     eligible.sort((a, b) => {
       // Keep those with an active request at the top (if they haven't rejected)
       const aHired = a.hiringStatus && a.hiringStatus !== 'REJECTED';
       const bHired = b.hiringStatus && b.hiringStatus !== 'REJECTED';
-      
+
       if (aHired && !bHired) return -1;
       if (!aHired && bHired) return 1;
-      
+
       return (priority[a.availability] - priority[b.availability]) || (a.distance - b.distance);
     });
 
@@ -128,23 +128,26 @@ export async function hireDeliveryBoy(orderId, deliveryBoyId, distance) {
     // 1. Order Existence & Payment Check
     const order = await db.order.findUnique({ where: { id: orderId } });
     if (!order) throw new Error("Order not found");
-    
+
     // CRITICAL: Block hiring for UNPAID online orders
     if (order.paymentMethod === 'ONLINE' && order.paymentStatus !== 'PAID') {
-        throw new Error("Cannot hire delivery for an unpaid online order. Wait for payment confirmation.");
+      throw new Error("Cannot hire delivery for an unpaid online order. Wait for payment confirmation.");
     }
 
     // 2. Authorization: Only the seller hires.
     const isSeller = await isSellerOfOrder(user.id, orderId);
     if (!isSeller) throw new Error("Unauthorized: Only the seller can hire a delivery partner for this order.");
-    
+
     // Pickup: Boy's current location -> Order location
-    let roadDistance = distance;
+    const safeDistance = parseFloat(distance?.toString() || "0");
+    let roadDistance = isNaN(safeDistance) ? 0 : Math.max(0, safeDistance);
+
     if (order.lat && order.lng && boy.lat && boy.lng) {
-        roadDistance = await getOSRMDistance(boy.lat, boy.lng, order.lat, order.lng);
+      const osrmDist = await getOSRMDistance(boy.lat, boy.lng, order.lat, order.lng);
+      if (!isNaN(osrmDist)) roadDistance = osrmDist;
     }
 
-    const totalPrice = roadDistance * boy.pricePerKm;
+    const totalPrice = Math.max(0, roadDistance * (boy.pricePerKm || 0));
     const otp = generateOTP();
 
     // Use a transaction to handle the potential state transitions gracefully
@@ -154,7 +157,7 @@ export async function hireDeliveryBoy(orderId, deliveryBoyId, distance) {
       });
 
       if (existing && !["REJECTED", "CANCELLED"].includes(existing.status)) {
-         throw new Error("A request for this partner is already active.");
+        throw new Error("A request for this partner is already active.");
       }
 
       return await tx.deliveryJob.upsert({
@@ -220,12 +223,12 @@ export async function updateDeliveryJobStatus(jobId, status, notes = "", lat = n
 
     const job = await db.deliveryJob.findUnique({
       where: { id: jobId },
-      include: { 
+      include: {
         order: {
           include: {
             buyerUser: true
           }
-        } 
+        }
       }
     });
 
@@ -236,21 +239,21 @@ export async function updateDeliveryJobStatus(jobId, status, notes = "", lat = n
     const isSeller = await isSellerOfOrder(user.id, job.orderId);
 
     if (!isAssigned) {
-        // Allow the seller to CANCEL/REVOKE the request if not picked up yet
-        if (status === "CANCELLED" && isSeller) {
-            if (job.status !== "REQUESTED" && job.status !== "ACCEPTED") {
-              throw new Error("You cannot revoke a hire once the items have been picked up.");
-            }
-        } else {
-            throw new Error("Unauthorized: You are not the assigned delivery partner for this job.");
+      // Allow the seller to CANCEL/REVOKE the request if not picked up yet
+      if (status === "CANCELLED" && isSeller) {
+        if (job.status !== "REQUESTED" && job.status !== "ACCEPTED") {
+          throw new Error("You cannot revoke a hire once the items have been picked up.");
         }
+      } else {
+        throw new Error("Unauthorized: You are not the assigned delivery partner for this job.");
+      }
     } else {
-        // Delivery partner is trying to update
-        if (status === "CANCELLED") {
-            if (job.status === "PICKED_UP" || job.status === "IN_TRANSIT") {
-                throw new Error("You cannot cancel the job after picking up the items. Please contact support.");
-            }
+      // Delivery partner is trying to update
+      if (status === "CANCELLED") {
+        if (job.status === "PICKED_UP" || job.status === "IN_TRANSIT") {
+          throw new Error("You cannot cancel the job after picking up the items. Please contact support.");
         }
+      }
     }
 
     // CRITICAL: State Machine Guard
@@ -268,70 +271,70 @@ export async function updateDeliveryJobStatus(jobId, status, notes = "", lat = n
     }
 
     await db.$transaction(async (tx) => {
-        // CRITICAL: Acceptance & Pickup Guard (Inside TX)
-        if (status === "ACCEPTED" || status === "PICKED_UP") {
-          const alreadyAssigned = await tx.deliveryJob.findFirst({
-            where: {
-              orderId: job.orderId,
-              status: { in: ["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"] },
-              id: { not: jobId } // Exclude the current job
-            }
-          });
-
-          if (alreadyAssigned) {
-            throw new Error("This order has already been accepted by another delivery partner.");
+      // CRITICAL: Acceptance & Pickup Guard (Inside TX)
+      if (status === "ACCEPTED" || status === "PICKED_UP") {
+        const alreadyAssigned = await tx.deliveryJob.findFirst({
+          where: {
+            orderId: job.orderId,
+            status: { in: ["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"] },
+            id: { not: jobId } // Exclude the current job
           }
-        }
-        // If accepting, cancel all other REQUESTED jobs for this order to clean up dashboards
-        if (status === "ACCEPTED") {
-          await tx.deliveryJob.updateMany({
-            where: {
-              orderId: job.orderId,
-              status: "REQUESTED",
-              id: { not: jobId }
-            },
-            data: { 
-              status: "CANCELLED",
-              notes: "This order has already been accepted by another delivery partner."
-            }
-          });
-        }
-
-        // Use updateMany for atomic status-checked update
-        const updated = await tx.deliveryJob.updateMany({
-            where: { 
-                id: jobId,
-                status: job.status // Ensure it hasn't changed since we read it
-            },
-            data: updateData
         });
 
-        if (updated.count === 0) {
-            throw new Error("Job status changed or already updated by another process.");
+        if (alreadyAssigned) {
+          throw new Error("This order has already been accepted by another delivery partner.");
         }
-
-        // Sync status with Order if applicable
-        let orderStatus = job.order.orderStatus;
-        if (status === "ACCEPTED" && orderStatus === "PROCESSING") orderStatus = "PROCESSING";
-        if (status === "PICKED_UP") orderStatus = "SHIPPED";
-        if (status === "IN_TRANSIT") orderStatus = "IN_TRANSIT";
-        if (status === "DELIVERED") orderStatus = "DELIVERED";
-        if (status === "CANCELLED") orderStatus = "PROCESSING";
-
-        await tx.order.update({
-            where: { id: job.orderId },
-            data: { orderStatus }
+      }
+      // If accepting, cancel all other REQUESTED jobs for this order to clean up dashboards
+      if (status === "ACCEPTED") {
+        await tx.deliveryJob.updateMany({
+          where: {
+            orderId: job.orderId,
+            status: "REQUESTED",
+            id: { not: jobId }
+          },
+          data: {
+            status: "CANCELLED",
+            notes: "This order has already been accepted by another delivery partner."
+          }
         });
+      }
 
-        // Also update order tracking table
-        await tx.orderTracking.create({
-            data: {
-                orderId: job.orderId,
-                status: orderStatus,
-                notes: notes || `Status updated by delivery partner: ${status}`,
-                updatedBy: user.id
-            }
-        });
+      // Use updateMany for atomic status-checked update
+      const updated = await tx.deliveryJob.updateMany({
+        where: {
+          id: jobId,
+          status: job.status // Ensure it hasn't changed since we read it
+        },
+        data: updateData
+      });
+
+      if (updated.count === 0) {
+        throw new Error("Job status changed or already updated by another process.");
+      }
+
+      // Sync status with Order if applicable
+      let orderStatus = job.order.orderStatus;
+      if (status === "ACCEPTED" && orderStatus === "PROCESSING") orderStatus = "PROCESSING";
+      if (status === "PICKED_UP") orderStatus = "SHIPPED";
+      if (status === "IN_TRANSIT") orderStatus = "IN_TRANSIT";
+      if (status === "DELIVERED") orderStatus = "DELIVERED";
+      if (status === "CANCELLED") orderStatus = "PROCESSING";
+
+      await tx.order.update({
+        where: { id: job.orderId },
+        data: { orderStatus }
+      });
+
+      // Also update order tracking table
+      await tx.orderTracking.create({
+        data: {
+          orderId: job.orderId,
+          status: orderStatus,
+          notes: notes || `Status updated by delivery partner: ${status}`,
+          updatedBy: user.id
+        }
+      });
     });
 
     // ─── NEW: Send OTP to Buyer when package is Picked Up ───
@@ -362,7 +365,7 @@ export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null
 
     const job = await db.deliveryJob.findUnique({
       where: { id: jobId },
-      include: { 
+      include: {
         order: {
           include: {
             items: {
@@ -386,14 +389,14 @@ export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null
     // SECURITY: Ensure caller is the assigned delivery partner
     const isAssigned = await isAssignedDeliveryPartner(user.id, jobId);
     if (!isAssigned) {
-        throw new Error("You are not authorized to complete this delivery.");
+      throw new Error("You are not authorized to complete this delivery.");
     }
 
     if (job.status === "DELIVERED") {
-        return apiResponse.error("This delivery has already been completed.");
+      return apiResponse.error("This delivery has already been completed.");
     }
-    if (job.status !== "PICKED_UP" && job.status !== "IN_TRANSIT") {
-        return apiResponse.error("You must pick up the order before completing the delivery.");
+    if (job.status !== "PICKED_UP" && job.status !== "IN_TRANSIT" && job.status !== "ACCEPTED") {
+      return apiResponse.error("You must accept and pick up the order before completing the delivery.");
     }
     if (job.otp !== otp) {
       return apiResponse.error("Invalid OTP. Please check with the buyer.");
@@ -401,7 +404,7 @@ export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null
 
     // OTP matched, perform updates in a transaction
     const result = await db.$transaction(async (tx) => {
-      const updateData = { 
+      const updateData = {
         status: "DELIVERED",
         notes: "Delivery completed successfully via OTP verification."
       };
@@ -416,10 +419,21 @@ export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null
         if (job.startLat && job.startLng) {
           // LOGIC A: Pickup Location -> Delivery Location
           actualDist = await getOSRMDistance(job.startLat, job.startLng, endLat, endLng);
+          
+          // PROTECTIVE FALLBACK: If the boy clicked "Picked Up" at the delivery destination (Late Click)
+          // We treat it as if they "Forgot" and use the Seller -> Buyer distance instead.
+          if (actualDist < 0.1) {
+             const firstItem = job.order.items?.[0];
+             const seller = firstItem?.product?.farmer || firstItem?.product?.agent;
+             if (seller?.lat && seller?.lng && job.order.lat && job.order.lng) {
+                console.log(`[Delivery] Detected late pickup click. Falling back to baseline.`);
+                actualDist = await getOSRMDistance(seller.lat, seller.lng, job.order.lat, job.order.lng);
+             }
+          }
         } else {
           // LOGIC B: Fallback (Seller Location -> Buyer/Order Location)
-          const firstItem = job.order.items[0];
-          const seller = firstItem.product.farmer || firstItem.product.agent;
+          const firstItem = job.order.items?.[0];
+          const seller = firstItem?.product?.farmer || firstItem?.product?.agent;
           
           if (seller?.lat && seller?.lng && job.order.lat && job.order.lng) {
             console.log(`[Delivery] Pickup update skipped. Falling back to Seller-Buyer distance.`);
@@ -428,7 +442,7 @@ export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null
             actualDist = job.distance || 0; // Last resort: use the initial estimate
           }
         }
-        
+
         updateData.actualDistance = actualDist;
         updateData.totalPrice = actualDist * job.deliveryBoy.pricePerKm;
       }
@@ -440,7 +454,7 @@ export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null
 
       await tx.order.update({
         where: { id: job.orderId },
-        data: { 
+        data: {
           orderStatus: "DELIVERED",
           deliveredAt: new Date()
         }
@@ -462,12 +476,12 @@ export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null
     try {
       const firstItem = job.order.items[0];
       const sellerUser = firstItem.product.farmer?.user || firstItem.product.agent?.user;
-      
+
       if (sellerUser?.email) {
         const { sendDeliveryCompletionEmailToSeller } = await import("@/lib/email");
         await sendDeliveryCompletionEmailToSeller(
-          sellerUser.email, 
-          job.orderId, 
+          sellerUser.email,
+          job.orderId,
           job.deliveryBoy.name
         );
       }
@@ -497,13 +511,13 @@ export async function updateLiveLocation(jobId, lat, lng) {
     const nLat = parseFloat(lat);
     const nLng = parseFloat(lng);
     if (isNaN(nLat) || isNaN(nLng) || nLat < -90 || nLat > 90 || nLng < -180 || nLng > 180) {
-        throw new Error("Invalid GPS coordinates");
+      throw new Error("Invalid GPS coordinates");
     }
 
     // 2. Ownership Check
     const isAssigned = await isAssignedDeliveryPartner(user.id, jobId);
     if (!isAssigned) {
-        throw new Error("Unauthorized: You are not the assigned delivery partner for this job.");
+      throw new Error("Unauthorized: You are not the assigned delivery partner for this job.");
     }
 
     await db.deliveryJob.update({
@@ -530,7 +544,7 @@ export async function markPartnerPaymentReceived(jobId) {
     // CRITICAL: Only the delivery partner themselves can mark their payment as received
     const isAssigned = await isAssignedDeliveryPartner(user.id, jobId);
     if (!isAssigned) {
-        throw new Error("Unauthorized: Only the delivery partner can mark their payment as received.");
+      throw new Error("Unauthorized: Only the delivery partner can mark their payment as received.");
     }
 
     await db.deliveryJob.update({
@@ -557,7 +571,7 @@ export async function resendDeliveryOtp(jobId) {
 
     const job = await db.deliveryJob.findUnique({
       where: { id: jobId },
-      include: { 
+      include: {
         order: {
           include: { buyerUser: true }
         },
@@ -570,11 +584,11 @@ export async function resendDeliveryOtp(jobId) {
     const isSeller = await isSellerOfOrder(user.id, job.orderId);
 
     if (!isAssigned && !isSeller) {
-        throw new Error("Unauthorized: Only the delivery partner or the seller can resend the OTP.");
+      throw new Error("Unauthorized: Only the delivery partner or the seller can resend the OTP.");
     }
 
     if (job.status !== "PICKED_UP" && job.status !== "IN_TRANSIT") {
-        throw new Error("OTP can only be resent for active deliveries (Picked up or In-transit).");
+      throw new Error("OTP can only be resent for active deliveries (Picked up or In-transit).");
     }
 
     if (job.order.buyerUser?.email) {

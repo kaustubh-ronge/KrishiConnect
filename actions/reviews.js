@@ -22,12 +22,17 @@ export async function createReview(formData) {
     }
   });
 
-  const orderId = formData.get('orderId');
-  const productId = formData.get('productId');
-  const rating = parseInt(formData.get('rating'));
-  const comment = sanitizeContent(formData.get('comment'));
+  const orderId = formData.get('orderId')?.toString();
+  const productId = formData.get('productId')?.toString();
+  const rawRating = formData.get('rating')?.toString();
+  const rating = parseInt(rawRating || "0");
+  const comment = sanitizeContent(formData.get('comment'))?.slice(0, 1000);
 
-  if (!rating || rating < 1 || rating > 5) {
+  if (!orderId || !productId) {
+    return { success: false, error: "Missing required order or product information." };
+  }
+
+  if (isNaN(rating) || rating < 1 || rating > 5) {
     return { success: false, error: "Please provide a valid rating (1-5)." };
   }
 

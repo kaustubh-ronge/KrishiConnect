@@ -27,9 +27,9 @@ export async function createNotification({ userId, type, title, message, linkUrl
       data: {
         userId,
         type,
-        title,
-        message,
-        linkUrl
+        title: title?.slice(0, 100),
+        message: message?.slice(0, 500),
+        linkUrl: linkUrl?.slice(0, 500)
       }
     });
 

@@ -62,13 +62,13 @@ export async function createProductListing(formData) {
   const rawPrice = parseFloat(formData.get("pricePerUnit")?.toString() || "0");
   const rawMin = parseFloat(formData.get("minOrderQuantity")?.toString() || "0");
   
-  // BOUNDARY PROTECTION: Cap numbers to prevent database overflow
-  const availableStock = Math.min(rawStock, 10000000); // 10M cap
-  const pricePerUnit = Math.min(rawPrice, 1000000); // 1M cap
-  const minOrderQuantity = Math.min(rawMin, 1000000); 
+  // BOUNDARY PROTECTION: Cap numbers and handle NaN
+  const availableStock = isNaN(rawStock) ? 0 : Math.min(rawStock, 10000000); 
+  const pricePerUnit = isNaN(rawPrice) ? 0 : Math.min(rawPrice, 1000000); 
+  const minOrderQuantity = isNaN(rawMin) ? 0 : Math.min(rawMin, 1000000); 
 
-  const unit = sanitizeContent(formData.get("unit"))?.slice(0, 20);
-  const deliveryCharge = Math.min(parseFloat(formData.get("deliveryCharge")?.toString() || "0"), 100000);
+  const deliveryChargeVal = parseFloat(formData.get("deliveryCharge")?.toString() || "0");
+  const deliveryCharge = isNaN(deliveryChargeVal) ? 0 : Math.min(deliveryChargeVal, 100000);
   const deliveryChargeType = formData.get("deliveryChargeType")?.toString() || "per_unit";
 
   const qualityGrade = sanitizeContent(formData.get("qualityGrade"))?.slice(0, 50);
@@ -246,12 +246,12 @@ export async function updateProductListing(listingId, formData) {
     const rawMin = parseFloat(formData.get("minOrderQuantity")?.toString() || "0");
     
     // BOUNDARY PROTECTION
-    const availableStock = Math.min(rawStock, 10000000); 
-    const pricePerUnit = Math.min(rawPrice, 1000000); 
-    const minOrderQuantity = Math.min(rawMin, 1000000); 
+    const availableStock = isNaN(rawStock) ? 0 : Math.min(rawStock, 10000000); 
+    const pricePerUnit = isNaN(rawPrice) ? 0 : Math.min(rawPrice, 1000000); 
+    const minOrderQuantity = isNaN(rawMin) ? 0 : Math.min(rawMin, 1000000); 
 
-    const unit = sanitizeContent(formData.get("unit"))?.slice(0, 20);
-    const deliveryCharge = Math.min(parseFloat(formData.get("deliveryCharge")?.toString() || "0"), 100000);
+    const deliveryChargeVal = parseFloat(formData.get("deliveryCharge")?.toString() || "0");
+    const deliveryCharge = isNaN(deliveryChargeVal) ? 0 : Math.min(deliveryChargeVal, 100000);
     const deliveryChargeType = formData.get("deliveryChargeType")?.toString() || "per_unit";
     const qualityGrade = sanitizeContent(formData.get("qualityGrade"))?.slice(0, 50);
     const shelfLife = sanitizeContent(formData.get("shelfLife"))?.slice(0, 50);
