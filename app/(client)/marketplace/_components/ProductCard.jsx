@@ -133,6 +133,20 @@ export default function ProductCard({ product, index }) {
                 <h3 className="font-bold text-lg text-gray-900 line-clamp-1 group-hover:text-emerald-700 transition-colors">
                   {product.productName}
                 </h3>
+                <div className="flex items-center gap-2 mb-2 mt-1">
+                  {isFarmer ? (
+                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]">
+                      <Leaf className="h-3 w-3 mr-1" /> Farm
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-[10px]">
+                      <Verified className="h-3 w-3 mr-1" /> Trader
+                    </Badge>
+                  )}
+                  <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-[10px]">
+                    {product.category || "General"}
+                  </Badge>
+                </div>
                 <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
                   <MapPin className="h-3 w-3 text-gray-400" />
                   <span className="line-clamp-1">{location || "India"}</span>

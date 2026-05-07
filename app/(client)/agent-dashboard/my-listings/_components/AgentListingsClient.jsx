@@ -63,7 +63,14 @@ export default function AgentListingsClient({ initialListings }) {
               </div>
               <CardContent className="p-5">
                 <div className="flex justify-between items-start mb-3">
-                  <h3 className="font-bold text-xl text-gray-900 line-clamp-1">{product.productName}</h3>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-100 uppercase tracking-wider font-bold">
+                        {product.category || "General"}
+                      </Badge>
+                    </div>
+                    <h3 className="font-bold text-xl text-gray-900 line-clamp-1">{product.productName}</h3>
+                  </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 -mr-2"><MoreVertical className="h-4 w-4 text-gray-500" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">

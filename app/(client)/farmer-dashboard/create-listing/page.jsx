@@ -76,8 +76,9 @@ export default function CreateListingPage() {
   const [tagInput, setTagInput] = useState("");
 
   // Custom Product State
-  const [selectedProduct, setSelectedProduct] = useState("");
-  const [customProduct, setCustomProduct] = useState("");
+  const [productName, setProductName] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [customCategory, setCustomCategory] = useState("");
 
   // Calculation State (for UX)
   const [price, setPrice] = useState("");
@@ -98,7 +99,7 @@ export default function CreateListingPage() {
   // Form progress tracking
   const [formProgress, setFormProgress] = useState(0);
 
-  const isPerishable = !["Cotton", "Other"].includes(selectedProduct);
+  const isPerishable = !["Cotton", "Other"].includes(selectedCategory);
 
   // --- Handlers ---
   const handleImageUpload = (newImages) => {
@@ -124,7 +125,8 @@ export default function CreateListingPage() {
 
   const updateProgress = () => {
     let progress = 0;
-    if (selectedProduct) progress += 25;
+    if (productName) progress += 15;
+    if (selectedCategory) progress += 10;
     if (price && stock) progress += 25;
     if (images.length > 0) progress += 25;
     if (tags.length > 0) progress += 15;
@@ -137,9 +139,17 @@ export default function CreateListingPage() {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
 
-    const productName = selectedProduct === "Other" ? customProduct.trim() : selectedProduct;
-    if (!productName) {
-      toast.error("Please select or enter a product.", {
+    const category = selectedCategory === "Other" ? customCategory.trim() : selectedCategory;
+    
+    if (!productName || productName.length < 3) {
+      toast.error("Please enter a valid product name (min 3 chars).", {
+        icon: <AlertCircle className="h-5 w-5" />
+      });
+      return;
+    }
+
+    if (!category) {
+      toast.error("Please select a category.", {
         icon: <AlertCircle className="h-5 w-5" />
       });
       return;
@@ -154,6 +164,7 @@ export default function CreateListingPage() {
     }
 
     formData.set("productName", productName);
+    formData.set("category", category);
     formData.set("qualityGrade", qualityGrade);
     formData.set("description", description);
     formData.set("availableStock", stock);
@@ -173,6 +184,7 @@ export default function CreateListingPage() {
 
     const validationData = {
       productName,
+      category,
       variety: tags.join(", "),
       description,
       availableStock: stock,
@@ -452,23 +464,42 @@ export default function CreateListingPage() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Product Select */}
+                        {/* Product Name */}
+                        <div className="space-y-2 group md:col-span-2">
+                          <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <Tag className="h-4 w-4 text-emerald-500" />
+                            Product Name *
+                          </Label>
+                          <Input
+                            placeholder="e.g. Fresh Organic Alphanso Mangoes"
+                            value={productName}
+                            onChange={(e) => {
+                              setProductName(e.target.value);
+                              updateProgress();
+                            }}
+                            maxLength={100}
+                            className="h-14 bg-white/80 backdrop-blur-sm border-2 border-emerald-100 hover:border-emerald-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 rounded-2xl transition-all duration-300 text-lg"
+                            required
+                          />
+                        </div>
+
+                        {/* Category Select */}
                         <div className="space-y-2 group">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <Leaf className="h-4 w-4 text-emerald-500" />
-                            Crop / Product *
+                            Category *
                           </Label>
                           <Select
-                            name="productName"
+                            name="category"
                             required
-                            value={selectedProduct}
+                            value={selectedCategory}
                             onValueChange={(value) => {
-                              setSelectedProduct(value);
+                              setSelectedCategory(value);
                               updateProgress();
                             }}
                           >
                             <SelectTrigger className="h-14 bg-white/80 backdrop-blur-sm border-2 border-emerald-100 hover:border-emerald-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 rounded-2xl transition-all duration-300 text-lg">
-                              <SelectValue placeholder="Choose your crop..." />
+                              <SelectValue placeholder="Choose category..." />
                             </SelectTrigger>
                             <SelectContent className="rounded-xl">
                               {produceCategories.map(c => (
@@ -480,7 +511,7 @@ export default function CreateListingPage() {
                           </Select>
 
                           <AnimatePresence>
-                            {selectedProduct === "Other" && (
+                            {selectedCategory === "Other" && (
                               <motion.div
                                 initial={{ opacity: 0, height: 0, y: -10 }}
                                 animate={{ opacity: 1, height: 'auto', y: 0 }}
@@ -491,13 +522,13 @@ export default function CreateListingPage() {
                                 <div className="bg-gradient-to-r from-emerald-50 to-green-50 p-4 rounded-2xl border border-emerald-200">
                                   <Label className="text-emerald-700 text-xs font-bold uppercase tracking-wider flex items-center gap-2 mb-2">
                                     <Info className="h-3 w-3" />
-                                    Custom Product Name
+                                    Custom Category Name
                                   </Label>
                                   <Input
-                                    placeholder="e.g. Dragon Fruit, Mushrooms..."
-                                    value={customProduct}
-                                    onChange={(e) => setCustomProduct(e.target.value)}
-                                    maxLength={100}
+                                    placeholder="e.g. Exotic Fruit, Spices..."
+                                    value={customCategory}
+                                    onChange={(e) => setCustomCategory(e.target.value)}
+                                    maxLength={50}
                                     className="h-12 bg-white border-emerald-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 rounded-xl"
                                     required
                                   />

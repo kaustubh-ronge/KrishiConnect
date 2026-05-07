@@ -48,6 +48,7 @@ export async function createProductListing(formData) {
   // 3. Extract & Sanitize Data (Strips all HTML tags to prevent XSS)
 
   const productName = sanitizeContent(formData.get("productName"))?.slice(0, 100);
+  const category = sanitizeContent(formData.get("category"))?.slice(0, 50);
   const variety = sanitizeContent(formData.get("variety"))?.slice(0, 50);
   const description = sanitizeContent(formData.get("description"))?.slice(0, 2000);
 
@@ -94,11 +95,11 @@ export async function createProductListing(formData) {
   try {
     await db.productListing.create({
       data: {
-        productName, variety, description, images,
+        productName, category, variety, description, images,
         quantityLabel: `${availableStock} ${unit}`,
         availableStock, unit, pricePerUnit, deliveryCharge, deliveryChargeType, minOrderQuantity,
         qualityGrade, shelfLife, harvestDate, whatsappNumber,
-        shelfLifeStartDate, // <<< NEW FIELD
+        shelfLifeStartDate, 
         isAvailable: true,
         sellerType,
         farmerId: sellerType === 'farmer' ? sellerProfileId : null,
@@ -196,6 +197,7 @@ export async function updateProductListing(listingId, formData) {
     // Extract & Sanitize Data
 
     const productName = sanitizeContent(formData.get("productName"))?.slice(0, 100);
+    const category = sanitizeContent(formData.get("category"))?.slice(0, 50);
     const variety = sanitizeContent(formData.get("variety"))?.slice(0, 50);
     const description = sanitizeContent(formData.get("description"))?.slice(0, 2000);
 
@@ -236,11 +238,11 @@ export async function updateProductListing(listingId, formData) {
     await db.productListing.update({
       where: { id: listingId },
       data: {
-        productName, variety, description, images,
+        productName, category, variety, description, images,
         quantityLabel: `${availableStock} ${unit}`,
         availableStock, unit, pricePerUnit, deliveryCharge, deliveryChargeType, minOrderQuantity,
         qualityGrade, shelfLife, harvestDate, whatsappNumber,
-        shelfLifeStartDate, // <<< NEW FIELD
+        shelfLifeStartDate, 
       }
     });
 

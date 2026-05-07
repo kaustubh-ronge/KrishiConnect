@@ -50,8 +50,9 @@ export default function AgentCreateListingPage() {
   const [images, setImages] = useState([]);
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState("");
-  const [selectedProduct, setSelectedProduct] = useState("");
-  const [customProduct, setCustomProduct] = useState("");
+  const [productName, setProductName] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [customCategory, setCustomCategory] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [unit, setUnit] = useState("piece");
@@ -66,11 +67,12 @@ export default function AgentCreateListingPage() {
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [formProgress, setFormProgress] = useState(10);
 
-  const isPerishable = ["Seeds", "Nursery Plants", "Vegetables (Bulk Trade)", "Fruits (Bulk Trade)", "Grains & Pulses", "Animal Feed"].includes(selectedProduct);
+  const isPerishable = ["Seeds", "Nursery Plants", "Vegetables (Bulk Trade)", "Fruits (Bulk Trade)", "Grains & Pulses", "Animal Feed"].includes(selectedCategory);
 
   const updateProgress = () => {
     let progress = 10;
-    if (selectedProduct) progress += 25;
+    if (productName) progress += 15;
+    if (selectedCategory) progress += 10;
     if (price && stock) progress += 25;
     if (images.length > 0) progress += 25;
     if (description.length > 10) progress += 15;
@@ -88,11 +90,13 @@ export default function AgentCreateListingPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const productName = selectedProduct === "Other" ? customProduct.trim() : selectedProduct;
-    if (!productName || images.length === 0) { toast.error("Missing required info"); return; }
+    const category = selectedCategory === "Other" ? customCategory.trim() : selectedCategory;
+    if (!productName || productName.length < 3) { toast.error("Valid product name required"); return; }
+    if (!category) { toast.error("Category required"); return; }
+    if (images.length === 0) { toast.error("Images required"); return; }
 
     formData.set("productName", productName);
+    formData.set("category", category);
     formData.set("qualityGrade", qualityGrade);
     formData.set("description", description);
     formData.set("availableStock", stock);
@@ -173,13 +177,17 @@ export default function AgentCreateListingPage() {
                   <motion.section key="step1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-8">
                     <div className="flex items-center gap-3"><div className="bg-blue-100 p-3 rounded-xl text-blue-700"><Package className="h-7 w-7" /></div><h3 className="text-2xl font-bold text-gray-800">Product Info</h3></div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2 md:col-span-2">
+                        <Label className="flex items-center gap-2"><Tag className="h-4 w-4" /> Product Name *</Label>
+                        <Input placeholder="Product Name" value={productName} onChange={(e) => { setProductName(e.target.value); updateProgress(); }} className="h-14 rounded-2xl border-2 border-blue-50" required />
+                      </div>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-2"><Boxes className="h-4 w-4" /> Category *</Label>
-                        <Select name="productName" value={selectedProduct} onValueChange={(v) => { setSelectedProduct(v); updateProgress(); }}>
+                        <Select name="category" value={selectedCategory} onValueChange={(v) => { setSelectedCategory(v); updateProgress(); }}>
                           <SelectTrigger className="h-14 rounded-2xl border-2 border-blue-50"><SelectValue placeholder="Select Category" /></SelectTrigger>
                           <SelectContent>{agentProductCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                         </Select>
-                        {selectedProduct === "Other" && <Input placeholder="Name" maxLength={100} className="mt-3 h-12 rounded-xl" value={customProduct} onChange={(e) => setCustomProduct(e.target.value)} />}
+                        {selectedCategory === "Other" && <Input placeholder="Custom Category" maxLength={50} className="mt-3 h-12 rounded-xl" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} />}
                       </div>
                       <div className="space-y-2"><Label className="flex items-center gap-2"><Award className="h-4 w-4" /> Quality</Label><Select value={qualityGrade} onValueChange={setQualityGrade}><SelectTrigger className="h-14 rounded-2xl border-2 border-blue-50"><SelectValue placeholder="Grade" /></SelectTrigger><SelectContent>{gradeOptions.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div>
                       <div className="md:col-span-2 space-y-2">

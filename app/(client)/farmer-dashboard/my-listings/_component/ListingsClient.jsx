@@ -124,6 +124,11 @@ export default function ListingsClient({ initialListings }) {
               <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-100 uppercase tracking-wider font-bold">
+                        {product.category || "General"}
+                      </Badge>
+                    </div>
                     <h3 className="font-bold text-xl text-gray-900 line-clamp-1">{product.productName}</h3>
                     {product.variety && (
                         <div className="flex flex-wrap gap-2 mt-2">

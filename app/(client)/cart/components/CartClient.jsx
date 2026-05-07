@@ -286,9 +286,14 @@ return (
                                         <div className="flex justify-between items-start">
                                             <div>
                                                 <h3 className="font-bold text-xl text-gray-900">{item.product.productName}</h3>
-                                                <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-                                                    Sold by: <span className="font-medium text-gray-700 capitalize bg-gray-100 px-2 py-0.5 rounded text-xs">{item.product.sellerType}</span>
-                                                </p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <Badge variant="outline" className="text-[10px] bg-gray-50 border-gray-200 text-gray-500 font-medium">
+                                                        {item.product.category || "General"}
+                                                    </Badge>
+                                                    <p className="text-sm text-gray-500 flex items-center gap-2">
+                                                        Sold by: <span className="font-medium text-gray-700 capitalize bg-gray-100 px-2 py-0.5 rounded text-xs">{item.product.sellerType}</span>
+                                                    </p>
+                                                </div>
                                                 <p className="text-sm text-green-600 mt-1 font-medium flex items-center">
                                                     <CheckCircle2 className="w-3 h-3 mr-1" /> In Stock
                                                 </p>

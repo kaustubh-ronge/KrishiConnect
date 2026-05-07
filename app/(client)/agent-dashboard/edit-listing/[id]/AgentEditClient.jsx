@@ -43,10 +43,13 @@ export default function AgentEditClient({ product }) {
   const [tags, setTags] = useState(product.variety ? product.variety.split(", ") : []);
   const [tagInput, setTagInput] = useState("");
 
-  // --- Custom Product Logic (For 'Other') ---
+  // --- NEW: Product State ---
   const initialProductName = product.productName || "";
-  const [selectedProduct, setSelectedProduct] = useState(isStandardCategory(initialProductName) ? initialProductName : "Other");
-  const [customProduct, setCustomProduct] = useState(isStandardCategory(initialProductName) ? "" : initialProductName);
+  const initialCategory = product.category || "";
+
+  const [productName, setProductName] = useState(initialProductName);
+  const [selectedCategory, setSelectedCategory] = useState(isStandardCategory(initialCategory) ? initialCategory : (initialCategory ? "Other" : ""));
+  const [customCategory, setCustomCategory] = useState(isStandardCategory(initialCategory) ? "" : initialCategory);
 
   // --- Handlers ---
   const handleAddTag = (e) => {
@@ -79,17 +82,21 @@ export default function AgentEditClient({ product }) {
       return;
     }
 
-    // 1. Handle Custom Product Name
-    if (selectedProduct === "Other") {
-      if (!customProduct.trim()) {
-        toast.error("Please specify the product name.");
-        return;
-      }
-      formData.set("productName", customProduct.trim());
-    } else if (!selectedProduct) {
-      toast.error("Please select a product category.");
+    // 1. Handle Category Logic
+    const category = selectedCategory === "Other" ? customCategory.trim() : selectedCategory;
+
+    if (!productName || productName.trim().length < 3) {
+      toast.error("Please enter a valid product name (min 3 chars).");
       return;
     }
+
+    if (!category) {
+      toast.error("Please select a category.");
+      return;
+    }
+
+    formData.set("productName", productName.trim());
+    formData.set("category", category);
 
     // 2. Append Images
     formData.delete("images");
@@ -141,15 +148,28 @@ export default function AgentEditClient({ product }) {
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
+                    {/* Product Name */}
+                    <div className="space-y-2 md:col-span-2">
+                      <Label className="text-blue-700 font-semibold">Product Name *</Label>
+                      <Input
+                        placeholder="e.g. Premium Neem Fertilizer"
+                        value={productName}
+                        onChange={(e) => setProductName(e.target.value)}
+                        maxLength={100}
+                        className="h-12 bg-white border-blue-200 focus:border-blue-500 rounded-xl"
+                        required
+                      />
+                    </div>
+
                     {/* Category Select + Custom Input */}
                     <div className="space-y-2">
-                      <Label>Product Category</Label>
+                      <Label>Product Category *</Label>
                       <Select
-                        name="productName"
-                        defaultValue={selectedProduct}
-                        onValueChange={setSelectedProduct}
+                        name="category"
+                        defaultValue={selectedCategory}
+                        onValueChange={setSelectedCategory}
                       >
-                        <SelectTrigger className="bg-white h-12"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="bg-white h-12"><SelectValue placeholder="Select Category" /></SelectTrigger>
                         <SelectContent>
                           {agentProductCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                         </SelectContent>
@@ -157,19 +177,19 @@ export default function AgentEditClient({ product }) {
 
                       {/* Conditional Input */}
                       <AnimatePresence>
-                        {selectedProduct === "Other" && (
+                        {selectedCategory === "Other" && (
                           <motion.div
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
                             className="pt-1 overflow-hidden"
                           >
-                            <Label className="text-blue-600 text-xs font-semibold uppercase tracking-wide">Specify Product Name</Label>
+                            <Label className="text-blue-600 text-xs font-semibold uppercase tracking-wide">Specify Category Name</Label>
                             <Input
-                              placeholder="e.g. Neem Oil, Tractor Parts..."
-                              value={customProduct}
-                              onChange={(e) => setCustomProduct(e.target.value)}
-                              maxLength={100}
+                              placeholder="e.g. Specialty Items, New Category..."
+                              value={customCategory}
+                              onChange={(e) => setCustomCategory(e.target.value)}
+                              maxLength={50}
                               className="bg-blue-50 border-blue-200 focus:border-blue-500 h-11 mt-1"
                               required
                             />

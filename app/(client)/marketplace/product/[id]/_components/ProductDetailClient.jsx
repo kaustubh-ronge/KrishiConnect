@@ -504,6 +504,9 @@ export default function ProductDetailClient({ product, userRole }) {
                           <Verified className="h-3 w-3 mr-1" /> Verified Trader
                         </Badge>
                       )}
+                      <Badge className="bg-orange-100 text-orange-700 border-orange-200">
+                        {product.category || "General"}
+                      </Badge>
                       <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
                         <Star className="h-3 w-3 mr-1 fill-yellow-500" /> {product.averageRating || 'New'}
                       </Badge>

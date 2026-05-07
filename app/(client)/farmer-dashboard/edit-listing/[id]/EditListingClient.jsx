@@ -330,10 +330,13 @@ export default function EditListingClient({ product }) {
   const [tagInput, setTagInput] = useState("");
   const [activeSection, setActiveSection] = useState(1);
 
-  // --- NEW: Custom Product State for 'Other' ---
+  // --- NEW: Product State ---
   const initialProductName = product.productName || "";
-  const [selectedProduct, setSelectedProduct] = useState(isStandardCategory(initialProductName) ? initialProductName : "Other");
-  const [customProduct, setCustomProduct] = useState(isStandardCategory(initialProductName) ? "" : initialProductName);
+  const initialCategory = product.category || "";
+  
+  const [productName, setProductName] = useState(initialProductName);
+  const [selectedCategory, setSelectedCategory] = useState(isStandardCategory(initialCategory) ? initialCategory : (initialCategory ? "Other" : ""));
+  const [customCategory, setCustomCategory] = useState(isStandardCategory(initialCategory) ? "" : initialCategory);
 
   // --- Handlers ---
   const handleAddTag = (e) => {
@@ -369,17 +372,21 @@ export default function EditListingClient({ product }) {
       return;
     }
 
-    // 1. Handle Custom Product Name Logic
-    if (selectedProduct === "Other") {
-      if (!customProduct.trim()) {
-        toast.error("Please specify the product name.");
-        return;
-      }
-      formData.set("productName", customProduct.trim());
-    } else if (!selectedProduct) {
-      toast.error("Please select a product.");
+    // 1. Handle Category Logic
+    const category = selectedCategory === "Other" ? customCategory.trim() : selectedCategory;
+    
+    if (!productName || productName.trim().length < 3) {
+      toast.error("Please enter a valid product name (min 3 chars).");
       return;
     }
+
+    if (!category) {
+      toast.error("Please select a category.");
+      return;
+    }
+
+    formData.set("productName", productName.trim());
+    formData.set("category", category);
 
     // 2. Append Images
     formData.delete("images");
@@ -541,15 +548,28 @@ export default function EditListingClient({ product }) {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Product Name */}
+                        <div className="space-y-2 md:col-span-2">
+                          <Label className="text-sm font-semibold text-gray-700">Product Name *</Label>
+                          <Input
+                            placeholder="e.g. Fresh Organic Alphanso Mangoes"
+                            value={productName}
+                            onChange={(e) => setProductName(e.target.value)}
+                            maxLength={100}
+                            className="h-12 bg-white/70 backdrop-blur-sm border-emerald-200 hover:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 rounded-xl"
+                            required
+                          />
+                        </div>
+
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Crop / Product</Label>
+                          <Label className="text-sm font-medium text-gray-700">Category *</Label>
                           <Select
-                            name="productName"
-                            defaultValue={selectedProduct}
-                            onValueChange={setSelectedProduct}
+                            name="category"
+                            defaultValue={selectedCategory}
+                            onValueChange={setSelectedCategory}
                           >
                             <SelectTrigger className="h-12 bg-white/70 backdrop-blur-sm border-emerald-200 hover:border-emerald-400 transition-all focus:ring-2 focus:ring-emerald-500/20 rounded-xl">
-                              <SelectValue placeholder="Select product" />
+                              <SelectValue placeholder="Select category" />
                             </SelectTrigger>
                             <SelectContent>
                               {produceCategories.map(c => (
@@ -559,7 +579,7 @@ export default function EditListingClient({ product }) {
                           </Select>
 
                           <AnimatePresence>
-                            {selectedProduct === "Other" && (
+                            {selectedCategory === "Other" && (
                               <motion.div
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: 'auto' }}
@@ -568,13 +588,13 @@ export default function EditListingClient({ product }) {
                               >
                                 <Label className="text-emerald-700 text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
                                   <Info className="h-3 w-3" />
-                                  Specify Product Name
+                                  Specify Category Name
                                 </Label>
                                 <Input
-                                  placeholder="e.g. Dragon Fruit, Mushrooms..."
-                                  value={customProduct}
-                                  onChange={(e) => setCustomProduct(e.target.value)}
-                                  maxLength={100}
+                                  placeholder="e.g. Exotic Fruit, Spices..."
+                                  value={customCategory}
+                                  onChange={(e) => setCustomCategory(e.target.value)}
+                                  maxLength={50}
                                   className="mt-1.5 h-11 bg-emerald-50/50 border-emerald-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl transition-all"
                                   required
                                 />
