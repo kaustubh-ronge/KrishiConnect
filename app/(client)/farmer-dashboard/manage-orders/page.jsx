@@ -17,9 +17,9 @@ export default async function ManageOrdersPage(props) {
   
   return (
     <ManageOrdersClient 
-      initialOrders={ordersResult.success ? ordersResult.data : []} 
-      total={ordersResult.total || 0}
-      hasMore={ordersResult.hasMore}
+      initialOrders={ordersResult.success ? ordersResult.data.data : []} 
+      total={ordersResult.success ? ordersResult.data.total : 0}
+      hasMore={ordersResult.success ? ordersResult.data.hasMore : false}
       currentPage={page}
       userType="farmer"
     />

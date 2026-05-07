@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   IndianRupee, TrendingUp, Package, Calendar, 
-  ArrowUpRight, Download, Filter, Search, User
+  ArrowUpRight, Download, Filter, Search, User, Loader2
 } from "lucide-react";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar 

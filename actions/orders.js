@@ -221,8 +221,16 @@ export async function initiateCheckout(addressData) {
         }
         // If it's PENDING and has no razorpayOrderId, it means the previous attempt failed 
         // after DB commit but before Razorpay call. We allow resumption.
-        console.log("[Checkout] Resuming existing pending order.");
-        return existing;
+        // Update timestamp and expiration to "refresh" the session
+        const updated = await tx.order.update({
+          where: { id: existing.id },
+          data: { 
+            createdAt: new Date(),
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000) 
+          }
+        });
+        console.log("[Checkout] Resumed and refreshed existing pending order.");
+        return updated;
       }
 
       console.log("[Checkout] Creating Order Record...");

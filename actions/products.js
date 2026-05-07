@@ -74,6 +74,7 @@ export async function createProductListing(formData) {
   const qualityGrade = sanitizeContent(formData.get("qualityGrade"))?.slice(0, 50);
   const shelfLife = sanitizeContent(formData.get("shelfLife"))?.slice(0, 50);
   const whatsappNumber = sanitizeContent(formData.get("whatsappNumber"))?.slice(0, 20);
+  const unit = formData.get("unit")?.toString() || "kg";
 
   const harvestDateStr = formData.get("harvestDate")?.toString();
   const harvestDate = harvestDateStr ? new Date(harvestDateStr) : null;
@@ -256,6 +257,8 @@ export async function updateProductListing(listingId, formData) {
     const qualityGrade = sanitizeContent(formData.get("qualityGrade"))?.slice(0, 50);
     const shelfLife = sanitizeContent(formData.get("shelfLife"))?.slice(0, 50);
     const whatsappNumber = sanitizeContent(formData.get("whatsappNumber"))?.slice(0, 20);
+    const unit = formData.get("unit")?.toString() || "kg";
+
     const harvestDateStr = formData.get("harvestDate")?.toString();
     const harvestDate = harvestDateStr ? new Date(harvestDateStr) : null;
 
