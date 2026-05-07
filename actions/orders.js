@@ -96,7 +96,18 @@ export const getBuyerOrders = cache(async () => {
         },
         deliveryJobs: {
           include: {
-            deliveryBoy: true
+            deliveryBoy: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                vehicleType: true,
+                averageRating: true,
+                isOnline: true,
+                lat: true,
+                lng: true
+              }
+            }
           }
         },
         tracking: {
@@ -405,6 +416,11 @@ export async function confirmOrderPayment({ orderId, razorpayPaymentId, razorpay
       }
 
       if (ord.paymentStatus === 'PAID') return { success: true, message: "Already paid" };
+
+      // EXPIRED GUARD: Prevent processing if order session has timed out
+      if (ord.expiresAt && new Date() > ord.expiresAt) {
+          throw new Error("Order session has expired and reserved stock may have been released. Please start a new checkout.");
+      }
 
       // (Stock was already decremented during initiateCheckout to reserve it)
 

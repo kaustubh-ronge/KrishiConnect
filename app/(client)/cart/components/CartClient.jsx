@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/useCartStore";
 import { initiateCheckout, confirmOrderPayment } from '@/actions/orders';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import {
     Trash2, ShoppingBag, ArrowRight, IndianRupee, Minus, Plus,
     ArrowLeft, ShieldCheck, Lock, Truck, CheckCircle2,
@@ -31,6 +32,12 @@ const loadRazorpay = () => {
 export default function CartClient({ initialCart, user }) {
     const router = useRouter();
     const { removeItem, updateQuantity, fetchCart } = useCartStore();
+    const [isMounted, setIsMounted] = useState(false);
+
+    // Sync mounted state
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     // Use initial data for now (in production, sync with store state)
     const cartItems = initialCart?.items || [];
@@ -43,9 +50,14 @@ export default function CartClient({ initialCart, user }) {
 
     const [isPending, setIsPending] = useState(false);
 
-    // --- Calculations ---
-    const productSubtotal = cartItems.reduce((acc, item) => acc + (item.quantity * item.product.pricePerUnit), 0);
+    // --- Calculations with Defensive Null Checks ---
+    const productSubtotal = cartItems.reduce((acc, item) => {
+        const price = item.product?.pricePerUnit || 0;
+        return acc + (item.quantity * price);
+    }, 0);
+
     const deliveryTotal = cartItems.reduce((acc, item) => {
+        if (!item.product) return acc;
         if (item.product.deliveryChargeType === 'per_unit') {
             return acc + (item.quantity * (item.product.deliveryCharge || 0));
         }
@@ -53,8 +65,14 @@ export default function CartClient({ initialCart, user }) {
     }, 0);
 
     const platformRateFor = (price) => (price < 20 ? 0.01 : 0.02);
-    const platformFee = Math.round(cartItems.reduce((acc, item) => acc + (item.product.pricePerUnit * item.quantity * platformRateFor(item.product.pricePerUnit)), 0));
+    const platformFee = Math.round(cartItems.reduce((acc, item) => {
+        const price = item.product?.pricePerUnit || 0;
+        return acc + (price * item.quantity * platformRateFor(price));
+    }, 0));
     const total = productSubtotal + deliveryTotal + platformFee;
+
+    // Prevent hydration errors by not rendering until mounted
+    if (!isMounted) return <div className="min-h-screen bg-gray-50/50" />;
 
     // --- Handlers ---
     const handleRemove = async (itemId) => {

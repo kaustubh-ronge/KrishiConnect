@@ -22,7 +22,16 @@ export async function getAvailableDeliveryBoys(lat, lng, orderId = null) {
       where: {
         approvalStatus: "APPROVED",
       },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        lat: true,
+        lng: true,
+        isOnline: true,
+        pricePerKm: true,
+        vehicleType: true,
+        averageRating: true,
+        totalJobs: true,
         jobs: {
           where: {
             status: { notIn: ["DELIVERED", "CANCELLED", "REJECTED"] }
@@ -113,27 +122,6 @@ export async function hireDeliveryBoy(orderId, deliveryBoyId, distance) {
 
     if (!boy) throw new Error("Delivery partner not found");
 
-    // NEW: Check for ANY existing record (active or inactive) for this order & boy
-    const existingJob = await db.deliveryJob.findFirst({
-      where: {
-        orderId,
-        deliveryBoyId,
-      }
-    });
-
-    if (existingJob) {
-      // If it's an active job, block it
-      if (!["REJECTED", "CANCELLED"].includes(existingJob.status)) {
-        throw new Error("You have already requested this partner and the request is active.");
-      }
-      
-      // If it's REJECTED or CANCELLED, we must delete it to satisfy the 
-      // UNIQUE constraint before creating a fresh request
-      await db.deliveryJob.delete({
-        where: { id: existingJob.id }
-      });
-    }
-
     // Calculate accurate road distance using OSRM
     // Note: The distance passed from frontend is Haversine for initial filtering,
     // we recalculate here for final billing/hiring.
@@ -146,18 +134,11 @@ export async function hireDeliveryBoy(orderId, deliveryBoyId, distance) {
         throw new Error("Cannot hire delivery for an unpaid online order. Wait for payment confirmation.");
     }
 
-    // 2. Authorization: Only the buyer or seller of the order can hire? 
-    // Actually, usually only the seller hires.
+    // 2. Authorization: Only the seller hires.
     const isSeller = await isSellerOfOrder(user.id, orderId);
     if (!isSeller) throw new Error("Unauthorized: Only the seller can hire a delivery partner for this order.");
     
-    // Pickup: Boy's current location (or store location if applicable)
-    // For KrishiConnect, we usually measure from Store -> Buyer
-    // But since the boy has to travel from his location to pickup first,
-    // some platforms charge for that. For now, let's stick to Road Distance.
-    
-    // We assume distance parameter passed is what seller agreed to, 
-    // but let's re-verify with OSRM if lat/lng available on order.
+    // Pickup: Boy's current location -> Order location
     let roadDistance = distance;
     if (order.lat && order.lng && boy.lat && boy.lng) {
         roadDistance = await getOSRMDistance(boy.lat, boy.lng, order.lat, order.lng);
@@ -166,33 +147,41 @@ export async function hireDeliveryBoy(orderId, deliveryBoyId, distance) {
     const totalPrice = roadDistance * boy.pricePerKm;
     const otp = generateOTP();
 
-    const job = await db.deliveryJob.upsert({
-      where: {
-        orderId_deliveryBoyId: {
-          orderId,
-          deliveryBoyId
-        }
-      },
-      update: {
-        status: "REQUESTED",
-        distance,
-        totalPrice,
-        otp,
-        updatedAt: new Date()
-      },
-      create: {
-        orderId,
-        deliveryBoyId,
-        status: "REQUESTED",
-        distance,
-        totalPrice,
-        otp
-      },
-      include: {
-        deliveryBoy: {
-          include: { user: true }
-        }
+    // Use a transaction to handle the potential state transitions gracefully
+    const job = await db.$transaction(async (tx) => {
+      const existing = await tx.deliveryJob.findUnique({
+        where: { orderId_deliveryBoyId: { orderId, deliveryBoyId } }
+      });
+
+      if (existing && !["REJECTED", "CANCELLED"].includes(existing.status)) {
+         throw new Error("A request for this partner is already active.");
       }
+
+      return await tx.deliveryJob.upsert({
+        where: {
+          orderId_deliveryBoyId: { orderId, deliveryBoyId }
+        },
+        update: {
+          status: "REQUESTED",
+          distance: roadDistance,
+          totalPrice,
+          otp,
+          updatedAt: new Date()
+        },
+        create: {
+          orderId,
+          deliveryBoyId,
+          status: "REQUESTED",
+          distance: roadDistance,
+          totalPrice,
+          otp
+        },
+        include: {
+          deliveryBoy: {
+            include: { user: true }
+          }
+        }
+      });
     });
 
     // Send Email Notification
@@ -278,22 +267,21 @@ export async function updateDeliveryJobStatus(jobId, status, notes = "", lat = n
       }
     }
 
-    // CRITICAL: Acceptance & Pickup Guard
-    if (status === "ACCEPTED" || status === "PICKED_UP") {
-      const alreadyAssigned = await db.deliveryJob.findFirst({
-        where: {
-          orderId: job.orderId,
-          status: { in: ["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"] },
-          id: { not: jobId } // Exclude the current job
-        }
-      });
-
-      if (alreadyAssigned) {
-        throw new Error("This order has already been accepted by another delivery partner.");
-      }
-    }
-
     await db.$transaction(async (tx) => {
+        // CRITICAL: Acceptance & Pickup Guard (Inside TX)
+        if (status === "ACCEPTED" || status === "PICKED_UP") {
+          const alreadyAssigned = await tx.deliveryJob.findFirst({
+            where: {
+              orderId: job.orderId,
+              status: { in: ["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"] },
+              id: { not: jobId } // Exclude the current job
+            }
+          });
+
+          if (alreadyAssigned) {
+            throw new Error("This order has already been accepted by another delivery partner.");
+          }
+        }
         // If accepting, cancel all other REQUESTED jobs for this order to clean up dashboards
         if (status === "ACCEPTED") {
           await tx.deliveryJob.updateMany({

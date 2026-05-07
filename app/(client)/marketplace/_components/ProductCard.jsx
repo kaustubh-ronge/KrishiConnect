@@ -31,7 +31,12 @@ export default function ProductCard({ product, index }) {
     : "from-blue-500 to-indigo-600";
   const themeColor = isFarmer ? "emerald" : "blue";
 
-  const harvestDate = product.harvestDate
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const harvestDate = (product.harvestDate && mounted)
     ? new Date(product.harvestDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
     : null;
 

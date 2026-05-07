@@ -43,49 +43,51 @@ export default function MarketplaceClient({ initialListings, userRole, recentlyV
   }, [initialListings]);
 
   // --- Filter Logic ---
-  const filteredListings = initialListings.filter(item => {
-    const matchesSearch = item.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredListings = useMemo(() => {
+    return initialListings.filter(item => {
+      const matchesSearch = item.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.description?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesCategory = selectedCategory === "All" || item.productName === selectedCategory;
+      const matchesCategory = selectedCategory === "All" || item.productName === selectedCategory;
 
-    const matchesTab = activeTab === "all" ? true :
-      activeTab === "farmers" ? item.sellerType === 'farmer' : item.sellerType === 'agent';
+      const matchesTab = activeTab === "all" ? true :
+        activeTab === "farmers" ? item.sellerType === 'farmer' : item.sellerType === 'agent';
 
-    const price = item.pricePerUnit;
-    const minPrice = priceRange.min ? parseFloat(priceRange.min) : 0;
-    const maxPrice = priceRange.max ? parseFloat(priceRange.max) : Infinity;
-    const matchesPrice = price >= minPrice && price <= maxPrice;
+      const price = item.pricePerUnit;
+      const minPrice = priceRange.min ? parseFloat(priceRange.min) : 0;
+      const maxPrice = priceRange.max ? parseFloat(priceRange.max) : Infinity;
+      const matchesPrice = price >= minPrice && price <= maxPrice;
 
-    const matchesStock = showOutOfStock ? true : item.availableStock > 0;
+      const matchesStock = showOutOfStock ? true : item.availableStock > 0;
 
-    const sellerLocation = item.sellerType === 'farmer'
-      ? (item.farmer?.region || item.farmer?.district || '').toLowerCase()
-      : (item.agent?.region || item.agent?.district || '').toLowerCase();
-    const matchesLocation = !locationFilter || sellerLocation.includes(locationFilter.toLowerCase());
+      const sellerLocation = item.sellerType === 'farmer'
+        ? (item.farmer?.region || item.farmer?.district || '').toLowerCase()
+        : (item.agent?.region || item.agent?.district || '').toLowerCase();
+      const matchesLocation = !locationFilter || sellerLocation.includes(locationFilter.toLowerCase());
 
-    let matchesFreshness = true;
-    if (freshnessFilter !== 'all' && item.harvestDate) {
-      const harvestDate = new Date(item.harvestDate);
-      const now = new Date();
-      const daysDiff = (now - harvestDate) / (1000 * 60 * 60 * 24);
+      let matchesFreshness = true;
+      if (freshnessFilter !== 'all' && item.harvestDate) {
+        const harvestDate = new Date(item.harvestDate);
+        const now = new Date();
+        const daysDiff = (now - harvestDate) / (1000 * 60 * 60 * 24);
 
-      if (freshnessFilter === 'week') matchesFreshness = daysDiff <= 7;
-      else if (freshnessFilter === 'month') matchesFreshness = daysDiff <= 30;
-    }
+        if (freshnessFilter === 'week') matchesFreshness = daysDiff <= 7;
+        else if (freshnessFilter === 'month') matchesFreshness = daysDiff <= 30;
+      }
 
-    return matchesSearch && matchesCategory && matchesTab && matchesPrice && matchesStock && matchesLocation && matchesFreshness;
-  }).sort((a, b) => {
-    if (sortBy === "price_low") return a.pricePerUnit - b.pricePerUnit;
-    if (sortBy === "price_high") return b.pricePerUnit - a.pricePerUnit;
-    if (sortBy === "rating") return (b.averageRating || 0) - (a.averageRating || 0);
-    if (sortBy === "harvest") {
-      if (!a.harvestDate) return 1;
-      if (!b.harvestDate) return -1;
-      return new Date(b.harvestDate) - new Date(a.harvestDate);
-    }
-    return new Date(b.createdAt) - new Date(a.createdAt);
-  });
+      return matchesSearch && matchesCategory && matchesTab && matchesPrice && matchesStock && matchesLocation && matchesFreshness;
+    }).sort((a, b) => {
+      if (sortBy === "price_low") return a.pricePerUnit - b.pricePerUnit;
+      if (sortBy === "price_high") return b.pricePerUnit - a.pricePerUnit;
+      if (sortBy === "rating") return (b.averageRating || 0) - (a.averageRating || 0);
+      if (sortBy === "harvest") {
+        if (!a.harvestDate) return 1;
+        if (!b.harvestDate) return -1;
+        return new Date(b.harvestDate) - new Date(a.harvestDate);
+      }
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+  }, [initialListings, searchQuery, selectedCategory, activeTab, priceRange, showOutOfStock, locationFilter, freshnessFilter, sortBy]);
 
   const resetFilters = () => {
     setSearchQuery("");

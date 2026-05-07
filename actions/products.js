@@ -33,9 +33,15 @@ export async function createProductListing(formData) {
     if (!dbUser) return { success: false, error: "User not found." };
 
     if (dbUser.role === 'farmer' && dbUser.farmerProfile) {
+      if (dbUser.farmerProfile.sellingStatus !== 'APPROVED') {
+        return { success: false, error: "Your seller profile is pending approval. You cannot create listings yet." };
+      }
       sellerType = 'farmer';
       sellerProfileId = dbUser.farmerProfile.id;
     } else if (dbUser.role === 'agent' && dbUser.agentProfile) {
+      if (dbUser.agentProfile.sellingStatus !== 'APPROVED') {
+        return { success: false, error: "Your seller profile is pending approval. You cannot create listings yet." };
+      }
       sellerType = 'agent';
       sellerProfileId = dbUser.agentProfile.id;
     } else {
@@ -93,6 +99,22 @@ export async function createProductListing(formData) {
   }
 
   try {
+    // IDEMPOTENCY CHECK: Prevent duplicate submissions within 1 minute
+    const recentlyCreated = await db.productListing.findFirst({
+      where: {
+        productName,
+        sellerType,
+        farmerId: sellerType === 'farmer' ? sellerProfileId : null,
+        agentId: sellerType === 'agent' ? sellerProfileId : null,
+        createdAt: { gte: new Date(Date.now() - 60 * 1000) } // Last 60 seconds
+      }
+    });
+
+    if (recentlyCreated) {
+      console.warn(`[Products] Duplicate submission blocked for user ${user.id}`);
+      return { success: true, duplicated: true }; // Return success so UI doesn't show error, but we blocked the duplicate
+    }
+
     await db.productListing.create({
       data: {
         productName, category, variety, description, images,
@@ -163,9 +185,21 @@ export async function getProductById(listingId) {
 
   try {
     const listing = await db.productListing.findUnique({
-      where: { id: listingId }
+      where: { id: listingId },
+      include: {
+        farmer: { select: { userId: true } },
+        agent: { select: { userId: true } }
+      }
     });
     if (!listing) return { success: false, error: "Listing not found" };
+
+    // IDOR Check: Ensure requester is the owner
+    const isOwner = 
+      (listing.farmer && listing.farmer.userId === user.id) || 
+      (listing.agent && listing.agent.userId === user.id);
+
+    if (!isOwner) return { success: false, error: "Unauthorized access to listing details." };
+
     return { success: true, data: listing };
   } catch (err) {
     return { success: false, error: "Database error" };
@@ -193,6 +227,12 @@ export async function updateProductListing(listingId, formData) {
       (dbUser.role === 'agent' && existingListing.agentId === dbUser.agentProfile?.id);
 
     if (!isOwner) return { success: false, error: "Unauthorized" };
+
+    // SECURITY: Ensure seller is still APPROVED
+    const sellerProfile = dbUser.farmerProfile || dbUser.agentProfile;
+    if (sellerProfile?.sellingStatus !== 'APPROVED') {
+        return { success: false, error: "Your seller profile must be approved to update listings." };
+    }
 
     // Extract & Sanitize Data
 
@@ -437,8 +477,41 @@ export async function getProductDetail(listingId) {
     const product = await db.productListing.findUnique({
       where: { id: listingId },
       include: {
-        farmer: true, // Get full farmer details
-        agent: true   // Get full agent details
+        farmer: {
+          select: {
+            id: true,
+            name: true,
+            farmName: true,
+            phone: true, // Needed for contact
+            address: true,
+            region: true,
+            district: true,
+            state: true,
+            city: true,
+            averageRating: true,
+            totalReviews: true,
+            farmingExperience: true,
+            primaryProduce: true,
+            createdAt: true
+          }
+        },
+        agent: {
+          select: {
+            id: true,
+            name: true,
+            companyName: true,
+            phone: true, // Needed for contact
+            address: true,
+            region: true,
+            district: true,
+            state: true,
+            city: true,
+            averageRating: true,
+            totalReviews: true,
+            agentType: true,
+            createdAt: true
+          }
+        }
       }
     });
 

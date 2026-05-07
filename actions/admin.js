@@ -6,7 +6,7 @@ import { after } from "next/server";
 import { sendProfileApprovalEmail, sendProfileRejectionEmail, sendDeliveryProfileApprovalEmail } from "@/lib/email";
 import { sanitizeContent } from "@/lib/utils";
 
-async function ensureAdmin(userId) {
+export async function ensureAdmin(userId) {
   const u = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
   if (!u || u.role !== "admin") {
     throw new Error("Unauthorized: admin only");
