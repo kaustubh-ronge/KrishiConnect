@@ -94,6 +94,7 @@ export default function CreateListingPage() {
   const [harvestDate, setHarvestDate] = useState("");
   const [shelfLife, setShelfLife] = useState("");
   const [shelfLifeStartDate, setShelfLifeStartDate] = useState("");
+  const [maxDeliveryRange, setMaxDeliveryRange] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("");
 
   // Form progress tracking
@@ -181,6 +182,7 @@ export default function CreateListingPage() {
     formData.set("harvestDate", harvestDate);
     formData.set("shelfLife", shelfLife);
     formData.set("shelfLifeStartDate", shelfLifeStartDate);
+    formData.set("maxDeliveryRange", maxDeliveryRange);
     formData.set("whatsappNumber", whatsappNumber);
     formData.set("variety", tags.join(", "));
 
@@ -203,6 +205,7 @@ export default function CreateListingPage() {
       whatsappNumber,
       harvestDate,
       shelfLifeStartDate,
+      maxDeliveryRange,
       images,
     };
 
@@ -802,8 +805,28 @@ export default function CreateListingPage() {
                               <SelectItem value="flat">Flat Rate (One-time)</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-gray-500 mt-2 ml-2">
+                          <p className="text-xs text-gray-500 mt-1.5 ml-1">
                             Per unit multiplies by quantity; flat applies once
+                          </p>
+                        </div>
+
+                        {/* Max Delivery Range */}
+                        <div className="space-y-2 group">
+                          <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-emerald-500" />
+                            Max Delivery Range (KM)
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            name="maxDeliveryRange"
+                            value={maxDeliveryRange}
+                            placeholder="e.g. 50"
+                            className="h-14 bg-white/80 backdrop-blur-sm border-2 border-emerald-100 hover:border-emerald-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 rounded-2xl transition-all duration-300"
+                            onChange={(e) => setMaxDeliveryRange(e.target.value)}
+                          />
+                          <p className="text-xs text-gray-500 mt-1.5 ml-1">
+                            Maximum distance you can deliver (overrides profile setting)
                           </p>
                         </div>
 
@@ -820,6 +843,7 @@ export default function CreateListingPage() {
                             value={minOrderQuantity}
                             className="h-14 bg-white/80 backdrop-blur-sm border-2 border-emerald-100 hover:border-emerald-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 rounded-2xl transition-all duration-300"
                             onChange={(e) => setMinOrderQuantity(e.target.value)}
+                            placeholder="Optional"
                           />
                         </div>
 

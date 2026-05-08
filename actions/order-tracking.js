@@ -85,7 +85,7 @@ export async function updateOrderStatus(formData) {
     }
 
     // ─── ATOMIC TRANSACTION START ───
-    await db.$transaction(async (tx) => {
+    const txResult = await db.$transaction(async (tx) => {
       // 1. Re-fetch inside TX to get the freshest state
       const currentOrder = await tx.order.findUnique({
         where: { id: orderId }
@@ -153,7 +153,66 @@ export async function updateOrderStatus(formData) {
         updateData.deliveredAt = new Date();
       }
 
-      // 5. Update order status and payment details
+      // 5. Sync with Delivery Jobs if applicable
+      const activeDeliveryJob = await tx.deliveryJob.findFirst({
+        where: { orderId, status: { in: ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'] } }
+      });
+
+      let otpToSend = null;
+
+      if (status === 'CANCELLED') {
+        await tx.deliveryJob.updateMany({
+          where: { orderId, status: { notIn: ['DELIVERED', 'CANCELLED', 'REJECTED'] } },
+          data: { status: 'CANCELLED', notes: 'Order was cancelled by the seller.' }
+        });
+      } else if (status === 'DELIVERED') {
+        // 1. If an active delivery job exists, seller CANNOT mark as delivered manually
+        if (activeDeliveryJob) {
+          throw new Error("This order is being handled by a delivery partner. Only they can mark it as delivered via OTP.");
+        }
+
+        // 2. If self-delivery, verify the selfDeliveryOtp
+        const otp = formData.get("otp");
+        const actualSelfOtp = currentOrder.selfDeliveryOtp || order.selfDeliveryOtp;
+        if (!actualSelfOtp) {
+           throw new Error("Self-delivery verification code not found. Please mark as Shipped first to generate OTP.");
+        }
+        if (actualSelfOtp !== otp) {
+          throw new Error("Invalid verification code. Please check with the buyer.");
+        }
+
+        await tx.deliveryJob.updateMany({
+          where: { orderId, status: { notIn: ['DELIVERED', 'CANCELLED', 'REJECTED'] } },
+          data: { status: 'DELIVERED', notes: 'Order marked as delivered by the seller.' }
+        });
+      } else if (status === 'SHIPPED') {
+        if (!activeDeliveryJob) {
+          let selfOtp = currentOrder.selfDeliveryOtp || order.selfDeliveryOtp;
+          if (!selfOtp) {
+            selfOtp = generateOTP();
+            updateData.selfDeliveryOtp = selfOtp; // Attached to updateData to be saved in tx.order.update
+          }
+          otpToSend = selfOtp;
+        }
+
+        await tx.deliveryJob.updateMany({
+          where: { orderId, status: { in: ['REQUESTED', 'ACCEPTED'] } },
+          data: { status: 'PICKED_UP', notes: 'Order marked as shipped by the seller.' }
+        });
+      } else if (status === 'IN_TRANSIT') {
+        await tx.deliveryJob.updateMany({
+          where: { orderId, status: { in: ['REQUESTED', 'ACCEPTED', 'PICKED_UP'] } },
+          data: { status: 'IN_TRANSIT', notes: 'Order marked as in transit by the seller.' }
+        });
+      } else if (status === 'PACKED') {
+        // Just add a note to the job if it exists
+        await tx.deliveryJob.updateMany({
+          where: { orderId, status: 'ACCEPTED' },
+          data: { notes: 'Seller has packed the order. Ready for pickup.' }
+        });
+      }
+
+      // 6. Update order status and payment details
       const paymentMethod = formData.get('paymentMethod');
       const paymentStatus = formData.get('paymentStatus');
 
@@ -165,71 +224,14 @@ export async function updateOrderStatus(formData) {
           ...(paymentStatus && { paymentStatus })
         }
       });
+
+      return { otpToSend };
     });
     // ─── ATOMIC TRANSACTION END ───
 
-    // NEW: Sync with Delivery Jobs if applicable
-    const activeDeliveryJob = await db.deliveryJob.findFirst({
-      where: { orderId, status: { in: ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'] } }
-    });
-
-    if (status === 'CANCELLED') {
-      await db.deliveryJob.updateMany({
-        where: { orderId, status: { notIn: ['DELIVERED', 'CANCELLED', 'REJECTED'] } },
-        data: { status: 'CANCELLED', notes: 'Order was cancelled by the seller.' }
-      });
-    } else if (status === 'DELIVERED') {
-      // 1. If an active delivery job exists, seller CANNOT mark as delivered manually
-      if (activeDeliveryJob) {
-        throw new Error("This order is being handled by a delivery partner. Only they can mark it as delivered via OTP.");
-      }
-
-      // 2. If self-delivery, verify the selfDeliveryOtp
-      const otp = formData.get("otp");
-      if (!order.selfDeliveryOtp) {
-         throw new Error("Self-delivery verification code not found. Please mark as Shipped first to generate OTP.");
-      }
-      if (order.selfDeliveryOtp !== otp) {
-        throw new Error("Invalid verification code. Please check with the buyer.");
-      }
-
-      await db.deliveryJob.updateMany({
-        where: { orderId, status: { notIn: ['DELIVERED', 'CANCELLED', 'REJECTED'] } },
-        data: { status: 'DELIVERED', notes: 'Order marked as delivered by the seller.' }
-      });
-    } else if (status === 'SHIPPED') {
-      if (!activeDeliveryJob) {
-        let selfOtp = order.selfDeliveryOtp;
-        if (!selfOtp) {
-          selfOtp = generateOTP();
-          await db.order.update({
-            where: { id: orderId },
-            data: { selfDeliveryOtp: selfOtp }
-          });
-        }
-        
-        // Send OTP email to buyer (Reminder)
-        if (order.buyerUser?.email) {
-          const { sendDeliveryOTPEmail } = await import("@/lib/email");
-          await sendDeliveryOTPEmail(order.buyerUser.email, orderId, selfOtp);
-        }
-      }
-
-      await db.deliveryJob.updateMany({
-        where: { orderId, status: { in: ['REQUESTED', 'ACCEPTED'] } },
-        data: { status: 'PICKED_UP', notes: 'Order marked as shipped by the seller.' }
-      });
-    } else if (status === 'IN_TRANSIT') {
-      await db.deliveryJob.updateMany({
-        where: { orderId, status: { in: ['REQUESTED', 'ACCEPTED', 'PICKED_UP'] } },
-        data: { status: 'IN_TRANSIT', notes: 'Order marked as in transit by the seller.' }
-      });
-    } else if (status === 'PACKED') {
-      // Just add a note to the job if it exists
-      await db.deliveryJob.updateMany({
-        where: { orderId, status: 'ACCEPTED' },
-        data: { notes: 'Seller has packed the order. Ready for pickup.' }
-      });
+    if (txResult?.otpToSend && order.buyerUser?.email) {
+      const { sendDeliveryOTPEmail } = await import("@/lib/email");
+      await sendDeliveryOTPEmail(order.buyerUser.email, orderId, txResult.otpToSend);
     }
 
     // Create notification for buyer

@@ -192,6 +192,7 @@ model ProductListing {
   shelfLife          String?
   whatsappNumber     String?
   variety            String?
+  maxDeliveryRange   Float? // Product-specific delivery range override
 
   isAvailable Boolean @default(true)
 

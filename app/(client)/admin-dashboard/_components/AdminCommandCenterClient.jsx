@@ -362,7 +362,7 @@ export default function AdminCommandCenterClient({
          if (activeView === 'mediation') return matchesSearch && item.isSpecialDelivery && (statusFilter === 'ALL' || item.adminApprovalStatus === statusFilter);
          if (activeView === 'orders') return matchesSearch && item.orderStatus === statusFilter;
          if (activeView === 'catalog') return matchesSearch && (statusFilter === 'ACTIVE' ? !item.isDeactivated : item.isDeactivated);
-         if (activeView === 'support') return matchesSearch && (statusFilter === 'PENDING' ? !item.isRead : item.isRead);
+         if (activeView === 'support') return matchesSearch && (statusFilter === 'ALL' ? true : (statusFilter === 'PENDING' ? !item.isRead : item.isRead));
          if (statusFilter === 'PENDING_PAYMENT' && item.paymentStatus === 'Waiting for Payment') return matchesSearch;
          
          return matchesSearch && (item.status === statusFilter || item.approvalStatus === statusFilter);
@@ -853,10 +853,11 @@ export default function AdminCommandCenterClient({
                            </div>
                         </div>
                         <div className="space-y-4">
-                           <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inventory Status</h5>
-                           <div className="p-6 bg-white border border-slate-100 rounded-3xl flex items-center justify-between shadow-sm">
+                           <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inventory & Delivery</h5>
+                           <div className="p-6 bg-white border border-slate-100 rounded-3xl grid grid-cols-2 gap-4 shadow-sm">
                               <div><p className="text-[9px] font-black text-slate-400 uppercase">Available Stock</p><p className="text-xl font-black text-slate-900">{selectedProduct?.availableStock} {selectedProduct?.unit}</p></div>
-                              <div className="text-right"><p className="text-[9px] font-black text-slate-400 uppercase">Listing State</p><Badge className={selectedProduct?.isDisabled ? "bg-rose-100 text-rose-600 border-0 text-[8px] font-black" : "bg-emerald-100 text-emerald-600 border-0 text-[8px] font-black"}>{selectedProduct?.isDisabled ? "DEACTIVATED" : "LIVE"}</Badge></div>
+                              <div><p className="text-[9px] font-black text-slate-400 uppercase">Max Delivery Range</p><p className="text-xl font-black text-indigo-600">{selectedProduct?.maxDeliveryRange ? `${selectedProduct.maxDeliveryRange} KM` : "Profile Default"}</p></div>
+                              <div className="pt-2 border-t border-slate-50"><p className="text-[9px] font-black text-slate-400 uppercase">Listing State</p><Badge className={selectedProduct?.isDisabled ? "bg-rose-100 text-rose-600 border-0 text-[8px] font-black" : "bg-emerald-100 text-emerald-600 border-0 text-[8px] font-black"}>{selectedProduct?.isDisabled ? "DEACTIVATED" : "LIVE"}</Badge></div>
                            </div>
                         </div>
                      </div>

@@ -77,11 +77,14 @@ export async function createProductListing(formData) {
   const unit = formData.get("unit")?.toString() || "kg";
 
   const harvestDateStr = formData.get("harvestDate")?.toString();
-  const harvestDate = harvestDateStr ? new Date(harvestDateStr) : null;
+  const harvestDate = (harvestDateStr && !isNaN(new Date(harvestDateStr).getTime())) ? new Date(harvestDateStr) : null;
 
   // NEW: Shelf Life Start Date
   const shelfLifeStartDateStr = formData.get("shelfLifeStartDate")?.toString();
-  const shelfLifeStartDate = shelfLifeStartDateStr ? new Date(shelfLifeStartDateStr) : null;
+  const shelfLifeStartDate = (shelfLifeStartDateStr && !isNaN(new Date(shelfLifeStartDateStr).getTime())) ? new Date(shelfLifeStartDateStr) : null;
+
+  const rawMaxRange = parseFloat(formData.get("maxDeliveryRange")?.toString() || "");
+  const maxDeliveryRange = isNaN(rawMaxRange) ? null : Math.min(rawMaxRange, 10000); 
 
   // Filter empty images
   const images = formData.getAll("images").filter(img => img && img.toString().trim() !== "");
@@ -122,7 +125,7 @@ export async function createProductListing(formData) {
         quantityLabel: `${availableStock} ${unit}`,
         availableStock, unit, pricePerUnit, deliveryCharge, deliveryChargeType, minOrderQuantity,
         qualityGrade, shelfLife, harvestDate, whatsappNumber,
-        shelfLifeStartDate, 
+        shelfLifeStartDate, maxDeliveryRange,
         isAvailable: true,
         sellerType,
         farmerId: sellerType === 'farmer' ? sellerProfileId : null,
@@ -134,7 +137,7 @@ export async function createProductListing(formData) {
     if (err.message && err.message.includes("too large")) {
       return { success: false, error: "Images too large." };
     }
-    return { success: false, error: "Failed to save listing." };
+    return { success: false, error: err.message || "Failed to save listing." };
   }
 
   revalidatePath(`/${sellerType}-dashboard/my-listings`);
@@ -261,11 +264,14 @@ export async function updateProductListing(listingId, formData) {
     const unit = formData.get("unit")?.toString() || "kg";
 
     const harvestDateStr = formData.get("harvestDate")?.toString();
-    const harvestDate = harvestDateStr ? new Date(harvestDateStr) : null;
+    const harvestDate = (harvestDateStr && !isNaN(new Date(harvestDateStr).getTime())) ? new Date(harvestDateStr) : null;
 
     // NEW: Shelf Life Start Date
     const shelfLifeStartDateStr = formData.get("shelfLifeStartDate")?.toString();
-    const shelfLifeStartDate = shelfLifeStartDateStr ? new Date(shelfLifeStartDateStr) : null;
+    const shelfLifeStartDate = (shelfLifeStartDateStr && !isNaN(new Date(shelfLifeStartDateStr).getTime())) ? new Date(shelfLifeStartDateStr) : null;
+
+    const rawMaxRangeUpdate = parseFloat(formData.get("maxDeliveryRange")?.toString() || "");
+    const maxDeliveryRange = isNaN(rawMaxRangeUpdate) ? null : Math.min(rawMaxRangeUpdate, 10000);
 
     // Filter empty images
     const images = formData.getAll("images").filter(img => img && img.toString().trim() !== "");
@@ -286,12 +292,13 @@ export async function updateProductListing(listingId, formData) {
         quantityLabel: `${availableStock} ${unit}`,
         availableStock, unit, pricePerUnit, deliveryCharge, deliveryChargeType, minOrderQuantity,
         qualityGrade, shelfLife, harvestDate, whatsappNumber,
-        shelfLifeStartDate, 
+        shelfLifeStartDate, maxDeliveryRange,
       }
     });
 
   } catch (err) {
-    return { success: false, error: "Update failed" };
+    console.error("Update Error:", err);
+    return { success: false, error: err.message || "Update failed" };
   }
 
   revalidatePath("/agent-dashboard/my-listings");

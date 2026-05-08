@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Edit, Save, Image as ImageIcon, Tag, X, Leaf, Phone, Calendar, Scale, IndianRupee, Briefcase } from "lucide-react";
+import { ArrowLeft, Edit, Save, Image as ImageIcon, Tag, X, Leaf, Phone, Calendar, Scale, IndianRupee, Briefcase, Truck } from "lucide-react";
 import ImageUpload from "@/components/ImageUpload";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -261,6 +261,22 @@ export default function AgentEditClient({ product }) {
                       </Select>
                       <p className="text-xs text-gray-500 mt-1">Choose how delivery is applied: per unit multiplies by quantity; flat applies once per listing.</p>
                     </div>
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <Truck className="h-4 w-4 text-blue-500" />
+                        Max Delivery Range (KM)
+                      </Label>
+                      <Input
+                        name="maxDeliveryRange"
+                        type="number"
+                        step="0.1"
+                        defaultValue={product.maxDeliveryRange}
+                        placeholder="e.g. 150"
+                        className="h-12 bg-white border-blue-200 focus:border-blue-500 rounded-xl"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Maximum delivery distance (overrides profile).</p>
+                    </div>
+
                     <div className="space-y-2"><Label>Min Order Qty</Label><Input name="minOrderQuantity" type="number" step="0.01" defaultValue={product.minOrderQuantity} className="bg-white h-12" /></div>
                     <div className="space-y-2 md:col-span-2"><Label>Procured Date</Label><Input type="date" name="harvestDate" defaultValue={formatDate(product.harvestDate)} className="bg-white h-12" /></div>
                   </div>

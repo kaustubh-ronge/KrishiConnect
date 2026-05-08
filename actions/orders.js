@@ -293,12 +293,16 @@ export async function initiateCheckout(params) {
 
       if (sellerProfile && sellerProfile.lat && sellerProfile.lng && addressData.lat && addressData.lng) {
         const dist = await getOSRMDistance(sellerProfile.lat, sellerProfile.lng, addressData.lat, addressData.lng);
+        console.log(`[Checkout] Dist to seller ${seller.id}: ${dist}km`);
         
-        // --- SERVICEABILITY CHECK ---
-        const maxRange = sellerProfile.maxDeliveryRange || 100;
-        if (dist > maxRange) {
-           // Instead of blocking, we flag it for admin approval
-           isSpecialDelivery = true;
+        // --- SERVICEABILITY CHECK (Per-Product Override) ---
+        for (const it of seller.items) {
+          const effectiveMaxRange = it.product.maxDeliveryRange || sellerProfile.maxDeliveryRange || 100;
+          if (dist > effectiveMaxRange) {
+             console.warn(`[Checkout] Out of Range: Dist ${dist} > Max ${effectiveMaxRange} for ${it.product.productName}`);
+             isSpecialDelivery = true;
+             break;
+          }
         }
         
         // Real-time market scan for partners within 100km of the seller
@@ -369,6 +373,27 @@ export async function initiateCheckout(params) {
     }
 
     const created = existing || await db.$transaction(async (tx) => {
+      // Generate invoice number inside transaction for COD
+      let invNum = null;
+      if (addressData.paymentMethod === 'COD') {
+        try {
+          const { generateInvoiceNumber } = await import('@/lib/invoice-generator');
+          const generated = await generateInvoiceNumber(idempotencyId);
+          if (generated && typeof generated === 'string') {
+            const crypto = await import('crypto');
+            const entropy = crypto.randomBytes(2).toString('hex').toUpperCase();
+            invNum = `${generated}-${entropy}`; 
+          }
+        } catch (e) {
+          console.error("Generator error:", e);
+        }
+
+        if (!invNum) {
+          const crypto = await import('crypto');
+          invNum = `INV-${idempotencyId.slice(-6).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+        }
+      }
+
       // Re-verify inside if needed, but existing is stable due to idempotencyId
       const newOrder = await tx.order.create({
         data: {
@@ -389,6 +414,7 @@ export async function initiateCheckout(params) {
           expiresAt: new Date(Date.now() + 30 * 60 * 1000),
           isSpecialDelivery: isSpecialDelivery,
           adminApprovalStatus: isSpecialDelivery ? "PENDING" : "NONE",
+          ...(invNum && { invoiceNumber: invNum }),
         }
       });
 
@@ -442,31 +468,6 @@ export async function initiateCheckout(params) {
     // Handle COD Success Flow
     if (addressData.paymentMethod === 'COD') {
         // Cart deletion removed to keep items in both tabs per user request.
-
-      let invNum = created.invoiceNumber;
-      if (!invNum) {
-        try {
-          const { generateInvoiceNumber } = await import('@/lib/invoice-generator');
-          const generated = await generateInvoiceNumber(created.id);
-          if (generated && typeof generated === 'string') {
-            const crypto = await import('crypto');
-            const entropy = crypto.randomBytes(2).toString('hex').toUpperCase();
-            invNum = `${generated}-${entropy}`; 
-          }
-        } catch (e) {
-          console.error("Generator error:", e);
-        }
-
-        if (!invNum) {
-          const crypto = await import('crypto');
-          invNum = `INV-${created.id.slice(-6).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
-        }
-
-        await db.order.update({
-          where: { id: created.id },
-          data: { invoiceNumber: invNum }
-        });
-      }
 
       const { createNotification } = await import('./notifications');
       const orderWithItems = await db.order.findUnique({
@@ -764,13 +765,27 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
 
             if (profile?.lat && profile?.lng) {
                 const dist = await getOSRMDistance(profile.lat, profile.lng, targetLat, targetLng);
+                console.log(`[Logistics] Seller ${seller.id} Dist: ${dist}km, Buyer: ${targetLat},${targetLng}`);
                 
-                // --- SERVICEABILITY CHECK ---
-                const maxRange = profile.maxDeliveryRange || 100;
-                if (dist > maxRange) {
-                    // Collect IDs of items from this seller
-                    const sellerItems = items.filter(it => (it.product.farmerId || it.product.agentId) === seller.id);
-                    unserviceableIds.push(...sellerItems.map(it => it.id));
+                // --- SERVICEABILITY CHECK (Per-Product Override) ---
+                const sellerItems = items.filter(it => (it.product.farmerId || it.product.agentId) === seller.id);
+                let isSellerOutOfRange = false;
+
+                for (const it of sellerItems) {
+                    const productRange = it.product.maxDeliveryRange;
+                    const profileRange = profile.maxDeliveryRange;
+                    const effectiveMaxRange = Number(productRange ?? profileRange ?? 100);
+                    
+                    if (dist > effectiveMaxRange) {
+                        console.warn(`[Logistics] Out of Range: Dist ${dist}km > Max ${effectiveMaxRange}km (Product: ${productRange}, Profile: ${profileRange})`);
+                        isSellerOutOfRange = true;
+                        break;
+                    }
+                }
+
+                if (isSellerOutOfRange) {
+                    // Use it.id if it's a CartItem, otherwise use it.product.id for single product preview
+                    unserviceableIds.push(...sellerItems.map(it => it.id || it.product.id));
                     isLongDistance = true; // Mark as problematic
                 } else {
                     // If distance is beyond 100km, we will FLAG it to hide the price in UI

@@ -22,7 +22,7 @@ import { useCartStore } from "@/store/useCartStore";
 import { toast } from "sonner";
 import { trackProductView } from "@/actions/products-enhanced";
 
-export default function ProductDetailClient({ product, userRole }) {
+export default function ProductDetailClient({ product, userRole, userLat, userLng }) {
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const router = useRouter();
   const [activeImage, setActiveImage] = useState(product.images[0]);
@@ -47,23 +47,31 @@ export default function ProductDetailClient({ product, userRole }) {
     setMounted(true);
     trackProductView(product.id);
 
-    const fetchFee = async () => {
+    const fetchFee = async (targetLat, targetLng) => {
       const { calculateDynamicDeliveryFee } = await import("@/actions/orders");
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-          setIsFeeLoading(true);
-          const res = await calculateDynamicDeliveryFee([], pos.coords.latitude, pos.coords.longitude, product.id);
-          if (res.success) {
-            setDynamicFee(res.fee);
-            setIsLongDistance(res.isLongDistance);
-            setIsOutOfRange(res.isOutOfRange);
-          }
-          setIsFeeLoading(false);
-        });
+      setIsFeeLoading(true);
+      const res = await calculateDynamicDeliveryFee([], targetLat, targetLng, product.id);
+      if (res.success) {
+        console.log(`[ProductDetail] Serviceability Check:`, res);
+        setDynamicFee(res.fee);
+        setIsLongDistance(res.isLongDistance);
+        setIsOutOfRange(res.isOutOfRange);
       }
+      setIsFeeLoading(false);
     };
-    fetchFee();
-  }, [product.id]);
+
+    if (product.id) {
+       if (userLat && userLng) {
+          // Use Profile coordinates (best for testing/consistency)
+          fetchFee(userLat, userLng);
+       } else if ("geolocation" in navigator) {
+          // Fallback to browser GPS
+          navigator.geolocation.getCurrentPosition(async (pos) => {
+            fetchFee(pos.coords.latitude, pos.coords.longitude);
+          });
+       }
+    }
+  }, [product.id, userLat, userLng]);
 
   const isFarmer = product.sellerType === 'farmer';
   const seller = isFarmer ? product.farmer : product.agent;
@@ -288,6 +296,12 @@ export default function ProductDetailClient({ product, userRole }) {
                   value={product.qualityGrade || "Standard"}
                   icon={Award}
                   color="purple"
+                />
+                <StatItem
+                  label="Delivery Radius"
+                  value={product.maxDeliveryRange ? `${product.maxDeliveryRange} KM` : "Standard Range"}
+                  icon={Navigation}
+                  color="indigo"
                 />
                 <StatItem
                   label="Min Order"
@@ -612,6 +626,7 @@ function StatItem({ label, value, icon: Icon, color = "gray" }) {
     orange: { bg: "bg-orange-100", text: "text-orange-600" },
     green: { bg: "bg-emerald-100", text: "text-emerald-600" },
     purple: { bg: "bg-purple-100", text: "text-purple-600" },
+    indigo: { bg: "bg-indigo-100", text: "text-indigo-600" },
     blue: { bg: "bg-blue-100", text: "text-blue-600" },
     gray: { bg: "bg-gray-100", text: "text-gray-600" },
   };

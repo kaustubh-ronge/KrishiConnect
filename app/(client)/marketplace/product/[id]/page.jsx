@@ -15,12 +15,26 @@ export default async function ProductPage({ params }) {
   const { db } = await import("@/lib/prisma");
   
   const user = await currentUser();
-  let userRole = 'none';
+  let userData = null;
   
   if (user) {
-    const dbUser = await db.user.findUnique({ where: { id: user.id }, select: { role: true } });
-    userRole = dbUser?.role || 'none';
+    userData = await db.user.findUnique({ 
+      where: { id: user.id }, 
+      select: { 
+        role: true,
+        farmerProfile: { select: { lat: true, lng: true } },
+        agentProfile: { select: { lat: true, lng: true } }
+      } 
+    });
   }
 
-  return <ProductDetailClient product={product} userRole={userRole} />;
+  const userLat = userData?.farmerProfile?.lat || userData?.agentProfile?.lat;
+  const userLng = userData?.farmerProfile?.lng || userData?.agentProfile?.lng;
+
+  return <ProductDetailClient 
+    product={product} 
+    userRole={userData?.role || 'none'} 
+    userLat={userLat}
+    userLng={userLng}
+  />;
 }

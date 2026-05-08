@@ -791,6 +791,24 @@ export default function EditListingClient({ product }) {
                         </div>
 
                         <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                            <Truck className="h-4 w-4 text-emerald-500" />
+                            Max Delivery Range (KM)
+                          </Label>
+                          <Input
+                            name="maxDeliveryRange"
+                            type="number"
+                            step="0.1"
+                            defaultValue={product.maxDeliveryRange}
+                            placeholder="e.g. 50"
+                            className="h-12 bg-white/70 backdrop-blur-sm border-emerald-200 hover:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 rounded-xl"
+                          />
+                          <p className="text-xs text-gray-500 mt-1.5 ml-1">
+                            Maximum distance you can deliver (overrides profile)
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
                           <Label className="text-sm font-medium text-gray-700">Min Order Qty</Label>
                           <Input
                             name="minOrderQuantity"
