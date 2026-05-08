@@ -134,6 +134,8 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
               <Link href="/admin-dashboard" className="text-gray-600 hover:text-green-600 font-medium transition-colors">Super Admin</Link>
             )}
 
+            <Link href="/how-it-works" className="text-gray-600 hover:text-green-600 font-medium transition-colors">How It Works</Link>
+
             {/* Language Selector Desktop */}
             {mounted ? (
               <DropdownMenu>
@@ -273,6 +275,8 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
                     {isAdmin && (
                       <MobileLink href="/admin-dashboard" icon={ShieldCheck}>Super Admin</MobileLink>
                     )}
+
+                    <Link href="/how-it-works" className="text-gray-600 hover:text-green-600 font-medium transition-colors">How It Works</Link>
 
                     <div className="my-4 border-t border-gray-100"></div>
 

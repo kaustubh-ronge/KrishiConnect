@@ -11,6 +11,7 @@ import {
   Search,
   CreditCard
 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function HowItWorksClient() {
   const steps = [
@@ -23,7 +24,7 @@ export default function HowItWorksClient() {
     },
     {
       title: "Step 2: List or Browse",
-      desc: "Farmers list their harvest with prices and images. Agents browse the marketplace using advanced filters for location, category, and freshness.",
+      desc: "Both Farmers and Agents list their harvest with prices and images. Both then browse the marketplace using advanced filters for location, category, and freshness.",
       icon: Search,
       color: "bg-green-500",
       details: ["High-quality listings", "Smart filters", "Direct communication"]
@@ -37,7 +38,7 @@ export default function HowItWorksClient() {
     },
     {
       title: "Step 4: Fulfillment",
-      desc: "Farmers hire verified delivery partners. Both parties use secure OTP verification at pickup and drop-off to ensure zero-loss delivery.",
+      desc: "Farmers and Agent can hire verified delivery partners. Both parties use secure OTP verification at pickup and drop-off to ensure zero-loss delivery.",
       icon: Truck,
       color: "bg-orange-500",
       details: ["OTP verification", "Real-time tracking", "Direct logistics"]
@@ -121,9 +122,11 @@ export default function HowItWorksClient() {
                      their businesses on KrishiConnect.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                     <button className="h-16 px-10 bg-white text-green-700 font-bold rounded-2xl shadow-xl hover:bg-green-50 transition-all flex items-center justify-center gap-2">
+                    <Link className='cursor-pointer' href={'/'}>
+                     <button className="cursor-pointer h-16 px-10 bg-white text-green-700 font-bold rounded-2xl shadow-xl hover:bg-green-50 transition-all flex items-center justify-center gap-2">
                         Get Started Free <ArrowRight className="h-5 w-5" />
                      </button>
+                     </Link>
                   </div>
                </div>
             </motion.div>
