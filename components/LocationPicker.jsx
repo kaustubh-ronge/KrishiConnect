@@ -31,6 +31,21 @@ export default function LocationPicker({ value = {}, onChange }) {
 
   useEffect(() => {
     setHasMounted(true);
+    // Auto-geolocate if we are on the default Nagpur coordinates
+    if (lat === 20.5937 && lng === 78.9629 && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const newLat = pos.coords.latitude;
+          const newLng = pos.coords.longitude;
+          setLat(newLat);
+          setLng(newLng);
+          onChange?.({ ...value, lat: newLat, lng: newLng });
+        },
+        () => {
+          console.log("[LocationPicker] Geolocation declined or failed, staying on default.");
+        }
+      );
+    }
   }, []);
 
   const countries = Country.getAllCountries();
