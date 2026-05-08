@@ -134,7 +134,7 @@ export default function EnhancedOrdersClient({ initialOrders }) {
             <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-blue-50">
                 {/* Animated background particles */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    {[...Array(20)].map((_, i) => (
+                    {mounted && [...Array(20)].map((_, i) => (
                         <motion.div
                             key={i}
                             className="absolute w-2 h-2 rounded-full"

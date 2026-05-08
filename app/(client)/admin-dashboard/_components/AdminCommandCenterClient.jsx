@@ -10,7 +10,7 @@ import {
    ArrowDownRight, Scale, ShieldAlert, Check, Ban, ExternalLink,
    MapPin, Phone, Mail, Building2, UserCircle2, Wallet,
    History as LucideHistory, PieChart, Activity, Globe, Landmark, Fingerprint,
-   ChevronLeft, ImageIcon,
+   ChevronLeft, ImageIcon, Trash2,
    UserX, UserCheck2, RefreshCw, ShoppingBag,
    ListChecks, ClipboardEdit, StickyNote, Map as LucideMap
 } from "lucide-react";
@@ -72,7 +72,8 @@ export default function AdminCommandCenterClient({
    viewBankAction,
    statsAction,
    ordersAction,
-   getPendingAction
+   getPendingAction,
+   deleteOrderAction
 }) {
    const [activeView, setActiveView] = useState("dashboard");
    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -263,6 +264,21 @@ export default function AdminCommandCenterClient({
       });
    };
 
+   const handleDeleteOrder = async (orderId) => {
+      if (!confirm("Are you sure you want to PERMANENTLY DELETE this order? Stock will be restored if it was not paid.")) return;
+      
+      toast.promise(deleteOrderAction(orderId), {
+         loading: 'Deleting Order...',
+         success: (res) => {
+            addLog("DELETED_ORDER", `Order #${orderId.slice(-6).toUpperCase()}`);
+            refreshData();
+            return res.message;
+         },
+         error: (err) => `Delete failed: ${err.message}`
+      });
+   };
+
+
    const openOrderAudit = async (orderId) => {
       setIsLoadingDetails(true);
       setIsOrderModalOpen(true);
@@ -335,8 +351,13 @@ export default function AdminCommandCenterClient({
             (item.user?.email || "").toLowerCase().includes(searchStr) ||
             (item.city || "").toLowerCase().includes(searchStr);
 
-         const matchStatus = statusFilter === "ALL" || (item.orderStatus === statusFilter) || (item.sellingStatus === statusFilter) || (item.approvalStatus === statusFilter);
+         const matchStatus = statusFilter === "ALL" || 
+                             (item.orderStatus === statusFilter) || 
+                             (item.sellingStatus === statusFilter) || 
+                             (item.approvalStatus === statusFilter) ||
+                             (statusFilter === 'PENDING' && (item.paymentStatus === 'Waiting for Payment' || item.orderStatus === 'PENDING'));
          return matchSearch && matchStatus;
+
       });
    };
 
@@ -438,10 +459,10 @@ export default function AdminCommandCenterClient({
                            <h3 className="text-2xl font-black text-slate-900 tracking-tighter">{"\u20B9"}{sNum(stats.finance?.totalPlatformRevenue).toLocaleString()}</h3>
                            <div className="text-[9px] text-emerald-600 font-black mt-4 uppercase">Direct Profit</div>
                         </Card>
-                        <Card className="border-0 shadow-sm rounded-2xl bg-white p-6 border-t-4 border-amber-500">
-                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Order Consistency</p>
-                           <h3 className="text-2xl font-black text-slate-900 tracking-tighter">100%</h3>
-                           <p className="text-[9px] font-bold text-slate-400 mt-4 uppercase tracking-tighter text-emerald-600">Audit Verified</p>
+                        <Card className="border-0 shadow-sm rounded-2xl bg-amber-500 p-6 border-t-4 border-amber-600">
+                           <p className="text-[9px] font-black text-amber-900 uppercase tracking-widest mb-1">Order Consistency</p>
+                           <h3 className="text-2xl font-black text-white tracking-tighter">100%</h3>
+                           <p className="text-[9px] font-bold text-amber-900 mt-4 uppercase tracking-tighter">Audit Verified</p>
                         </Card>
                         <Card className="border-0 shadow-sm rounded-2xl bg-indigo-300 p-6">
                            <p className="text-[9px] font-black text-slate-900 uppercase tracking-widest mb-1">Verified Score</p>
@@ -517,16 +538,17 @@ export default function AdminCommandCenterClient({
                            <div><h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-1">{navItems.find(n => n.id === activeView)?.label}</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Master Platform Database</p></div>
                         </div>
 
-                        <div className="flex items-center gap-3">
-                           {activeView === 'verifications' && selectedIds.length > 0 && (
-                              <Button className="h-10 px-8 bg-emerald-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20" onClick={handleBulkApprove}><ListChecks className="mr-2 h-4 w-4" /> Approve Selected ({selectedIds.length})</Button>
-                           )}
-                           <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-xl shadow-inner border border-slate-200">
-                              {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map(f => (
-                                 <Button key={f} variant={statusFilter === f ? "default" : "ghost"} size="sm" className={`h-10 px-6 rounded-xl text-[10px] font-black ${statusFilter === f ? "bg-slate-900 text-white shadow-xl" : "text-slate-400 hover:text-slate-900"}`} onClick={() => setStatusFilter(f)}>{f}</Button>
-                              ))}
-                           </div>
-                        </div>
+                         <div className="flex items-center gap-3">
+                            {activeView === 'verifications' && selectedIds.length > 0 && (
+                               <Button className="h-10 px-8 bg-emerald-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20" onClick={handleBulkApprove}><ListChecks className="mr-2 h-4 w-4" /> Approve Selected ({selectedIds.length})</Button>
+                            )}
+                            <div className="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border border-slate-200 overflow-x-auto custom-scrollbar no-scrollbar">
+                               {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map(f => (
+                                  <Button key={f} variant={statusFilter === f ? "default" : "ghost"} size="sm" className={`h-10 px-5 rounded-xl text-[9px] font-black shrink-0 ${statusFilter === f ? "bg-slate-900 text-white shadow-xl" : "text-slate-400 hover:text-slate-900"}`} onClick={() => setStatusFilter(f)}>{f}</Button>
+                               ))}
+                            </div>
+                         </div>
+
                      </div>
 
                      <Card className="rounded-[2rem] border-0 shadow-sm bg-white overflow-hidden flex flex-col h-[600px]">
@@ -605,7 +627,12 @@ export default function AdminCommandCenterClient({
                                     <TableCell className="pr-8 text-right">
                                        <div className="flex justify-end gap-2 transition-all">
                                           <Button size="icon" variant="outline" className="h-8 w-8 rounded-lg bg-white border-slate-200 shadow-sm hover:border-indigo-600 hover:text-indigo-600" onClick={() => activeView === 'orders' || activeView === 'disputes' ? openOrderAudit(item.id) : openProfileAudit(item)}><Eye className="h-4 w-4 text-slate-400" /></Button>
-                                          <Button size="icon" variant="outline" className={`h-8 w-8 rounded-lg border-slate-200 shadow-sm ${item.user?.isDisabled ? 'text-emerald-500 bg-emerald-50' : 'text-rose-500 bg-rose-50'}`} onClick={() => handleToggleStatus(item.userId || item.id, item.name || item.displayName)}>{item.user?.isDisabled ? <UserCheck2 className="h-4 w-4" /> : <UserX className="h-4 w-4" />}</Button>
+                                          {activeView === 'orders' && (
+                                             <Button size="icon" variant="outline" className="h-8 w-8 rounded-lg border-slate-200 shadow-sm text-rose-500 hover:bg-rose-50" onClick={() => handleDeleteOrder(item.id)}><Trash2 className="h-4 w-4" /></Button>
+                                          )}
+                                          {activeView !== 'orders' && (
+                                             <Button size="icon" variant="outline" className={`h-8 w-8 rounded-lg border-slate-200 shadow-sm ${item.user?.isDisabled ? 'text-emerald-500 bg-emerald-50' : 'text-rose-500 bg-rose-50'}`} onClick={() => handleToggleStatus(item.userId || item.id, item.name || item.displayName)}>{item.user?.isDisabled ? <UserCheck2 className="h-4 w-4" /> : <UserX className="h-4 w-4" />}</Button>
+                                          )}
                                        </div>
                                     </TableCell>
                                  </TableRow>

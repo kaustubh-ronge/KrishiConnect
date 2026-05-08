@@ -358,7 +358,7 @@ export async function updateDeliveryJobStatus(jobId, status, notes = "", lat = n
 /**
  * Securely complete delivery using OTP verification.
  */
-export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null) {
+export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null, paymentMethod = null, paymentStatus = null) {
   try {
     const user = await currentUser();
     if (!user) throw new Error("Unauthorized");
@@ -456,7 +456,9 @@ export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null
         where: { id: job.orderId },
         data: {
           orderStatus: "DELIVERED",
-          deliveredAt: new Date()
+          deliveredAt: new Date(),
+          ...(paymentMethod && { paymentMethod }),
+          ...(paymentStatus && { paymentStatus })
         }
       });
 

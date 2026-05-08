@@ -153,10 +153,17 @@ export async function updateOrderStatus(formData) {
         updateData.deliveredAt = new Date();
       }
 
-      // 5. Update order status
+      // 5. Update order status and payment details
+      const paymentMethod = formData.get('paymentMethod');
+      const paymentStatus = formData.get('paymentStatus');
+
       await tx.order.update({
         where: { id: orderId },
-        data: updateData
+        data: {
+          ...updateData,
+          ...(paymentMethod && { paymentMethod }),
+          ...(paymentStatus && { paymentStatus })
+        }
       });
     });
     // ─── ATOMIC TRANSACTION END ───
@@ -191,15 +198,17 @@ export async function updateOrderStatus(formData) {
         data: { status: 'DELIVERED', notes: 'Order marked as delivered by the seller.' }
       });
     } else if (status === 'SHIPPED') {
-      // Generate OTP for self-delivery if no partner is active
       if (!activeDeliveryJob) {
-        const selfOtp = generateOTP();
-        await db.order.update({
-          where: { id: orderId },
-          data: { selfDeliveryOtp: selfOtp }
-        });
+        let selfOtp = order.selfDeliveryOtp;
+        if (!selfOtp) {
+          selfOtp = generateOTP();
+          await db.order.update({
+            where: { id: orderId },
+            data: { selfDeliveryOtp: selfOtp }
+          });
+        }
         
-        // Send OTP email to buyer
+        // Send OTP email to buyer (Reminder)
         if (order.buyerUser?.email) {
           const { sendDeliveryOTPEmail } = await import("@/lib/email");
           await sendDeliveryOTPEmail(order.buyerUser.email, orderId, selfOtp);
@@ -245,6 +254,7 @@ export async function updateOrderStatus(formData) {
     revalidatePath('/my-orders');
     revalidatePath('/delivery-dashboard');
     revalidatePath('/farmer-dashboard/manage-orders');
+    revalidatePath('/agent-dashboard/manage-orders');
 
     return apiResponse.success(null, "Order status updated successfully");
   } catch (error) {
@@ -358,7 +368,13 @@ export async function resendSelfDeliveryOtp(orderId) {
     if (!isSeller) throw new Error("Unauthorized: Only the seller can resend OTP.");
 
     if (!order.selfDeliveryOtp) {
-        throw new Error("No active self-delivery OTP found. Ensure order is marked as SHIPPED.");
+        // Fallback: Generate one if somehow missing
+        const newOtp = generateOTP();
+        await db.order.update({
+            where: { id: orderId },
+            data: { selfDeliveryOtp: newOtp }
+        });
+        order.selfDeliveryOtp = newOtp;
     }
     if (order.orderStatus === 'DELIVERED') {
         throw new Error("Order is already delivered.");

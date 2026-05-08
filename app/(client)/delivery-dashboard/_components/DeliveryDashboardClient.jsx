@@ -20,7 +20,7 @@ import {
   ChevronRight, ChevronLeft, MapPin, Truck, IndianRupee, Navigation, Clock, User, Phone, CheckCircle2,
   Settings, Power, Package, Calendar, BarChart3, Star, ArrowUpRight, TrendingUp,
   Zap, Shield, Award, Crown, Sparkles, Heart, Target, Layers, Gift,
-  MessageCircle, AlertCircle, RotateCcw, Search, Filter, X
+  MessageCircle, AlertCircle, RotateCcw, Search, Filter, X, Loader2, ShieldCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from 'framer-motion';
 import LocationPicker from '@/components/LocationPicker';
@@ -44,6 +44,8 @@ export default function DeliveryDashboardClient({
   const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
   const [otpValue, setOtpValue] = useState("");
   const [currentJobId, setCurrentJobId] = useState(null);
+  const [deliveryMethod, setDeliveryMethod] = useState("");
+  const [deliveryPaymentStatus, setDeliveryPaymentStatus] = useState("");
   const [mounted, setMounted] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const lastLocationUpdate = useRef(0);
@@ -72,6 +74,11 @@ export default function DeliveryDashboardClient({
   const [bankName, setBankName] = useState("");
   const [ifscCode, setIfscCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
+  const [resendingJobId, setResendingJobId] = useState(null);
+  const [statusUpdatingJobId, setStatusUpdatingJobId] = useState(null);
+  const [isCompletingDelivery, setIsCompletingDelivery] = useState(false);
+  const [isMarkingPaymentId, setIsMarkingPaymentId] = useState(null);
+  const [isTogglingOnline, setIsTogglingOnline] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -190,6 +197,7 @@ export default function DeliveryDashboardClient({
       return;
     }
 
+    setStatusUpdatingJobId(jobId);
     let lat = null;
     let lng = null;
 
@@ -214,17 +222,21 @@ export default function DeliveryDashboardClient({
     } else {
       toast.error(res.error);
     }
+    setStatusUpdatingJobId(null);
   };
 
   const handleToggleOnline = async (newStatus) => {
+    setIsTogglingOnline(true);
     const res = await toggleOnlineStatus(newStatus);
     if (res.success) {
       setOnlineStatus(newStatus);
       toast.success(newStatus ? "Online" : "Offline");
     }
+    setIsTogglingOnline(false);
   };
 
   const confirmDeliveryWithOtp = async () => {
+    setIsCompletingDelivery(true);
     let lat = null;
     let lng = null;
 
@@ -240,7 +252,7 @@ export default function DeliveryDashboardClient({
       console.warn("Location capture failed during OTP verification:", err);
     }
 
-    const res = await completeDeliveryWithOtp(currentJobId, otpValue, lat, lng);
+    const res = await completeDeliveryWithOtp(currentJobId, otpValue, lat, lng, deliveryMethod, deliveryPaymentStatus);
     if (res.success) {
       toast.success("Delivered!");
       setIsOtpDialogOpen(false);
@@ -249,9 +261,11 @@ export default function DeliveryDashboardClient({
     } else {
       toast.error(res.error);
     }
+    setIsCompletingDelivery(false);
   };
 
   const handleMarkPaymentReceived = async (jobId) => {
+    setIsMarkingPaymentId(jobId);
     const res = await markPartnerPaymentReceived(jobId);
     if (res.success) {
       toast.success("Payment recorded!");
@@ -259,15 +273,18 @@ export default function DeliveryDashboardClient({
     } else {
       toast.error(res.error);
     }
+    setIsMarkingPaymentId(null);
   };
 
   const handleResendOtp = async (jobId) => {
+    setResendingJobId(jobId);
     const res = await resendDeliveryOtp(jobId);
     if (res.success) {
       toast.success("OTP Resent to Buyer!");
     } else {
       toast.error(res.error);
     }
+    setResendingJobId(null);
   };
 
   const getStatusColor = (status) => {
@@ -547,7 +564,7 @@ export default function DeliveryDashboardClient({
             transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
             className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-gradient-to-tr from-blue-200/30 to-indigo-300/20 rounded-full blur-3xl"
           />
-          {[...Array(20)].map((_, i) => (
+          {mounted && [...Array(20)].map((_, i) => (
             <motion.div
               key={i}
               className="absolute w-1.5 h-1.5 rounded-full"
@@ -643,12 +660,13 @@ export default function DeliveryDashboardClient({
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button
                   onClick={() => handleToggleOnline(!onlineStatus)}
+                  disabled={isTogglingOnline}
                   className={`rounded-full px-5 h-10 font-bold transition-all ${onlineStatus
                     ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg shadow-emerald-500/25'
                     : 'border-2 border-gray-300 text-gray-600 hover:bg-gray-50'
                     }`}
                 >
-                  <Power className="h-4 w-4 mr-2" />
+                  {isTogglingOnline ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Power className="h-4 w-4 mr-2" />}
                   {onlineStatus ? "Go Offline" : "Go Online"}
                 </Button>
               </motion.div>
@@ -842,9 +860,16 @@ export default function DeliveryDashboardClient({
                                       <IndianRupee className="h-3.5 w-3.5" />
                                       <span className="text-[10px] font-bold uppercase">Payment</span>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                      <p className="text-sm font-black text-gray-900">₹{job.totalPrice?.toFixed(2) || '---'}</p>
-                                      <span className="text-[10px] font-bold text-gray-400">({job.distance} KM)</span>
+                                    <div className="flex flex-col gap-1">
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-sm font-black text-gray-900">₹{job.totalPrice?.toFixed(2) || '---'}</p>
+                                        <span className="text-[10px] font-bold text-gray-400">({job.distance} KM)</span>
+                                      </div>
+                                      {job.order?.paymentStatus === 'PAID' && job.order?.paymentMethod === 'ONLINE' && (
+                                        <div className="flex items-center gap-1 text-[9px] font-black text-emerald-600 uppercase tracking-tighter bg-emerald-50 px-2 py-0.5 rounded-md w-fit">
+                                          <ShieldCheck className="h-3 w-3" /> Paid Online
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -864,7 +889,7 @@ export default function DeliveryDashboardClient({
                                     <>
                                       <Button variant="outline" className="rounded-xl text-gray-600 font-bold border-2 border-gray-200 hover:bg-gray-50" onClick={() => handleJobStatus(job.id, 'REJECTED')}>Decline</Button>
                                       <Button className="rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white font-bold shadow-lg shadow-indigo-500/25" onClick={() => handleJobStatus(job.id, 'ACCEPTED')}>
-                                        <CheckCircle2 className="h-4 w-4 mr-2" /> Accept Task
+                                        {statusUpdatingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />} Accept Task
                                       </Button>
                                     </>
                                   )}
@@ -872,17 +897,17 @@ export default function DeliveryDashboardClient({
                                     <>
                                       <Button variant="outline" className="rounded-xl text-red-600 font-bold border-2 border-red-100 hover:bg-red-50" onClick={() => handleJobStatus(job.id, 'CANCELLED')}>Cancel Task</Button>
                                       <Button className="rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white font-bold shadow-lg" onClick={() => handleJobStatus(job.id, 'PICKED_UP')}>
-                                        <Package className="h-4 w-4 mr-2" /> Confirm Pickup
+                                        {statusUpdatingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Package className="h-4 w-4 mr-2" />} Confirm Pickup
                                       </Button>
                                     </>
                                   )}
                                   {job.status === 'PICKED_UP' && (
                                     <>
                                       <Button variant="outline" className="rounded-xl border-2 border-gray-200 font-bold" onClick={() => handleResendOtp(job.id)}>
-                                        <RotateCcw className="h-4 w-4 mr-2" /> Resend OTP
+                                        {resendingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCcw className="h-4 w-4 mr-2" />} Resend OTP
                                       </Button>
                                       <Button className="rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold shadow-lg" onClick={() => handleJobStatus(job.id, 'IN_TRANSIT')}>
-                                        <Navigation className="h-4 w-4 mr-2" /> Start Navigation
+                                        {statusUpdatingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Navigation className="h-4 w-4 mr-2" />} Start Navigation
                                       </Button>
                                     </>
                                   )}
@@ -892,13 +917,13 @@ export default function DeliveryDashboardClient({
                                         <RotateCcw className="h-4 w-4 mr-2" /> Resend OTP
                                       </Button>
                                       <Button className="rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-bold shadow-lg shadow-emerald-500/25" onClick={() => handleJobStatus(job.id, 'DELIVERED')}>
-                                        <CheckCircle2 className="h-4 w-4 mr-2" /> Deliver & Verify
+                                        {statusUpdatingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />} Deliver & Verify
                                       </Button>
                                     </>
                                   )}
                                   {job.status === 'DELIVERED' && !job.partnerPaymentReceived && (
                                     <Button className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold shadow-lg" onClick={() => handleMarkPaymentReceived(job.id)}>
-                                      <IndianRupee className="h-4 w-4 mr-2" /> Payment Received
+                                      {isMarkingPaymentId === job.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <IndianRupee className="h-4 w-4 mr-2" />} Payment Received
                                     </Button>
                                   )}
                                   {job.partnerPaymentReceived && (
@@ -960,19 +985,95 @@ export default function DeliveryDashboardClient({
             </DialogDescription>
           </div>
           <div className="p-8 space-y-6">
-            <Input
-              maxLength={6}
-              className="text-center text-5xl h-24 tracking-[1.5rem] font-black border-2 border-gray-200 bg-gray-50 rounded-2xl focus:border-emerald-500"
-              placeholder="000000"
-              value={otpValue}
-              onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, ""))}
-            />
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <CreditCard className="h-3 w-3 text-emerald-500" /> Method *
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'ONLINE', label: 'Online', icon: CreditCard },
+                    { id: 'COD', label: 'Cash/COD', icon: IndianRupee }
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setDeliveryMethod(m.id)}
+                      className={`p-3 rounded-xl border-2 transition-all text-left ${
+                        deliveryMethod === m.id 
+                          ? 'border-emerald-500 bg-emerald-50' 
+                          : 'border-gray-100 bg-white hover:border-emerald-200'
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-1 ${
+                        deliveryMethod === m.id ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        <m.icon className="h-4 w-4" />
+                      </div>
+                      <p className="font-black text-[10px] uppercase">{m.label}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <ShieldCheck className="h-3 w-3 text-emerald-500" /> Payment Status *
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'PAID', label: 'Paid', icon: CheckCircle2, bg: 'bg-emerald-500' },
+                    { id: 'PENDING', label: 'Pending', icon: Clock, bg: 'bg-amber-500' }
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setDeliveryPaymentStatus(s.id)}
+                      className={`p-3 rounded-xl border-2 transition-all text-left ${
+                        deliveryPaymentStatus === s.id 
+                          ? `border-${s.id === 'PAID' ? 'emerald' : 'amber'}-500 bg-${s.id === 'PAID' ? 'emerald' : 'amber'}-50` 
+                          : 'border-gray-100 bg-white hover:border-gray-200'
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-1 ${
+                        deliveryPaymentStatus === s.id ? s.bg : 'bg-gray-100'
+                      } text-white`}>
+                        <s.icon className="h-4 w-4" />
+                      </div>
+                      <p className="font-black text-[10px] uppercase">{s.label}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className={`space-y-4 transition-all ${(!deliveryMethod || !deliveryPaymentStatus) ? 'opacity-30 pointer-events-none grayscale' : 'opacity-100'}`}>
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">OTP Code *</Label>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => handleResendOtp(currentJobId)}
+                  className="h-6 text-[9px] font-black uppercase text-emerald-600 hover:text-emerald-700 p-0"
+                >
+                  {resendingJobId === currentJobId ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RotateCcw className="h-3 w-3 mr-1" />} Resend OTP
+                </Button>
+              </div>
+              <Input
+                maxLength={6}
+                className="text-center text-5xl h-24 tracking-[1.5rem] font-black border-2 border-gray-200 bg-gray-50 rounded-2xl focus:border-emerald-500"
+                placeholder="000000"
+                value={otpValue}
+                onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, ""))}
+              />
+            </div>
+            
             <Button
               onClick={confirmDeliveryWithOtp}
-              disabled={otpValue.length !== 6}
+              disabled={otpValue.length !== 6 || !deliveryMethod || !deliveryPaymentStatus}
               className="w-full h-14 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-2xl font-bold text-lg shadow-xl shadow-emerald-500/25"
             >
-              <CheckCircle2 className="h-5 w-5 mr-2" /> Complete Delivery
+              {isCompletingDelivery ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <CheckCircle2 className="h-5 w-5 mr-2" />} Complete Delivery
             </Button>
           </div>
         </DialogContent>

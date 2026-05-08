@@ -90,7 +90,14 @@ export async function getAllOrders({ onlyPendingPayouts = false } = {}) {
   try {
     await ensureAdmin(user.id);
 
-    const where = onlyPendingPayouts ? { paymentStatus: "PAID", payoutStatus: "PENDING" } : {};
+    const where = onlyPendingPayouts 
+      ? { paymentStatus: "PAID", payoutStatus: "PENDING" } 
+      : {
+          OR: [
+            { NOT: { paymentMethod: "ONLINE" } },
+            { paymentStatus: { not: "PENDING" } }
+          ]
+        };
 
     const orders = await db.order.findMany({
       where,
@@ -549,6 +556,44 @@ export async function bulkApproveProfiles(profileIds) {
     return { success: true, message: `Successfully approved ${actualFarmerIds.length + actualAgentIds.length + actualDeliveryIds.length} members.` };
   } catch (err) {
     console.error("Bulk Approve Error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function adminDeleteOrder(orderId) {
+  const user = await currentUser();
+  if (!user) return { success: false, error: "Not logged in" };
+
+  try {
+    await ensureAdmin(user.id);
+
+    return await db.$transaction(async (tx) => {
+      const ord = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true }
+      });
+
+      if (!ord) throw new Error("Order not found");
+
+      // RESTORE STOCK if it was pending or processing (safe guard)
+      if (ord.paymentStatus !== 'PAID') {
+        for (const item of ord.items) {
+          await tx.productListing.update({
+            where: { id: item.productId },
+            data: {
+              availableStock: { increment: item.quantity }
+            }
+          });
+        }
+      }
+
+      await tx.orderItem.deleteMany({ where: { orderId } });
+      await tx.order.delete({ where: { id: orderId } });
+
+      return { success: true, message: "Order deleted successfully" };
+    });
+  } catch (err) {
+    console.error("Admin Delete Order Error:", err);
     return { success: false, error: err.message };
   }
 }

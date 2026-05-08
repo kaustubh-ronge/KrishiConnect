@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,9 @@ import {
   Star, Zap, TrendingUp, Layers, IndianRupee, Target,
   LayoutGrid, List, Filter, MessageCircle, Navigation,
   Award, Crown, Shield, Heart, BarChart3, Flame,
-  Box, Gift, Search, RotateCcw
+  Box, Gift, Search, RotateCcw,
+  CreditCard,
+  ShieldCheck
 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AnimatePresence, motion } from "framer-motion";
@@ -30,27 +32,45 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ORDER_STATUS_OPTIONS, DASHBOARD_THEMES, getStatusBadgeConfig } from "@/data/DashboardData/constants";
 
+const STATUS_TRANSITIONS = {
+  'PROCESSING': ['PACKED', 'CANCELLED'],
+  'PACKED': ['SHIPPED', 'CANCELLED'],
+  'SHIPPED': ['IN_TRANSIT', 'CANCELLED'],
+  'IN_TRANSIT': ['DELIVERED', 'CANCELLED'],
+  'DELIVERED': [],
+  'CANCELLED': []
+};
+
 export default function ManageOrdersClient({ initialOrders, userType, total, hasMore, currentPage }) {
 
   const router = useRouter();
-  const orders = initialOrders;
+  const [orders, setOrders] = useState(initialOrders);
   const theme = DASHBOARD_THEMES[userType] || DASHBOARD_THEMES.farmer;
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [updating, setUpdating] = useState(false);
   const [newStatus, setNewStatus] = useState("");
   const [viewMode, setViewMode] = useState("table");
   const [filterStatus, setFilterStatus] = useState("all");
   const [mounted, setMounted] = useState(false);
+  const [updateMethod, setUpdateMethod] = useState("");
+  const [updatePaymentStatus, setUpdatePaymentStatus] = useState("");
+  const [otpValue, setOtpValue] = useState("");
+  const [resendingOtp, setResendingOtp] = useState(null); // stores orderId/jobId
+  const [markingPaymentId, setMarkingPaymentId] = useState(null);
+  const [isPending, startTransition] = useTransition();
+
+  // Sync orders with props when initialOrders changes
+  useEffect(() => {
+    setOrders(initialOrders);
+  }, [initialOrders]);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const handleUpdateStatus = async (formData) => {
-    setUpdating(true);
 
     const status = formData.get('status');
     if (status === 'SHIPPED' || status === 'DELIVERED') {
@@ -69,24 +89,34 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
       }
     }
 
-    const res = await updateOrderStatus(formData);
+    startTransition(async () => {
+      const res = await updateOrderStatus(formData);
 
-    if (res.success) {
-      toast.success(res.message, {
-        icon: <CheckCircle2 className="h-5 w-5" />,
-        className: "bg-green-50 border-green-200"
-      });
-      setIsUpdateDialogOpen(false);
-      router.refresh();
-    } else {
-      toast.error(res.error, {
-        icon: <AlertCircle className="h-5 w-5" />
-      });
-    }
-    setUpdating(false);
+      if (res.success) {
+        // Optimistic Update
+        const updatedStatus = formData.get('status');
+        const updatedOrderId = formData.get('orderId');
+        
+        setOrders(prev => prev.map(o => 
+          o.id === updatedOrderId ? { ...o, orderStatus: updatedStatus } : o
+        ));
+
+        toast.success(res.message, {
+          icon: <CheckCircle2 className="h-5 w-5" />,
+          className: "bg-green-50 border-green-200"
+        });
+        setIsUpdateDialogOpen(false);
+        router.refresh();
+      } else {
+        toast.error(res.error, {
+          icon: <AlertCircle className="h-5 w-5" />
+        });
+      }
+    });
   };
 
   const handleResendSelfOtp = async (orderId) => {
+    setResendingOtp(orderId);
     const res = await resendSelfDeliveryOtp(orderId);
     if (res.success) {
       toast.success("OTP Resent to Buyer!", {
@@ -98,9 +128,11 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
         icon: <AlertCircle className="h-5 w-5" />
       });
     }
+    setResendingOtp(null);
   };
 
   const handleResendPartnerOtp = async (jobId) => {
+    setResendingOtp(jobId);
     const res = await resendDeliveryOtp(jobId);
     if (res.success) {
       toast.success("OTP Resent to Buyer!", {
@@ -112,11 +144,15 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
         icon: <AlertCircle className="h-5 w-5" />
       });
     }
+    setResendingOtp(null);
   };
 
   const openUpdateDialog = (order) => {
     setSelectedOrder(order);
     setNewStatus(order.orderStatus);
+    setUpdateMethod("");
+    setUpdatePaymentStatus("");
+    setOtpValue("");
     setIsUpdateDialogOpen(true);
   };
 
@@ -126,7 +162,9 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
   };
 
   const openHireDialog = (orderId) => {
-    router.push(`/${userType}-dashboard/manage-orders/hire/${orderId}`);
+    startTransition(() => {
+      router.push(`/${userType}-dashboard/manage-orders/hire/${orderId}`);
+    });
   };
 
   const getStatusBadge = (status) => {
@@ -178,7 +216,7 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
         />
 
         {/* Floating particles */}
-        {[...Array(18)].map((_, i) => (
+        {mounted && [...Array(18)].map((_, i) => (
           <motion.div
             key={i}
             className="absolute w-2 h-2 rounded-full"
@@ -393,6 +431,9 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                       <TableCell className="py-5 text-center">
                         <div className="flex flex-col items-center gap-1.5">
                           {getStatusBadge(order.orderStatus)}
+                          {order.paymentMethod === 'ONLINE' && order.paymentStatus === 'PAID' && (
+                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter mt-1">Paid Online</span>
+                          )}
                           {order.paymentStatus === 'PENDING' && (
                             <Badge variant="outline" className="px-2 py-0.5 rounded-full text-[9px] font-bold border-amber-200 text-amber-600 bg-amber-50/50">
                               UNPAID
@@ -464,6 +505,11 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                       <div>
                         <p className="font-bold text-gray-900">{getBuyerName(order)}</p>
                         <p className="text-sm text-gray-500">{getBuyerPhone(order)}</p>
+                        {order.paymentMethod === 'ONLINE' && order.paymentStatus === 'PAID' && (
+                          <div className="mt-1 flex items-center gap-1 text-[9px] font-black text-emerald-600 uppercase tracking-tighter bg-emerald-50 px-2 py-0.5 rounded-md w-fit">
+                            <ShieldCheck className="h-3 w-3" /> Paid Online
+                          </div>
+                        )}
                       </div>
                     </div>
                     <Separator className="my-4" />
@@ -550,11 +596,25 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border-gray-200 shadow-xl">
-                    {ORDER_STATUS_OPTIONS.map(option => (
-                      <SelectItem key={option.value} value={option.value} className="py-3 font-semibold focus:bg-emerald-50 focus:text-emerald-700">
-                        {option.label}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value={selectedOrder.orderStatus} className="py-3 font-semibold opacity-50">
+                      {ORDER_STATUS_OPTIONS.find(o => o.value === selectedOrder.orderStatus)?.label} (Current)
+                    </SelectItem>
+                    {ORDER_STATUS_OPTIONS.map(option => {
+                      const isValidTransition = STATUS_TRANSITIONS[selectedOrder.orderStatus]?.includes(option.value);
+                      const isCurrent = option.value === selectedOrder.orderStatus;
+                      if (isCurrent) return null;
+
+                      return (
+                        <SelectItem
+                          key={option.value}
+                          value={option.value}
+                          disabled={!isValidTransition}
+                          className={`py-3 font-semibold focus:bg-emerald-50 focus:text-emerald-700 ${!isValidTransition ? 'opacity-30 cursor-not-allowed' : ''}`}
+                        >
+                          {option.label} {!isValidTransition && " (Invalid)"}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -565,14 +625,100 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="space-y-3 p-6 bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl border-2 border-emerald-200"
+                    className="space-y-6 p-8 bg-gradient-to-br from-emerald-50/50 via-white to-green-50/50 rounded-3xl border-2 border-emerald-100 shadow-inner"
                   >
-                    <Label className="text-emerald-800 font-bold flex items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5" /> Delivery Verification OTP (6 Digits)
-                    </Label>
-                    <Input id="otp" name="otp" placeholder="000000" maxLength={6} required
-                      className="text-center text-5xl font-black tracking-[1.5rem] h-24 rounded-2xl bg-white border-2 border-emerald-200 focus:border-emerald-500" />
-                    <p className="text-sm text-emerald-600 font-medium">Ask the buyer for the verification code sent to their email.</p>
+                    <div className="space-y-6">
+                      <div className="space-y-4">
+                        <Label className="text-emerald-900 font-black text-xs uppercase tracking-[0.2em] flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-emerald-500" /> Payment Method *
+                        </Label>
+                        <div className="grid grid-cols-2 gap-4">
+                          {[
+                            { id: 'ONLINE', label: 'Online', icon: CreditCard, desc: 'Digital Payment' },
+                            { id: 'COD', label: 'Cash/COD', icon: IndianRupee, desc: 'Hand-to-hand' }
+                          ].map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => setUpdateMethod(m.id)}
+                              className={`relative p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${updateMethod === m.id
+                                ? 'border-emerald-500 bg-emerald-50 shadow-md ring-2 ring-emerald-500/10'
+                                : 'border-gray-100 bg-white hover:border-emerald-200 hover:bg-gray-50'
+                                }`}
+                            >
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-colors ${updateMethod === m.id ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-emerald-100 group-hover:text-emerald-500'
+                                }`}>
+                                <m.icon className="h-5 w-5" />
+                              </div>
+                              <p className={`font-black text-sm ${updateMethod === m.id ? 'text-emerald-900' : 'text-gray-900'}`}>{m.label}</p>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{m.desc}</p>
+                              <input type="hidden" name="paymentMethod" value={updateMethod} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <Label className="text-emerald-900 font-black text-xs uppercase tracking-[0.2em] flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4 text-emerald-500" /> Payment Status *
+                        </Label>
+                        <div className="grid grid-cols-2 gap-4">
+                          {[
+                            { id: 'PAID', label: 'Paid', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500' },
+                            { id: 'PENDING', label: 'Pending', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500' }
+                          ].map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => setUpdatePaymentStatus(s.id)}
+                              className={`relative p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${updatePaymentStatus === s.id
+                                ? `border-${s.id === 'PAID' ? 'emerald' : 'amber'}-500 bg-${s.id === 'PAID' ? 'emerald' : 'amber'}-50 shadow-md`
+                                : 'border-gray-100 bg-white hover:bg-gray-50'
+                                }`}
+                            >
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-colors ${updatePaymentStatus === s.id ? `${s.bg} text-white` : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'
+                                }`}>
+                                <s.icon className="h-5 w-5" />
+                              </div>
+                              <p className={`font-black text-sm ${updatePaymentStatus === s.id ? `text-${s.id === 'PAID' ? 'emerald' : 'amber'}-900` : 'text-gray-900'}`}>{s.label}</p>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Confirmation</p>
+                              <input type="hidden" name="paymentStatus" value={updatePaymentStatus} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={`space-y-4 pt-4 transition-all duration-500 ${(!updateMethod || !updatePaymentStatus) ? 'opacity-30 pointer-events-none filter blur-[2px]' : 'opacity-100'}`}>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-emerald-900 font-black flex items-center gap-2">
+                          <CheckCircle2 className="h-5 w-5" /> Delivery OTP (6 Digits) *
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={resendingOtp === selectedOrder.id}
+                          onClick={() => handleResendSelfOtp(selectedOrder.id)}
+                          className="h-8 text-[10px] font-black uppercase text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg"
+                        >
+                          {resendingOtp === selectedOrder.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RotateCcw className="h-3 w-3 mr-1" />}
+                          Resend OTP
+                        </Button>
+                      </div>
+                      <Input
+                        id="otp"
+                        name="otp"
+                        placeholder="000000"
+                        maxLength={6}
+                        required
+                        value={otpValue}
+                        onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, ""))}
+                        disabled={!updateMethod || !updatePaymentStatus}
+                        className="text-center text-5xl font-black tracking-[1.5rem] h-24 rounded-2xl bg-white border-2 border-emerald-200 focus:border-emerald-500 shadow-inner"
+                      />
+                      <p className="text-[10px] text-emerald-600 font-black uppercase tracking-wider text-center">Verification required for delivery completion</p>
+                    </div>
                   </motion.div>
                 )}
 
@@ -618,13 +764,15 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-2">
                   {/* Self Delivery Resend */}
                   {!selectedOrder.deliveryJobs?.some(j => ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'].includes(j.status)) ? (
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={resendingOtp === selectedOrder.id}
                       className="w-full rounded-2xl h-12 border-2 border-gray-100 hover:border-emerald-300 font-bold flex items-center gap-2"
                       onClick={() => handleResendSelfOtp(selectedOrder.id)}
                     >
-                      <RotateCcw className="h-4 w-4" /> Resend Self-Delivery Code
+                      {resendingOtp === selectedOrder.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                      Resend OTP to Buyer
                     </Button>
                   ) : (
                     /* Partner Delivery Resend */
@@ -632,13 +780,15 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                       const activeJob = selectedOrder.deliveryJobs?.find(j => ['PICKED_UP', 'IN_TRANSIT'].includes(j.status));
                       if (activeJob) {
                         return (
-                          <Button 
-                            type="button" 
-                            variant="outline" 
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={resendingOtp === activeJob.id}
                             className="w-full rounded-2xl h-12 border-2 border-gray-100 hover:border-blue-300 font-bold flex items-center gap-2"
                             onClick={() => handleResendPartnerOtp(activeJob.id)}
                           >
-                            <RotateCcw className="h-4 w-4" /> Resend Partner Delivery OTP
+                            {resendingOtp === activeJob.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                            Resend Partner Delivery OTP
                           </Button>
                         );
                       }
@@ -650,13 +800,13 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
               )}
 
               <div className="flex gap-4 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsUpdateDialogOpen(false)} disabled={updating}
+                <Button type="button" variant="outline" onClick={() => setIsUpdateDialogOpen(false)} disabled={isPending}
                   className="flex-1 rounded-2xl h-14 font-bold border-2 border-gray-200 hover:bg-gray-50 transition-all">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updating || (newStatus === "DELIVERED" && selectedOrder.deliveryJobs?.some(j => ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'].includes(j.status)))}
+                <Button type="submit" disabled={isPending || (newStatus === "DELIVERED" && selectedOrder.deliveryJobs?.some(j => ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'].includes(j.status)))}
                   className="flex-1 rounded-2xl h-14 font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-xl shadow-emerald-500/25 transition-all">
-                  {updating ? (
+                  {isPending ? (
                     <span className="flex items-center gap-2">
                       <Loader2 className="h-5 w-5 animate-spin" /> Updating...
                     </span>
@@ -725,7 +875,7 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                     <div className="flex justify-between items-end">
                       <div>
                         <Badge className={`border-0 font-bold uppercase text-xs mb-3 ${selectedOrder.paymentStatus === 'PAID' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
-                          {selectedOrder.paymentStatus === 'PAID' ? 'PAID' : 'UNPAID'}
+                          {selectedOrder.paymentMethod === 'ONLINE' && selectedOrder.paymentStatus === 'PAID' ? 'PAID ONLINE' : selectedOrder.paymentStatus === 'PAID' ? 'PAID' : 'UNPAID'}
                         </Badge>
                         <p className="text-3xl font-black">₹{mounted ? selectedOrder.totalAmount.toLocaleString('en-IN') : '---'}</p>
                       </div>
@@ -808,13 +958,17 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                   <div className="flex-grow flex flex-col gap-1">
                     <Button
                       onClick={() => { setIsViewDialogOpen(false); openHireDialog(selectedOrder.id); }}
-                      disabled={selectedOrder.paymentMethod === 'ONLINE' && selectedOrder.paymentStatus === 'PENDING'}
+                      disabled={isPending || (selectedOrder.paymentMethod === 'ONLINE' && selectedOrder.paymentStatus === 'PENDING') || selectedOrder.orderStatus !== 'PROCESSING'}
                       className="w-full rounded-2xl font-bold bg-gray-900 hover:bg-gray-800 text-white shadow-lg shadow-gray-900/25 disabled:opacity-30"
                     >
-                      <Truck className="h-5 w-5 mr-2" /> Hire Courier
+                      {isPending ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Truck className="h-5 w-5 mr-2" />} 
+                      Hire Courier
                     </Button>
                     {selectedOrder.paymentMethod === 'ONLINE' && selectedOrder.paymentStatus === 'PENDING' && (
                       <p className="text-[9px] text-amber-600 font-bold text-center px-2">Awaiting online payment confirmation</p>
+                    )}
+                    {selectedOrder.orderStatus !== 'PROCESSING' && (
+                      <p className="text-[9px] text-red-600 font-bold text-center px-2">Self-delivery in progress (cannot hire)</p>
                     )}
                   </div>
                 )}
