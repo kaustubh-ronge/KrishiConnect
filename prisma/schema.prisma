@@ -108,6 +108,7 @@ model FarmerProfile {
   usagePurpose  UsagePurpose  @default(buy)
   sellingStatus SellingStatus @default(NONE)
   deliveryPricePerKm Float? @default(10)
+  maxDeliveryRange    Float? @default(100) // Max distance the farmer can ship
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -156,6 +157,7 @@ model AgentProfile {
   usagePurpose  UsagePurpose  @default(buy)
   sellingStatus SellingStatus @default(NONE)
   deliveryPricePerKm Float? @default(12)
+  maxDeliveryRange    Float? @default(150) // Max distance the agent can ship
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -322,6 +324,10 @@ model Order {
   disputeReason     String?
   disputeCreatedAt  DateTime?
   disputeResolvedAt DateTime?
+
+  // Mediation & Special Delivery (New)
+  isSpecialDelivery   Boolean @default(false)
+  adminApprovalStatus String  @default("NONE") // NONE, PENDING, APPROVED, REJECTED
 
   items         OrderItem[]
   tracking      OrderTracking[]
@@ -539,4 +545,18 @@ model Notification {
 
   @@index([userId, isRead])
   @@map("notifications")
+}
+
+model SupportMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  userName  String?
+  userEmail String?
+  userRole  String?
+  type      String?  @default("GENERAL")
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("support_messages")
 }

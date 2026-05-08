@@ -207,7 +207,7 @@ export default function ProductCard({ product, index }) {
               onClick={() => setShowInquiry(true)}
               className={`w-full border-2 ${isFarmer ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' : 'border-blue-200 text-blue-700 hover:bg-blue-50'} h-11 text-sm font-semibold rounded-xl transition-all`}
             >
-              <MessageCircle className="h-4 w-4 mr-1.5" /> Chat
+              <MessageCircle className="h-4 w-4 mr-1.5" /> Inquiry
             </Button>
 
             <Button

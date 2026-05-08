@@ -11,7 +11,8 @@ import {
   Truck, User, Calendar, ShoppingCart, CheckCircle2, Heart,
   Share2, Star, Award, Clock, Package, Leaf, Sparkles,
   ChevronRight, Minus, Plus, RotateCcw, Zap, TrendingUp,
-  BadgeCheck, Phone, Navigation, IndianRupee, AlertCircle, Loader2
+  BadgeCheck, Phone, Navigation, IndianRupee, AlertCircle, Loader2,
+  HelpCircle
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -38,6 +39,8 @@ export default function ProductDetailClient({ product, userRole }) {
   const [dynamicFee, setDynamicFee] = useState(null);
   const [isFeeLoading, setIsFeeLoading] = useState(false);
   const [isLongDistance, setIsLongDistance] = useState(false);
+  const [isOutOfRange, setIsOutOfRange] = useState(false);
+  const [isBypassed, setIsBypassed] = useState(false);
 
   // Track product view & Fetch dynamic fee
   useEffect(() => {
@@ -53,6 +56,7 @@ export default function ProductDetailClient({ product, userRole }) {
           if (res.success) {
             setDynamicFee(res.fee);
             setIsLongDistance(res.isLongDistance);
+            setIsOutOfRange(res.isOutOfRange);
           }
           setIsFeeLoading(false);
         });
@@ -86,6 +90,14 @@ export default function ProductDetailClient({ product, userRole }) {
       return;
     }
 
+    if (isOutOfRange && !isBypassed) {
+      toast.error("Delivery Unavailable", {
+        description: "This seller is out of range. Please request special delivery first.",
+        icon: <Truck className="h-5 w-5 text-rose-500" />
+      });
+      return;
+    }
+
     setIsAdding(true);
     const success = await addItem(product.id, parseFloat(qty));
     setIsAdding(false);
@@ -95,8 +107,8 @@ export default function ProductDetailClient({ product, userRole }) {
     }
   };
 
-  const deliveryCost = dynamicFee !== null 
-    ? dynamicFee 
+  const deliveryCost = dynamicFee !== null
+    ? dynamicFee
     : (product.deliveryChargeType === 'per_unit' ? qty * (product.deliveryCharge || 0) : (product.deliveryCharge || 0));
 
   // Platform Fee Preview (Assuming Online 3% as default for preview)
@@ -181,8 +193,8 @@ export default function ProductDetailClient({ product, userRole }) {
                     whileTap={{ scale: 0.9 }}
                     onClick={() => setIsLiked(!isLiked)}
                     className={`p-2.5 rounded-xl backdrop-blur-sm transition-all ${isLiked
-                        ? 'bg-red-500 text-white shadow-lg'
-                        : 'bg-white/80 text-gray-700 hover:bg-white'
+                      ? 'bg-red-500 text-white shadow-lg'
+                      : 'bg-white/80 text-gray-700 hover:bg-white'
                       }`}
                   >
                     <Heart className={`h-5 w-5 ${isLiked ? 'fill-white' : ''}`} />
@@ -220,8 +232,8 @@ export default function ProductDetailClient({ product, userRole }) {
                       whileTap={{ scale: 0.95 }}
                       onClick={() => setActiveImage(img)}
                       className={`relative shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all ${activeImage === img
-                          ? `border-${themeColor}-500 shadow-lg shadow-${themeColor}-500/25 ring-2 ring-${themeColor}-300`
-                          : 'border-gray-200 hover:border-gray-400'
+                        ? `border-${themeColor}-500 shadow-lg shadow-${themeColor}-500/25 ring-2 ring-${themeColor}-300`
+                        : 'border-gray-200 hover:border-gray-400'
                         }`}
                     >
                       <Image src={img} alt={`${product.productName} ${idx + 1}`} fill className="object-cover" />
@@ -379,28 +391,30 @@ export default function ProductDetailClient({ product, userRole }) {
                           <div className="flex items-center gap-2">
                             {isFeeLoading && <Loader2 className="h-3 w-3 animate-spin text-orange-500" />}
                             <p className={`text-sm font-bold text-gray-900 ${isFeeLoading ? 'opacity-50' : ''}`}>
-                                {isLongDistance ? 'Calculated at Checkout' : (dynamicFee !== null ? `₹${dynamicFee}` : (product.deliveryCharge ? `₹${product.deliveryCharge} ${product.deliveryChargeType === 'per_unit' ? `/ ${product.unit}` : '(Flat)'}` : 'Check at Checkout'))}
+                              {isOutOfRange ? (
+                                <span className="text-rose-500 font-black">Out of Range</span>
+                              ) : isLongDistance ? 'Calculated at Checkout' : (dynamicFee !== null ? `₹${dynamicFee}` : (product.deliveryCharge ? `₹${product.deliveryCharge} ${product.deliveryChargeType === 'per_unit' ? `/ ${product.unit}` : '(Flat)'}` : 'Check at Checkout'))}
                             </p>
                             {isLongDistance ? (
-                                <Badge variant="outline" className="border-rose-200 text-rose-600 bg-rose-50 text-[8px] font-black uppercase">Long Distance</Badge>
+                              <Badge variant="outline" className="border-rose-200 text-rose-600 bg-rose-50 text-[8px] font-black uppercase">Long Distance</Badge>
                             ) : (
-                                <Badge variant="outline" className="border-orange-200 text-orange-600 bg-orange-50 text-[8px] font-black uppercase">
-                                    {dynamicFee !== null ? "Market Matched" : "Starting Rate"}
-                                </Badge>
+                              <Badge variant="outline" className="border-orange-200 text-orange-600 bg-orange-50 text-[8px] font-black uppercase">
+                                {dynamicFee !== null ? "Market Matched" : "Starting Rate"}
+                              </Badge>
                             )}
                           </div>
                         </div>
                       </div>
                       <div className="group relative">
-                         <Info className="h-4 w-4 text-gray-300 cursor-help" />
-                         <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-gray-900 text-white text-[10px] rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl">
-                            <p className="font-bold mb-1 border-b border-white/10 pb-1">Logistics Transparency</p>
-                            {isLongDistance ? (
-                                <span className="text-rose-300">This seller is very far from your location. Exact logistics cost will be finalized at checkout based on your specific address.</span>
-                            ) : (
-                                "Delivery fee is calculated based on road distance and real-time partner availability to ensure fair pay for delivery partners."
-                            )}
-                         </div>
+                        <Info className="h-4 w-4 text-gray-300 cursor-help" />
+                        <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-gray-900 text-white text-[10px] rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl">
+                          <p className="font-bold mb-1 border-b border-white/10 pb-1">Logistics Transparency</p>
+                          {isLongDistance ? (
+                            <span className="text-rose-300">This seller is very far from your location. Exact logistics cost will be finalized at checkout based on your specific address.</span>
+                          ) : (
+                            "Delivery fee is calculated based on road distance and real-time partner availability to ensure fair pay for delivery partners."
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -411,7 +425,7 @@ export default function ProductDetailClient({ product, userRole }) {
                       Select Quantity ({product.unit})
                     </label>
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 bg-gray-50 rounded-2xl p-1.5 border border-gray-200">
+                      <div className="flex items-center gap-2 bg-gray-50 rounded-2xl p-1.5 border border-gray-200">
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
@@ -447,21 +461,21 @@ export default function ProductDetailClient({ product, userRole }) {
                       <div className="flex-1 text-right">
                         <p className="text-xs text-gray-500">Total Amount</p>
                         <p className="text-2xl font-black text-gray-900">
-                            ₹{(isLongDistance ? productSubtotal + platformFee : totalPrice).toLocaleString()}
+                          ₹{(isLongDistance ? productSubtotal + platformFee : totalPrice).toLocaleString()}
                         </p>
                         <div className="flex flex-col items-end gap-0.5">
-                            {isLongDistance ? (
-                                <p className="text-[10px] text-rose-600 font-bold tracking-tight">Logistics to be added at checkout</p>
-                            ) : (
-                                <>
-                                    {deliveryCost > 0 && (
-                                        <p className="text-[10px] text-gray-400 font-medium tracking-tight">incl. delivery ₹{deliveryCost.toLocaleString()}</p>
-                                    )}
-                                </>
-                            )}
-                            {platformFee > 0 && (
-                                <p className="text-[10px] text-gray-400 font-medium tracking-tight">incl. platform fee ₹{platformFee.toLocaleString()}</p>
-                            )}
+                          {isLongDistance ? (
+                            <p className="text-[10px] text-rose-600 font-bold tracking-tight">Logistics to be added at checkout</p>
+                          ) : (
+                            <>
+                              {deliveryCost > 0 && (
+                                <p className="text-[10px] text-gray-400 font-medium tracking-tight">incl. delivery ₹{deliveryCost.toLocaleString()}</p>
+                              )}
+                            </>
+                          )}
+                          {platformFee > 0 && (
+                            <p className="text-[10px] text-gray-400 font-medium tracking-tight">incl. platform fee ₹{platformFee.toLocaleString()}</p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -469,13 +483,41 @@ export default function ProductDetailClient({ product, userRole }) {
 
                   {/* Action Buttons */}
                   <div className="space-y-3 pt-2">
+                    {isOutOfRange && (
+                      <div className="p-5 bg-amber-50 border border-amber-200 rounded-3xl space-y-3 animate-in fade-in slide-in-from-top-4 duration-500 shadow-sm">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Limited Delivery Range</p>
+                            <p className="text-[10px] text-amber-600 font-bold leading-relaxed mt-1">This seller is outside our standard 50KM radius. However, special delivery can be negotiated through our admin team.</p>
+                          </div>
+                        </div>
+                        {!isBypassed ? (
+                          <Button
+                            variant="secondary"
+                            className="w-full h-10 rounded-xl bg-amber-600 text-white hover:bg-amber-700 font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-amber-600/20"
+                            onClick={() => setShowInquiry(true)}
+                          >
+                            <MessageCircle className="h-4 w-4 mr-2" /> Request Special Delivery
+                          </Button>
+                        ) : (
+                          <div className="flex items-center gap-2 py-1 px-3 bg-white/50 rounded-xl border border-amber-200/50">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[9px] font-black text-emerald-700 uppercase">Special Request Acknowledged</span>
+                            <Button variant="link" className="text-[9px] h-auto p-0 font-black text-rose-500 ml-auto" onClick={() => setIsBypassed(false)}>Undo</Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {!isAdmin && (
                       <Button
                         onClick={handleAddToCart}
                         disabled={product.availableStock <= 0 || isAdding}
-                        className={`w-full h-14 text-lg font-bold shadow-2xl transition-all duration-300 ${product.availableStock > 0
-                            ? `bg-gradient-to-r ${themeGradient} hover:shadow-${themeColor}-500/50 text-white`
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        className={`w-full h-14 text-lg font-black shadow-2xl transition-all duration-500 rounded-2xl ${product.availableStock > 0
+                          ? (isOutOfRange && !isBypassed)
+                            ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-50"
+                            : `bg-gradient-to-r ${themeGradient} hover:shadow-${themeColor}-500/50 text-white hover:scale-[1.02]`
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           }`}
                       >
                         {isAdding ? (
@@ -490,7 +532,9 @@ export default function ProductDetailClient({ product, userRole }) {
                         ) : (
                           <span className="flex items-center gap-2">
                             <ShoppingCart className="h-6 w-6" />
-                            {product.availableStock > 0 ? "Add to Cart" : "Out of Stock"}
+                            {product.availableStock > 0
+                              ? (isOutOfRange && !isBypassed) ? "Delivery Unavailable" : "Add to Cart"
+                              : "Out of Stock"}
                             <ChevronRight className="h-5 w-5 ml-auto" />
                           </span>
                         )}
@@ -503,13 +547,14 @@ export default function ProductDetailClient({ product, userRole }) {
                         onClick={() => setShowInquiry(true)}
                         className={`h-12 font-semibold border-2 ${themeBorder} ${themeLightText} hover:${themeLightBg} transition-all`}
                       >
-                        <MessageCircle className="mr-2 h-5 w-5" /> Chat Seller
+                        <MessageCircle className="mr-2 h-5 w-5" /> Contact Support
                       </Button>
                       <Button
                         variant="outline"
                         className="h-12 font-semibold border-2 border-gray-200 text-gray-700 hover:bg-gray-50 transition-all"
+                        onClick={() => router.push('/support')}
                       >
-                        <Phone className="mr-2 h-5 w-5" /> Call Now
+                        <HelpCircle className="mr-2 h-5 w-5" /> Help Center
                       </Button>
                     </div>
                   </div>
@@ -546,7 +591,16 @@ export default function ProductDetailClient({ product, userRole }) {
 
       <InquiryModal
         isOpen={showInquiry}
-        onClose={() => setShowInquiry(false)}
+        onClose={() => {
+          setShowInquiry(false);
+          if (isOutOfRange) {
+            setIsBypassed(true);
+            toast.success("Logistics request initiated. You can now add the product to your cart while we coordinate.", {
+              duration: 8000,
+              icon: <Truck className="h-5 w-5 text-emerald-600" />
+            });
+          }
+        }}
         product={product}
       />
     </div>

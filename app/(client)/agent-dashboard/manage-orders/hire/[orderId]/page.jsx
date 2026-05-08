@@ -4,6 +4,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 import HireDeliveryClient from "@/components/Dashboard/HireDeliveryClient";
 import { getAvailableDeliveryBoys } from "@/actions/delivery-job";
+import { getHaversineDistance } from "@/lib/utils";
 
 export default async function HireDeliveryPage({ params }) {
     const { orderId } = await params;
@@ -22,7 +23,12 @@ export default async function HireDeliveryPage({ params }) {
             },
             items: {
                 include: {
-                    product: true
+                    product: {
+                        include: {
+                            farmer: true,
+                            agent: true
+                        }
+                    }
                 }
             }
         }
@@ -30,19 +36,29 @@ export default async function HireDeliveryPage({ params }) {
 
     if (!order) notFound();
 
-    // Determine delivery coordinates (Order explicitly stored coords > Buyer Profile fallback)
-    const lat = order.lat || order.buyerUser.farmerProfile?.lat || order.buyerUser.agentProfile?.lat;
-    const lng = order.lng || order.buyerUser.farmerProfile?.lng || order.buyerUser.agentProfile?.lng;
+    // Determine seller coordinates
+    const firstItem = order.items[0];
+    const seller = firstItem?.product?.farmer || firstItem?.product?.agent;
+    const sellerLat = seller?.lat;
+    const sellerLng = seller?.lng;
+    
+    // Calculate order distance
+    const orderDistance = (sellerLat && sellerLng && order.lat && order.lng) 
+        ? getHaversineDistance(sellerLat, sellerLng, order.lat, order.lng)
+        : 0;
 
     // Fetch delivery boys nearby
-    const boysRes = await getAvailableDeliveryBoys(lat, lng, orderId);
+    const boysRes = await getAvailableDeliveryBoys(order.lat, order.lng, orderId, sellerLat, sellerLng);
 
     return (
         <div className="min-h-screen bg-gray-50/50 py-8">
             <HireDeliveryClient 
                 order={order} 
                 initialBoys={boysRes.success ? boysRes.data : []}
-                deliveryCoords={{ lat, lng }}
+                deliveryCoords={{ lat: order.lat, lng: order.lng }}
+                sellerCoords={{ lat: sellerLat, lng: sellerLng }}
+                sellerRange={seller?.maxDeliveryRange || 100}
+                orderDistance={orderDistance}
                 userType="agent"
             />
         </div>

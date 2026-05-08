@@ -24,6 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 import { downloadCSV } from '@/lib/csvUtils';
 import { getExportableUsers, getExportableProducts, toggleUserStatus } from '@/actions/admin-advanced';
@@ -39,20 +40,20 @@ const CUSTOM_SCROLLBAR_CSS = `
   .custom-scrollbar::-webkit-scrollbar {
     width: 12px;
     height: 12px;
-  }
+}
   .custom-scrollbar::-webkit-scrollbar-track {
     background: #f8fafc;
     border-radius: 10px;
     box-shadow: inset 0 0 5px rgba(0,0,0,0.05);
-  }
+}
   .custom-scrollbar::-webkit-scrollbar-thumb {
     background: #94a3b8;
     border-radius: 10px;
     border: 3px solid #f8fafc;
-  }
+}
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #64748b;
-  }
+}
 `;
 
 const getFriendlyStatus = (status) => {
@@ -63,7 +64,7 @@ const getFriendlyStatus = (status) => {
       'IN_TRANSIT': 'On the Way',
       'DELIVERED': 'Safely Delivered',
       'CANCELLED': 'Order Cancelled'
-   };
+ };
    return map[status] || status;
 };
 
@@ -104,10 +105,13 @@ export default function AdminCommandCenterClient({
    const [products, setProducts] = useState([]);
    const [deliveryJobs, setDeliveryJobs] = useState([]);
    const [reviews, setReviews] = useState([]);
+   const [supportMessages, setSupportMessages] = useState([]);
+   const [unreadSupportCount, setUnreadSupportCount] = useState(0);
    const [isLoading, setIsLoading] = useState(false);
 
    // Modals
    const [selectedOrder, setSelectedOrder] = useState(null);
+   const [negotiatedFee, setNegotiatedFee] = useState("");
    const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
    const [selectedProfile, setSelectedProfile] = useState(null);
    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -115,6 +119,8 @@ export default function AdminCommandCenterClient({
    const [isProductModalOpen, setIsProductModalOpen] = useState(false);
    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
    const [adminNote, setAdminNote] = useState("");
+   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+   const [selectedMessage, setSelectedMessage] = useState(null);
 
    // Filters
    const [search, setSearch] = useState("");
@@ -123,33 +129,40 @@ export default function AdminCommandCenterClient({
    useEffect(() => {
       setMounted(true);
       fetchInitialData();
-   }, []);
+
+      const interval = setInterval(() => {
+         refreshData();
+      }, 30000);
+      return () => clearInterval(interval);
+ }, []);
 
    // Lazy load data based on view
    useEffect(() => {
       if (!mounted) return;
       if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews'].includes(activeView)) {
          fetchDirectoryData(activeView);
-      }
-   }, [activeView, mounted]);
+    }
+ }, [activeView, mounted]);
 
    useEffect(() => {
       setCurrentPage(1);
-   }, [activeView, search, statusFilter]);
+ }, [activeView, search, statusFilter]);
 
    const fetchInitialData = async () => {
       setIsLoading(true);
       try {
-         const [resS, resO, resPR] = await Promise.all([
+         const [resS, resO, resPR, resU] = await Promise.all([
             statsAction(),
             ordersAction(),
-            getPendingAction()
+            getPendingAction(),
+            import('@/actions/support').then(m => m.getUnreadSupportCount())
          ]);
          if (resS.success) setStats(resS.data || {});
          if (resO.success) setOrders(resO.data || []);
          if (resPR.success) setPendingProfiles(resPR.data || []);
-      } catch (err) { console.error("Initial load failed:", err); } finally { setIsLoading(false); }
-   };
+         if (resU.success) setUnreadSupportCount(resU.data || 0);
+    } catch (err) { console.error("Initial load failed:", err); } finally { setIsLoading(false); }
+ };
 
    const fetchDirectoryData = async (view) => {
       setIsLoading(true);
@@ -157,35 +170,39 @@ export default function AdminCommandCenterClient({
          if (view === 'farmers') {
             const res = await getExportableUsers('farmer');
             if (res.success) setFarmers(res.data);
-         } else if (view === 'agents') {
+       } else if (view === 'agents') {
             const res = await getExportableUsers('agent');
             if (res.success) setAgents(res.data);
-         } else if (view === 'delivery') {
+       } else if (view === 'delivery') {
             const res = await getExportableUsers('delivery');
             if (res.success) setDeliveryPartners(res.data);
-         } else if (view === 'catalog') {
+       } else if (view === 'catalog') {
             const res = await getExportableProducts();
             if (res.success) setProducts(res.data);
-         } else if (view === 'logistics') {
+       } else if (view === 'logistics') {
             const res = await deliveryJobsAction();
             if (res.success) setDeliveryJobs(res.data);
-         } else if (view === 'reviews') {
+       } else if (view === 'reviews') {
             const res = await reviewsAction();
             if (res.success) setReviews(res.data);
-         }
-      } catch (err) { console.error(`Fetch ${view} failed:`, err); } finally { setIsLoading(false); }
-   };
+       } else if (view === 'support') {
+            const { getSupportMessages } = await import('@/actions/support');
+            const res = await getSupportMessages();
+            if (res.success) setSupportMessages(res.data.messages);
+       }
+    } catch (err) { console.error(`Fetch ${view} failed:`, err); } finally { setIsLoading(false); }
+ };
 
    const refreshData = async () => {
-      if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews'].includes(activeView)) {
+      if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support'].includes(activeView)) {
          await fetchDirectoryData(activeView);
-      }
+    }
       await fetchInitialData();
-   };
+ };
 
    const addLog = (action, detail) => {
       setLogs(prev => [{ time: new Date().toLocaleTimeString(), action, detail }, ...prev].slice(0, 20));
-   };
+ };
 
    const handleApprove = async (userId, role, name) => {
       const previousProfiles = [...pendingProfiles];
@@ -198,14 +215,14 @@ export default function AdminCommandCenterClient({
             addLog("APPROVED", `${role.toUpperCase()}: ${name}`);
             setAdminNote("");
             toast.success(`${name} verified successfully.`);
-         } else {
+       } else {
             throw new Error(res.error);
-         }
-      } catch (err) {
+       }
+    } catch (err) {
          setPendingProfiles(previousProfiles);
          toast.error(`Failed to approve ${name}: ${err.message}`);
-      }
-   };
+    }
+ };
 
    const handleReject = async (userId, role, name) => {
       const previousProfiles = [...pendingProfiles];
@@ -218,14 +235,14 @@ export default function AdminCommandCenterClient({
             addLog("REJECTED", `${role.toUpperCase()}: ${name}`);
             setAdminNote("");
             toast.success(`Rejection sent to ${name}.`);
-         } else {
+       } else {
             throw new Error(res.error);
-         }
-      } catch (err) {
+       }
+    } catch (err) {
          setPendingProfiles(previousProfiles);
          toast.error(`Failed to reject ${name}: ${err.message}`);
-      }
-   };
+    }
+ };
 
    const handleBulkApprove = async () => {
       if (selectedIds.length === 0) return toast.error("Please select members first.");
@@ -242,15 +259,15 @@ export default function AdminCommandCenterClient({
          if (res.success) {
             addLog("BULK_APPROVE", `${count} members approved`);
             toast.success(res.message);
-         } else {
+       } else {
             throw new Error(res.error);
-         }
-      } catch (err) {
+       }
+    } catch (err) {
          setPendingProfiles(previousProfiles);
          setSelectedIds(selectedIds);
          toast.error(`Bulk approval failed: ${err.message}`);
-      }
-   };
+    }
+ };
 
    const handleToggleStatus = async (userId, name) => {
       toast.promise(toggleUserStatus(userId), {
@@ -259,10 +276,10 @@ export default function AdminCommandCenterClient({
             addLog("SECURITY_CHANGE", `${name}`);
             refreshData();
             return res.message;
-         },
+       },
          error: 'Update failed.'
-      });
-   };
+    });
+ };
 
    const handleSettle = async (orderId) => {
       toast.promise(settleAction(orderId), {
@@ -271,10 +288,10 @@ export default function AdminCommandCenterClient({
             addLog("PAID_OUT", `Order #${orderId.slice(-6).toUpperCase()}`);
             refreshData();
             return 'Payment Released to Seller.';
-         },
+       },
          error: 'Failed.'
-      });
-   };
+    });
+ };
 
    const handleDeleteOrder = async (orderId) => {
       if (!confirm("Are you sure you want to PERMANENTLY DELETE this order? Stock will be restored if it was not paid.")) return;
@@ -285,10 +302,10 @@ export default function AdminCommandCenterClient({
             addLog("DELETED_ORDER", `Order #${orderId.slice(-6).toUpperCase()}`);
             refreshData();
             return res.message;
-         },
+       },
          error: (err) => `Delete failed: ${err.message}`
-      });
-   };
+    });
+ };
 
    const handleClearStale = async () => {
       if (!confirm("Remove all PENDING orders older than 24 hours? This cannot be undone.")) return;
@@ -300,15 +317,68 @@ export default function AdminCommandCenterClient({
             toast.success(res.message);
             addLog("STALE_CLEANUP", res.message);
             refreshData();
-         } else {
+       } else {
             toast.error(res.error);
-         }
-      } catch (err) {
+       }
+    } catch (err) {
          toast.error("Cleanup failed: " + err.message);
-      } finally {
+    } finally {
          setIsLoading(false);
-      }
-   };
+    }
+ };
+
+   const getFilteredItems = () => {
+      let items = [];
+      if (activeView === 'verifications') items = pendingProfiles;
+      else if (activeView === 'farmers') items = farmers;
+      else if (activeView === 'agents') items = agents;
+      else if (activeView === 'delivery') items = deliveryPartners;
+      else if (activeView === 'mediation') items = orders.filter(o => o.isSpecialDelivery);
+      else if (activeView === 'orders') items = orders;
+      else if (activeView === 'disputes') items = disputes;
+      else if (activeView === 'catalog') items = products;
+      else if (activeView === 'logistics') items = deliveryJobs;
+      else if (activeView === 'reviews') items = reviews;
+      else if (activeView === 'support') items = supportMessages;
+
+      let filtered = items.filter(item => {
+         const searchLower = (search || "").toLowerCase();
+         const matchesSearch =
+            (item.productName || "").toLowerCase().includes(searchLower) ||
+            (item.name || "").toLowerCase().includes(searchLower) ||
+            (item.displayName || "").toLowerCase().includes(searchLower) ||
+            (item.buyerName || "").toLowerCase().includes(searchLower) ||
+            (item.userEmail || "").toLowerCase().includes(searchLower) ||
+            (item.user?.email || "").toLowerCase().includes(searchLower) ||
+            (item.id || "").toLowerCase().includes(searchLower) ||
+            (item.phone || "").toLowerCase().includes(searchLower) ||
+            (item.companyName || "").toLowerCase().includes(searchLower) ||
+            (item.city || "").toLowerCase().includes(searchLower) ||
+            (item.comment || "").toLowerCase().includes(searchLower) ||
+            (item.deliveryBoy?.name || "").toLowerCase().includes(searchLower);
+
+         if (statusFilter === 'ALL') return matchesSearch;
+         
+         if (activeView === 'mediation') return matchesSearch && item.isSpecialDelivery && (statusFilter === 'ALL' || item.adminApprovalStatus === statusFilter);
+         if (activeView === 'orders') return matchesSearch && item.orderStatus === statusFilter;
+         if (activeView === 'catalog') return matchesSearch && (statusFilter === 'ACTIVE' ? !item.isDeactivated : item.isDeactivated);
+         if (activeView === 'support') return matchesSearch && (statusFilter === 'PENDING' ? !item.isRead : item.isRead);
+         if (statusFilter === 'PENDING_PAYMENT' && item.paymentStatus === 'Waiting for Payment') return matchesSearch;
+         
+         return matchesSearch && (item.status === statusFilter || item.approvalStatus === statusFilter);
+    });
+
+      // Prioritize unread support messages
+      if (activeView === 'support') {
+         return filtered.sort((a, b) => {
+            if (a.isRead === b.isRead) return 0;
+            return a.isRead ? 1 : -1;
+       });
+    }
+
+      return filtered;
+ };
+
 
    const openOrderAudit = async (orderId) => {
       setIsLoadingDetails(true);
@@ -320,7 +390,7 @@ export default function AdminCommandCenterClient({
             toast.error("Order not found.");
             setIsOrderModalOpen(false);
             return;
-         }
+       }
 
          const bankRes = await viewBankAction(orderId);
          const sellersData = bankRes.success ? bankRes.data.sellers : [];
@@ -330,77 +400,68 @@ export default function AdminCommandCenterClient({
             ...order,
             sellers: sellersData,
             deliveryPartners: deliveryPartners.length > 0 ? deliveryPartners : (order.deliveryPartners || [])
-         });
-      } catch (err) {
+       });
+    } catch (err) {
          console.error("Audit fetch failed:", err);
          toast.error("Failed to load full audit data.");
-      } finally {
+    } finally {
          setIsLoadingDetails(false);
-      }
-   };
+    }
+ };
 
    const openProfileAudit = (profile) => {
       setSelectedProfile(profile);
       setAdminNote(profile.user?.adminNotes || "");
       setIsProfileModalOpen(true);
-   };
+ };
 
    const openProductAudit = (product) => {
       setSelectedProduct(product);
       setIsProductModalOpen(true);
-   };
+ };
+
+   const openSupportAudit = async (message) => {
+      setSelectedMessage(message);
+      setIsSupportModalOpen(true);
+      if (!message.isRead) {
+          const { markSupportMessageAsRead } = await import('@/actions/support');
+          await markSupportMessageAsRead(message.id);
+          refreshData();
+    }
+ };
 
    const disputes = useMemo(() => orders.filter(o => o.disputeStatus === 'OPEN'), [orders]);
+
+   const handleApproveSpecialDelivery = async (orderId, status, fee) => {
+      setIsLoading(true);
+      try {
+          const { updateOrderApprovalStatus } = await import('@/actions/orders');
+          const res = await updateOrderApprovalStatus(orderId, status, fee);
+          if (res.success) {
+              toast.success(`Order ${status.toLowerCase()} successfully!`);
+              refreshData();
+              setIsOrderModalOpen(false);
+          } else {
+              toast.error(res.error);
+          }
+      } catch (err) {
+          toast.error("Failed to update order status.");
+      } finally {
+          setIsLoading(false);
+      }
+   };
 
    const paginate = (items) => {
       const start = (currentPage - 1) * itemsPerPage;
       return items.slice(start, start + itemsPerPage);
-   };
+ };
 
-   const getFilteredItems = () => {
-      let items = [];
-      if (activeView === 'verifications') items = pendingProfiles;
-      else if (activeView === 'disputes') items = disputes;
-      else if (activeView === 'orders') items = orders;
-      else if (activeView === 'farmers') items = farmers;
-      else if (activeView === 'agents') items = agents;
-      else if (activeView === 'delivery') items = deliveryPartners;
-      else if (activeView === 'catalog') items = products;
-      else if (activeView === 'logistics') items = deliveryJobs;
-      else if (activeView === 'reviews') items = reviews;
-
-      return items.filter(item => {
-         const searchStr = search.toLowerCase();
-         const matchSearch =
-            (item.name || "").toLowerCase().includes(searchStr) ||
-            (item.companyName || "").toLowerCase().includes(searchStr) ||
-            (item.productName || "").toLowerCase().includes(searchStr) ||
-            (item.displayName || "").toLowerCase().includes(searchStr) ||
-            (item.buyerName || "").toLowerCase().includes(searchStr) ||
-            (item.id || "").toLowerCase().includes(searchStr) ||
-            (item.phone || "").toLowerCase().includes(searchStr) ||
-            (item.user?.email || "").toLowerCase().includes(searchStr) ||
-            (item.city || "").toLowerCase().includes(searchStr) ||
-            (item.deliveryBoy?.name || "").toLowerCase().includes(searchStr) ||
-            (item.comment || "").toLowerCase().includes(searchStr);
-
-         const matchStatus = statusFilter === "ALL" ||
-            (item.orderStatus === statusFilter) ||
-            (item.sellingStatus === statusFilter) ||
-            (item.approvalStatus === statusFilter) ||
-            (item.status === statusFilter) ||
-            (statusFilter === 'PENDING_PAYMENT' && item.paymentStatus === 'Waiting for Payment') ||
-            (statusFilter === 'ACTIVE' && (item.isDisabled === false || item.user?.isDisabled === false)) ||
-            (statusFilter === 'DEACTIVATED' && (item.isDisabled === true || item.user?.isDisabled === true));
-         return matchSearch && matchStatus;
-      });
-   };
 
    const handleGlobalExport = () => {
       const dataToExport = getFilteredItems();
       if (dataToExport.length === 0) return toast.error("No data found to export.");
       downloadCSV(dataToExport, `KrishiHub_${activeView}`);
-   };
+ };
 
    if (!mounted) return <PremiumLoader fullPage message="KrishiHub Initializing..." />;
 
@@ -413,8 +474,10 @@ export default function AdminCommandCenterClient({
       { id: 'agents', label: 'Agents List', icon: Building2, color: 'text-amber-500' },
       { id: 'delivery', label: 'Delivery Boys', icon: Truck, color: 'text-slate-400' },
       { id: 'logistics', label: 'Live Logistics', icon: Zap, color: 'text-amber-500' },
+      { id: 'mediation', label: 'Logistics Mediation', icon: ShieldAlert, color: 'text-rose-600', badge: orders.filter(o => o.isSpecialDelivery && o.adminApprovalStatus === 'PENDING').length },
       { id: 'catalog', label: 'Product List', icon: Package, color: 'text-purple-500' },
       { id: 'reviews', label: 'User Reviews', icon: Star, color: 'text-yellow-500' },
+      { id: 'support', label: 'Help & Support', icon: HelpCircle, color: 'text-rose-500', badge: unreadSupportCount },
       { id: 'finance', label: 'Money & Bank', icon: IndianRupee, color: 'text-emerald-600' },
    ];
 
@@ -430,8 +493,8 @@ export default function AdminCommandCenterClient({
                <Button variant="outline" size="sm" className="h-8 w-8 rounded-lg shadow-sm" disabled={currentPage === totalPages} onClick={() => { setCurrentPage(p => p + 1); window.scrollTo(0, 0); }}><ChevronRight className="h-4 w-4" /></Button>
             </div>
          </div>
-      );
-   };
+     );
+ };
 
    return (
       <div className="flex h-screen overflow-hidden bg-slate-50 text-[13px] font-sans selection:bg-indigo-100 selection:text-indigo-900">
@@ -571,7 +634,7 @@ export default function AdminCommandCenterClient({
                   )}
 
                   {/* DIRECTORY VIEWS */}
-                  {['verifications', 'disputes', 'orders', 'farmers', 'agents', 'delivery', 'catalog'].includes(activeView) && (
+                  {['verifications', 'disputes', 'orders', 'farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support'].includes(activeView) && (
                      <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
                         <div className="flex items-center justify-between flex-wrap gap-6 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
                            <div className="flex items-center gap-6">
@@ -637,7 +700,7 @@ export default function AdminCommandCenterClient({
                                                 <input type="checkbox" className="w-4 h-4 rounded-md border-slate-300 accent-indigo-600" checked={selectedIds.includes(item.userId)} onChange={(e) => {
                                                    if (e.target.checked) setSelectedIds([...selectedIds, item.userId]);
                                                    else setSelectedIds(selectedIds.filter(id => id !== item.userId));
-                                                }} />
+                                              }} />
                                              </TableCell>
                                           )}
                                           <TableCell className={activeView === 'verifications' ? "pl-2" : "pl-8"}>
@@ -647,7 +710,7 @@ export default function AdminCommandCenterClient({
                                                       activeView === 'reviews' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
                                                          item.role === 'farmer' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                                             'bg-indigo-50 text-indigo-600 border-indigo-100'
-                                                   }`}>
+                                                 }`}>
                                                    {(item.productName || item.name || item.displayName || item.buyerName)?.[0] || 'O'}
                                                 </div>
                                                 <div className="flex flex-col">
@@ -719,7 +782,7 @@ export default function AdminCommandCenterClient({
                                                    if (activeView === 'orders' || activeView === 'disputes') openOrderAudit(item.id);
                                                    else if (activeView === 'catalog') openProductAudit(item);
                                                    else openProfileAudit(item);
-                                                }}><Eye className="h-4 w-4 text-slate-400" /></Button>
+                                              }}><Eye className="h-4 w-4 text-slate-400" /></Button>
                                                 {activeView === 'orders' && (
                                                    <Button size="icon" variant="outline" className="h-8 w-8 rounded-lg border-slate-200 shadow-sm text-rose-500 hover:bg-rose-50" onClick={() => handleDeleteOrder(item.id)}><Trash2 className="h-4 w-4" /></Button>
                                                 )}
@@ -763,6 +826,8 @@ export default function AdminCommandCenterClient({
                      </div>
                   )}
                </div>
+            </div>
+         </main>
 
                {/* PRODUCT AUDIT MODAL */}
                <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
@@ -1030,14 +1095,84 @@ export default function AdminCommandCenterClient({
                         </div>
                      </div>
 
-                     <DialogFooter className="p-6 bg-white border-t border-slate-200 flex gap-6 shrink-0">
-                        <Button variant="ghost" className="font-black text-[11px] text-slate-400 h-12 px-10 rounded-2xl uppercase tracking-widest" onClick={() => setIsOrderModalOpen(false)}>Close Ledger</Button>
-                        <Button className="flex-grow h-12 bg-emerald-600 text-white rounded-2xl font-black text-sm shadow-2xl shadow-emerald-600/30 uppercase tracking-widest hover:bg-emerald-700 transition-all" onClick={() => { setIsOrderModalOpen(false); handleSettle(selectedOrder.id); }}>Release Final Funds</Button>
+                     <DialogFooter className="p-6 bg-white border-t border-slate-200 flex flex-col gap-6 shrink-0">
+                        {selectedOrder?.isSpecialDelivery && selectedOrder?.adminApprovalStatus === 'PENDING' && (
+                           <div className="w-full p-8 bg-amber-50 rounded-[2.5rem] border-2 border-dashed border-amber-200 space-y-6 mb-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                              <div className="flex items-center gap-3">
+                                 <div className="w-10 h-10 bg-amber-500 rounded-2xl flex items-center justify-center text-white"><ShieldAlert className="h-6 w-6" /></div>
+                                 <div>
+                                    <h5 className="text-xs font-black text-amber-700 uppercase tracking-widest">Logistics Mediation Required</h5>
+                                    <p className="text-[10px] text-amber-600 font-bold">Set negotiated delivery fee below</p>
+                                 </div>
+                              </div>
+                              <div className="space-y-3">
+                                 <Label className="text-[10px] font-black uppercase text-amber-700 ml-1">Final Delivery Fee (₹)</Label>
+                                 <Input 
+                                    type="number" 
+                                    className="h-12 rounded-2xl border-amber-200 bg-white text-lg font-black text-slate-900" 
+                                    placeholder="e.g. 450" 
+                                    value={negotiatedFee} 
+                                    onChange={(e) => setNegotiatedFee(e.target.value)}
+                                 />
+                              </div>
+                              <div className="flex gap-4">
+                                 <Button variant="outline" className="flex-grow h-12 border-rose-200 text-rose-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-rose-50" onClick={() => handleApproveSpecialDelivery(selectedOrder.id, 'REJECTED')}>Reject Order</Button>
+                                 <Button className="flex-grow h-12 bg-amber-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-amber-500/20" onClick={() => handleApproveSpecialDelivery(selectedOrder.id, 'APPROVED', parseFloat(negotiatedFee))}>Approve & Finalize</Button>
+                              </div>
+                           </div>
+                        )}
+                        <div className="flex gap-6 w-full">
+                           <Button variant="ghost" className="font-black text-[11px] text-slate-400 h-12 px-10 rounded-2xl uppercase tracking-widest" onClick={() => setIsOrderModalOpen(false)}>Close Ledger</Button>
+                           <Button className="flex-grow h-12 bg-emerald-600 text-white rounded-2xl font-black text-sm shadow-2xl shadow-emerald-600/30 uppercase tracking-widest hover:bg-emerald-700 transition-all" onClick={() => { setIsOrderModalOpen(false); handleSettle(selectedOrder.id); }}>Release Final Funds</Button>
+                        </div>
                      </DialogFooter>
                   </DialogContent>
                </Dialog>
-            </div>
-         </main>
-      </div>
-   );
+          {/* SUPPORT MESSAGE MODAL */}
+          <Dialog open={isSupportModalOpen} onOpenChange={setIsSupportModalOpen}>
+             <DialogContent className="sm:max-w-2xl p-0 border-0 bg-white shadow-2xl rounded-[2.5rem] overflow-hidden">
+                <div className="bg-rose-600 p-8 text-white relative">
+                   <div className="flex items-center justify-between mb-4">
+                      <Badge className="bg-white/10 text-white border-0 text-[8px] font-black uppercase px-4 py-1 rounded-full tracking-widest">SUPPORT TICKET</Badge>
+                      <Badge className={`text-[8px] font-black uppercase px-4 py-1 border-0 rounded-full ${selectedMessage?.isRead ? 'bg-white/20' : 'bg-white animate-bounce text-rose-600'}`}>
+                         {selectedMessage?.isRead ? 'ARCHIVED' : 'ACTION REQUIRED'}
+                      </Badge>
+                   </div>
+                   <DialogTitle className="text-3xl font-black tracking-tighter leading-tight flex items-center gap-3">
+                      <HelpCircle className="h-8 w-8" /> Support Request
+                   </DialogTitle>
+                   <p className="text-rose-100 font-bold mt-2 text-sm uppercase tracking-widest">From: {selectedMessage?.userName} ({selectedMessage?.userRole})</p>
+                </div>
+                <div className="p-8 space-y-8 bg-slate-50/50">
+                   <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                         <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Mail className="h-4 w-4" /> Message Content</h5>
+                         <span className="text-[10px] font-bold text-slate-400">{selectedMessage?.createdAt && new Date(selectedMessage.createdAt).toLocaleString()}</span>
+                      </div>
+                      <Card className="p-8 rounded-[2rem] border-0 bg-white shadow-sm italic text-slate-700 leading-relaxed text-base">
+                         "{selectedMessage?.message}"
+                      </Card>
+                   </div>
+
+                   <div className="grid grid-cols-2 gap-6">
+                      <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm">
+                         <p className="text-[9px] font-black text-slate-400 uppercase mb-1">User Email</p>
+                         <p className="text-sm font-black text-slate-900">{selectedMessage?.userEmail}</p>
+                      </div>
+                      <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm">
+                         <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Inquiry Type</p>
+                         <Badge className="bg-indigo-50 text-indigo-700 border-0 text-[10px] font-black uppercase px-3 py-1 rounded-lg">{selectedMessage?.type}</Badge>
+                      </div>
+                   </div>
+                </div>
+                <DialogFooter className="p-6 bg-white border-t border-slate-200 flex gap-6 shrink-0">
+                   <Button variant="ghost" className="flex-1 font-black text-[11px] text-slate-400 h-12 rounded-2xl uppercase tracking-widest" onClick={() => setIsSupportModalOpen(false)}>Close Ticket</Button>
+                   <Button className="flex-[2] h-12 bg-rose-600 text-white rounded-2xl font-black text-sm shadow-2xl shadow-rose-600/30 uppercase tracking-widest hover:bg-rose-700 transition-all" onClick={() => window.open(`mailto:${selectedMessage?.userEmail}?subject=Re: KrishiConnect Support Ticket`)}>
+                      Reply via Email <ExternalLink className="ml-2 h-4 w-4" />
+                   </Button>
+                </DialogFooter>
+             </DialogContent>
+          </Dialog>
+       </div>
+    );
 }

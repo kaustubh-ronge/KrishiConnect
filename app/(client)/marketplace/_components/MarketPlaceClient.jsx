@@ -118,13 +118,14 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
     if (!metadata) return null;
 
     const { page, totalPages, total } = metadata;
+    const safeTotalPages = Math.max(0, parseInt(totalPages) || 0);
     
-    if (totalPages <= 1) {
+    if (safeTotalPages <= 1) {
       return (
         <div className="flex flex-col items-center justify-center gap-4 py-12">
           <Separator className="w-24 bg-emerald-100" />
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            End of results • Showing all {total} products
+            End of results • Showing all {total || 0} products
           </p>
         </div>
       );
@@ -144,7 +145,7 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
           </Button>
 
           <div className="flex items-center gap-1.5 mx-2">
-            {[...Array(totalPages)].map((_, i) => {
+            {[...Array(safeTotalPages)].map((_, i) => {
               const p = i + 1;
               if (totalPages > 7) {
                 if (p > 1 && p < totalPages && (p < page - 1 || p > page + 1)) {

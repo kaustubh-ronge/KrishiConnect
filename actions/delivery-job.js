@@ -10,9 +10,9 @@ import { getOSRMDistance, getHaversineDistance, generateOTP } from "@/lib/utils"
 import { isSellerOfOrder, isAssignedDeliveryPartner, apiResponse } from "@/lib/permissions";
 
 /**
- * Fetch available delivery boys within range of the delivery location.
+ * Fetch available delivery boys with 3-point logistics distance.
  */
-export async function getAvailableDeliveryBoys(lat = null, lng = null, orderId = null) {
+export async function getAvailableDeliveryBoys(lat = null, lng = null, orderId = null, sellerLat = null, sellerLng = null) {
   // Coords are now optional to prevent UI blackout
   try {
     // Get all approved delivery partners (including offline)
@@ -45,9 +45,16 @@ export async function getAvailableDeliveryBoys(lat = null, lng = null, orderId =
       });
     }
 
-    // Filter by radius and calculate distance
     const eligible = deliveryBoys.map(boy => {
-      const distance = getHaversineDistance(lat, lng, boy.lat, boy.lng);
+      // Distance 1: Boy to Seller (Pickup)
+      const distToPickup = (sellerLat && sellerLng) ? getHaversineDistance(sellerLat, sellerLng, boy.lat, boy.lng) : 0;
+      // Distance 2: Seller to Buyer (Delivery) - Buyer is at lat/lng
+      const distSellerToBuyer = (sellerLat && sellerLng && lat && lng) ? getHaversineDistance(sellerLat, sellerLng, lat, lng) : 0;
+      
+      // Distance 3: Boy to Buyer (For 'Near Buyer' sorting)
+      const distBoyToBuyer = (lat && lng) ? getHaversineDistance(boy.lat, boy.lng, lat, lng) : 0;
+
+      const totalDistance = distToPickup + distSellerToBuyer;
 
       // Check if THIS specific boy has a request for THIS specific order
       const myRequestForThisOrder = existingRequests.find(r => r.deliveryBoyId === boy.id);
@@ -74,7 +81,10 @@ export async function getAvailableDeliveryBoys(lat = null, lng = null, orderId =
 
       return {
         ...boy,
-        distance: parseFloat(distance.toFixed(2)),
+        distance: parseFloat(totalDistance.toFixed(2)),
+        pickupDistance: parseFloat(distToPickup.toFixed(2)),
+        deliveryDistance: parseFloat(distSellerToBuyer.toFixed(2)),
+        boyToBuyerDistance: parseFloat(distBoyToBuyer.toFixed(2)),
         availability,
         hiringStatus: myRequestForThisOrder ? myRequestForThisOrder.status : null,
         hiringJobId: myRequestForThisOrder ? myRequestForThisOrder.id : null,

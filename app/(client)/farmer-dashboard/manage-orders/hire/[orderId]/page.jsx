@@ -22,7 +22,12 @@ export default async function HireDeliveryPage({ params }) {
             },
             items: {
                 include: {
-                    product: true
+                    product: {
+                        include: {
+                            farmer: true,
+                            agent: true
+                        }
+                    }
                 }
             }
         }
@@ -30,12 +35,14 @@ export default async function HireDeliveryPage({ params }) {
 
     if (!order) notFound();
 
-    // Determine delivery coordinates (Order explicitly stored coords > Buyer Profile fallback)
-    const lat = order.lat || order.buyerUser.farmerProfile?.lat || order.buyerUser.agentProfile?.lat;
-    const lng = order.lng || order.buyerUser.farmerProfile?.lng || order.buyerUser.agentProfile?.lng;
+    // Determine seller coordinates
+    const firstItem = order.items[0];
+    const seller = firstItem?.product?.farmer || firstItem?.product?.agent;
+    const sellerLat = seller?.lat;
+    const sellerLng = seller?.lng;
 
     // Fetch delivery boys nearby
-    const boysRes = await getAvailableDeliveryBoys(lat, lng, orderId);
+    const boysRes = await getAvailableDeliveryBoys(lat, lng, orderId, sellerLat, sellerLng);
 
     return (
         <div className="min-h-screen bg-gray-50/50 py-8">
@@ -43,6 +50,7 @@ export default async function HireDeliveryPage({ params }) {
                 order={order} 
                 initialBoys={boysRes.success ? boysRes.data : []}
                 deliveryCoords={{ lat, lng }}
+                sellerCoords={{ lat: sellerLat, lng: sellerLng }}
                 userType="farmer"
             />
         </div>

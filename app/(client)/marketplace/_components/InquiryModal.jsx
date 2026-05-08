@@ -12,70 +12,62 @@ import { Badge } from "@/components/ui/badge";
 import {
   MessageCircle, Send, User, Box, Phone, Package,
   IndianRupee, Sparkles, ArrowRight, Leaf, Star,
-  MapPin, Shield, Clock, CheckCircle2, AlertCircle
+  MapPin, Shield, Clock, CheckCircle2, AlertCircle, RotateCcw
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { sendSupportMessage } from "@/actions/support";
 
 export default function InquiryModal({ isOpen, onClose, product }) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [message, setMessage] = useState("");
   const [step, setStep] = useState(1);
+  const [isSending, setIsSending] = useState(false);
 
   const isFarmer = product.sellerType === 'farmer';
   const seller = isFarmer ? product.farmer : product.agent;
   const sellerName = isFarmer ? seller?.name : (seller?.companyName || seller?.name);
   const location = isFarmer ? seller?.address : seller?.region;
 
-  const handleSendInquiry = () => {
-    const phone = product.whatsappNumber || seller?.phone;
-
-    if (!phone) {
-      toast.error("Seller contact number not available.", {
-        icon: <AlertCircle className="h-5 w-5" />,
-      });
-      return;
-    }
-
+  const handleSendInquiry = async () => {
     if (!name.trim()) {
       toast.error("Please enter your name.");
       return;
     }
 
-    const text = `🌾 *New Inquiry from KrishiConnect* 🌾\n\n` +
-      `📦 *Product:* ${product.productName}\n` +
-      `💰 *Price:* ₹${product.pricePerUnit}/${product.unit}\n` +
-      `📍 *Location:* ${location || 'India'}\n` +
-      `━━━━━━━━━━━━━━━━━━\n` +
-      `👤 *Buyer:* ${name}\n` +
-      `📊 *Quantity:* ${quantity || 'Not specified'} ${product.unit}\n` +
-      `💬 *Message:* ${message || 'No message'}\n\n` +
-      `❓ *Is this stock available?*`;
+    setIsSending(true);
+    const fullMessage = `Inquiry regarding: ${product.productName}\n` +
+      `Quantity Requested: ${quantity || 'Not specified'} ${product.unit}\n` +
+      `Buyer Name: ${name}\n` +
+      `------------------\n` +
+      `User Message: ${message || 'No message'}`;
 
-    const cleanPhone = phone.replace(/\D/g, '');
-    const finalPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-    const encodedText = encodeURIComponent(text);
-
-    const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768;
-
-    const url = isDesktop
-      ? `https://web.whatsapp.com/send?phone=${finalPhone}&text=${encodedText}`
-      : `https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodedText}`;
-
-    window.open(url, '_blank');
-
-    toast.success("Opening WhatsApp...", {
-      icon: <CheckCircle2 className="h-5 w-5 text-green-500" />,
-      description: "You'll be redirected to chat with the seller"
-    });
-
-    onClose();
+    try {
+       const res = await sendSupportMessage(fullMessage, "PRODUCT_INQUIRY");
+       if (res.success) {
+          toast.success("Request Sent!", {
+            icon: <CheckCircle2 className="h-5 w-5 text-green-500" />,
+            description: "Admin will contact the seller and get back to you."
+          });
+          setName("");
+          setQuantity("");
+          setMessage("");
+          onClose();
+       } else {
+          toast.error(res.error || "Failed to send request.");
+       }
+    } catch (err) {
+       console.error("Inquiry Error:", err);
+       toast.error("Connection error. Try again.");
+    } finally {
+       setIsSending(false);
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-white rounded-3xl border-0 shadow-2xl">
+      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-white rounded-3xl border-0 shadow-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="relative bg-gradient-to-r from-emerald-500 to-green-600 p-6 text-white">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgMjAgMTAgTSAxMCAwIEwgMTAgMjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjEiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-30" />
@@ -91,17 +83,17 @@ export default function InquiryModal({ isOpen, onClose, product }) {
               </motion.div>
               <div>
                 <DialogTitle className="text-2xl font-bold text-white">
-                  Chat with Seller
+                  Contact Support
                 </DialogTitle>
                 <DialogDescription className="text-green-100 mt-1">
-                  Send a direct WhatsApp message
+                  Request product info through platform admin
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-grow">
           {/* Product Summary */}
           <div className="bg-gradient-to-br from-gray-50 to-emerald-50 rounded-2xl p-4 border border-gray-100">
             <div className="flex items-center gap-3 mb-3">
@@ -198,16 +190,24 @@ export default function InquiryModal({ isOpen, onClose, product }) {
         <div className="p-6 pt-0">
           <Button
             onClick={handleSendInquiry}
-            className="w-full h-14 bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:from-[#20BD5C] hover:to-[#0E7A6C] text-white font-bold text-lg shadow-2xl shadow-green-500/25 hover:shadow-green-500/40 rounded-2xl transition-all group"
+            disabled={isSending}
+            className="w-full h-14 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white font-bold text-lg shadow-2xl shadow-green-500/25 hover:shadow-green-500/40 rounded-2xl transition-all group"
           >
-            <span className="flex items-center gap-3">
-              <Send className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              Send on WhatsApp
-              <ArrowRight className="h-5 w-5 group-hover:translate-x-2 transition-transform" />
-            </span>
+            {isSending ? (
+              <span className="flex items-center gap-3">
+                <RotateCcw className="h-5 w-5 animate-spin" />
+                Processing...
+              </span>
+            ) : (
+              <span className="flex items-center gap-3">
+                <Send className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                Send Support Request
+                <ArrowRight className="h-5 w-5 group-hover:translate-x-2 transition-transform" />
+              </span>
+            )}
           </Button>
           <p className="text-xs text-center text-gray-400 mt-3">
-            You'll be redirected to WhatsApp to continue the conversation
+            Admin will mediate this conversation to ensure security
           </p>
         </div>
       </DialogContent>

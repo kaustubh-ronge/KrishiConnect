@@ -25,7 +25,8 @@ import {
     ArrowLeft, ShieldCheck, Lock, Truck, CheckCircle2,
     MapPin, RotateCcw, AlertCircle, X, CreditCard, Eye,
     Receipt, Package, Calendar, Clock,
-    Sparkles, Navigation, Loader2
+    Sparkles, Navigation, Loader2,
+    ShieldAlert, MessageCircle
 } from "lucide-react";
 
 
@@ -34,6 +35,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import InquiryModal from "@/app/(client)/marketplace/_components/InquiryModal";
 
 // Helper to load Razorpay SDK dynamically
 const loadRazorpay = () => {
@@ -48,7 +50,7 @@ const loadRazorpay = () => {
 
 export default function CartClient({ initialCart, user }) {
     const router = useRouter();
-    const { removeItem, updateQuantity, fetchCart } = useCartStore();
+    const { cartItems: storeCartItems, removeItem, updateQuantity, fetchCart } = useCartStore();
     const [isMounted, setIsMounted] = useState(false);
     const [isPending, setIsPending] = useState(false);
     const [selectedItemIds, setSelectedItemIds] = useState((initialCart?.items || []).map(it => it.id));
@@ -58,7 +60,12 @@ export default function CartClient({ initialCart, user }) {
     const [showCollisionModal, setShowCollisionModal] = useState(false);
     const [activeTab, setActiveTab] = useState("cart");
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [isSpecialApprovalModalOpen, setIsSpecialApprovalModalOpen] = useState(false);
+    const [isInquiryOpen, setIsInquiryOpen] = useState(false);
+    const [inquiryProduct, setInquiryProduct] = useState(null);
     const [selectedPendingOrder, setSelectedPendingOrder] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ordersPerPage = 3;
 
 
     // Sync mounted state and fetch pending
@@ -68,7 +75,10 @@ export default function CartClient({ initialCart, user }) {
     }, []);
 
     useEffect(() => {
-    }, []);
+        if (activeTab === 'pending') {
+            fetchPending();
+        }
+    }, [activeTab]);
 
     const fetchPending = async () => {
         const res = await getUserPendingOrders();
@@ -77,8 +87,8 @@ export default function CartClient({ initialCart, user }) {
         }
     };
 
-    // Use initial data for now (in production, sync with store state)
-    const cartItems = initialCart?.items || [];
+    // Use store items if available, fallback to initial prop
+    const cartItems = storeCartItems.length > 0 ? storeCartItems : (initialCart?.items || []);
     const totalQuantity = cartItems.reduce((acc, it) => acc + (it.quantity || 0), 0);
 
     const [shippingName, setShippingName] = useState(user?.fullName || "");
@@ -91,15 +101,29 @@ export default function CartClient({ initialCart, user }) {
 
 
     // --- Dynamic Calculations based on Selection ---
-    const selectedItems = cartItems.filter(it => selectedItemIds.includes(it.id));
+    const selectedPending = pendingOrders.filter(o => selectedItemIds.includes(o.id));
+    const pendingProductIds = new Set(selectedPending.flatMap(o => o.items.map(it => it.productId)));
 
-    const productSubtotal = selectedItems.reduce((acc, item) => {
+    // Active items: Only count those NOT already covered by a selected pending order
+    const selectedActiveItems = cartItems.filter(it => 
+        selectedItemIds.includes(it.id) && !pendingProductIds.has(it.productId)
+    );
+
+    const activeSubtotal = selectedActiveItems.reduce((acc, item) => {
         const price = item.product?.pricePerUnit || 0;
         return acc + (item.quantity * price);
     }, 0);
 
+    const pendingItemsSubtotal = selectedPending.reduce((acc, order) => {
+        return acc + order.items.reduce((sum, it) => sum + (it.quantity * (it.priceAtPurchase || 0)), 0);
+    }, 0);
+
+    const productSubtotal = activeSubtotal + pendingItemsSubtotal;
+
     const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState(0);
     const [isCalculatingFee, setIsCalculatingFee] = useState(false);
+    const [isOutOfRange, setIsOutOfRange] = useState(false);
+    const [unserviceableIds, setUnserviceableIds] = useState([]);
 
     // Fetch dynamic fee when selection or location changes
     useEffect(() => {
@@ -112,7 +136,9 @@ export default function CartClient({ initialCart, user }) {
                 setIsCalculatingFee(true);
                 const res = await calculateDynamicDeliveryFee(selectedItemIds, lat, lng);
                 if (res.success) {
-                    setDynamicDeliveryFee(res.fee);
+                    setDynamicDeliveryFee(res.fee || 0);
+                    setIsOutOfRange(!!res.isOutOfRange);
+                    setUnserviceableIds(res.unserviceableIds || []);
                 }
                 setIsCalculatingFee(false);
             }
@@ -121,13 +147,17 @@ export default function CartClient({ initialCart, user }) {
     }, [selectedItemIds, lat, lng]);
 
     // Final calculations
-    const deliveryTotal = (lat && lng) ? dynamicDeliveryFee : selectedItems.reduce((acc, item) => {
+    const activeDeliveryTotal = selectedActiveItems.reduce((acc, item) => {
         if (!item.product) return acc;
         if (item.product.deliveryChargeType === 'per_unit') {
             return acc + (item.quantity * (item.product.deliveryCharge || 0));
         }
         return acc + (item.product.deliveryCharge || 0);
     }, 0);
+
+    const pendingDeliveryTotal = selectedPending.reduce((acc, order) => acc + (order.deliveryFee || 0), 0);
+
+    const deliveryTotal = (lat && lng) ? dynamicDeliveryFee : (activeDeliveryTotal + pendingDeliveryTotal);
 
     const isOnline = paymentMethod === "ONLINE";
     let platformFee = 0;
@@ -137,10 +167,31 @@ export default function CartClient({ initialCart, user }) {
     }
     const total = productSubtotal + deliveryTotal + platformFee;
 
-    const toggleSelect = (itemId) => {
-        setSelectedItemIds(prev =>
-            prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]
-        );
+    const toggleSelect = (id) => {
+        setSelectedItemIds(prev => {
+            const isCurrentlySelected = prev.includes(id);
+            let newSelection = isCurrentlySelected 
+                ? prev.filter(prevId => prevId !== id) 
+                : [...prev, id];
+
+            // If this ID is a pending order, also try to toggle its cart items for collision detection
+            const order = pendingOrders.find(o => o.id === id);
+            if (order) {
+                const cartItemIdsInOrder = order.items
+                    .map(it => cartItems.find(ci => ci.productId === it.productId)?.id)
+                    .filter(Boolean);
+
+                if (isCurrentlySelected) {
+                    // Deselect associated cart items too
+                    newSelection = newSelection.filter(prevId => !cartItemIdsInOrder.includes(prevId));
+                } else {
+                    // Select associated cart items too
+                    newSelection = [...new Set([...newSelection, ...cartItemIdsInOrder])];
+                }
+            }
+
+            return newSelection;
+        });
     };
 
     const toggleSelectAll = () => {
@@ -246,6 +297,17 @@ export default function CartClient({ initialCart, user }) {
 
     const handleCheckout = async (resumeId = null, isFresh = false) => {
         if (isPending) return;
+
+        // If no explicit resumeId is passed, check if we have a selected pending order
+        let effectiveResumeId = resumeId;
+        if (!effectiveResumeId && selectedItemIds.length > 0) {
+            // Check if any selected ID belongs to a pending order
+            const selectedPending = pendingOrders.find(o => selectedItemIds.includes(o.id));
+            if (selectedPending) {
+                effectiveResumeId = selectedPending.id;
+            }
+        }
+
         if (!shippingName || !shippingPhone || !shippingAddress) {
             toast.error("Please fill all shipping details");
             return;
@@ -265,9 +327,10 @@ export default function CartClient({ initialCart, user }) {
                     lng: lng,
                     paymentMethod
                 },
-                selectedItemIds,
+                selectedItemIds: selectedItemIds,
                 forceFresh: isFresh,
-                forceResumeId: resumeId
+                // Only pass forceResumeId if it was explicitly passed (from the resume button in modal)
+                forceResumeId: resumeId 
             });
 
             if (!initRes.success) {
@@ -278,7 +341,7 @@ export default function CartClient({ initialCart, user }) {
 
             // --- Choice Logic ---
             const isCollision = !!initRes.data.isCollision;
-            
+
             if (isCollision && !resumeId && !isFresh) {
                 toast.dismiss(checkoutId);
                 setCollisionOrder(initRes.data);
@@ -299,6 +362,19 @@ export default function CartClient({ initialCart, user }) {
             }
 
 
+            if (initRes.data.isSpecialDelivery) {
+                toast.success("Approval Requested!", {
+                    id: checkoutId,
+                    description: "Order is out of range. Admin will approve after logistics negotiation.",
+                    icon: <ShieldCheck className="h-5 w-5 text-amber-500" />
+                });
+                // We DON'T redirect or remove from cart for special delivery anymore.
+                // fetchCart(); // Keep in cart
+                fetchPending(); // This fetches the pending orders (but we filter them out in UI)
+                setIsPending(false);
+                return;
+            }
+
             if (initRes.data.isCod) {
                 toast.success("Order Placed successfully (COD)!", { id: checkoutId });
                 fetchCart();
@@ -317,7 +393,7 @@ export default function CartClient({ initialCart, user }) {
     };
 
     const processRazorpayPayment = async (orderId, razorpayOrderId, amount, toastId) => {
-        
+
         if (!razorpayOrderId || !amount || !orderId) {
             toast.error("Invalid payment session. Please try again.", { id: toastId });
             setIsPending(false);
@@ -401,7 +477,7 @@ export default function CartClient({ initialCart, user }) {
         if (!order) {
             return;
         }
-        
+
         const targetId = order.id || order.orderId;
 
         if (!targetId) {
@@ -411,11 +487,11 @@ export default function CartClient({ initialCart, user }) {
 
         setIsPending(true);
         setIsDetailsModalOpen(false);
-        setShowCollisionModal(false); 
-        
+        setShowCollisionModal(false);
+
         // We always route through handleCheckout to get the latest server state
         // and ensure the Razorpay session is correctly initialized.
-        setIsPending(false); 
+        setIsPending(false);
         await handleCheckout(targetId);
     };
 
@@ -451,6 +527,163 @@ export default function CartClient({ initialCart, user }) {
                         </TabsList>
                     </div>
 
+                    <TabsContent value="pending" className="m-0 focus-visible:ring-0">
+                        <div className="space-y-8">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Recoveries</h2>
+                                    <p className="text-sm font-medium text-slate-500">Resume your unfinished checkouts from here.</p>
+                                </div>
+                            </div>
+
+                            {pendingOrders.length === 0 ? (
+                                <div className="text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-slate-200 shadow-sm">
+                                    <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <Clock className="h-10 w-10 text-slate-300" />
+                                    </div>
+                                    <h2 className="text-2xl font-black text-slate-900 mb-2 uppercase">No pending orders</h2>
+                                    <p className="text-slate-500 mb-8 max-w-xs mx-auto font-medium">All your orders are either paid or you haven't started any yet.</p>
+                                    <Button asChild variant="outline" className="rounded-2xl px-10 h-14 font-black uppercase tracking-widest text-xs transition-all border-slate-200 shadow-sm hover:shadow-md" onClick={() => setActiveTab('cart')}>
+                                        Return to Cart
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-8">
+                                    <div className="grid gap-8">
+                                        {pendingOrders.slice((currentPage - 1) * ordersPerPage, currentPage * ordersPerPage).map((order) => (
+                                            <motion.div
+                                                key={order.id}
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden hover:shadow-xl transition-all duration-500 group"
+                                            >
+                                                <div className="p-8">
+                                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transform group-hover:rotate-6 transition-transform duration-500 ${order.isSpecialDelivery ? 'bg-indigo-600 text-white' : 'bg-amber-500 text-white'}`}>
+                                                                {order.isSpecialDelivery ? <ShieldAlert className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-3">
+                                                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">
+                                                                        {order.isSpecialDelivery ? 'Special Delivery' : 'Recovery Order'}
+                                                                    </h3>
+                                                                    <Badge className={`${order.isSpecialDelivery ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'} border-0 font-bold px-3`}>
+                                                                        {order.adminApprovalStatus === 'PENDING' ? 'Awaiting Approval' : 'Ready to Pay'}
+                                                                    </Badge>
+                                                                </div>
+                                                                <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">ID: #{order.id.slice(-8).toUpperCase()}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-left md:text-right">
+                                                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Amount</p>
+                                                            <p className="text-3xl font-black text-slate-900 tracking-tighter">₹{order.totalAmount.toLocaleString()}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid gap-4 mb-8">
+                                                        {(() => {
+                                                            // Merge duplicate products in the same order for cleaner display
+                                                            const mergedItems = order.items.reduce((acc, item) => {
+                                                                const existing = acc.find(i => i.productId === item.productId);
+                                                                if (existing) {
+                                                                    existing.quantity += item.quantity;
+                                                                    return acc;
+                                                                }
+                                                                return [...acc, { ...item }];
+                                                            }, []);
+
+                                                            return mergedItems.map((item) => (
+                                                                <div key={item.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
+                                                                    <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-white border border-slate-100 shrink-0">
+                                                                        {item.product?.images?.[0] ? (
+                                                                            <Image src={item.product.images[0]} alt={item.product.productName} fill className="object-cover" />
+                                                                        ) : (
+                                                                            <div className="w-full h-full flex items-center justify-center text-slate-300"><ShoppingBag className="h-6 w-6" /></div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <h4 className="font-black text-slate-900 uppercase text-sm truncate">{item.product?.productName}</h4>
+                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                            <span className="text-xs font-bold text-slate-500 uppercase">{item.quantity} {item.product?.unit}</span>
+                                                                            <span className="text-slate-300 text-[10px]">•</span>
+                                                                            <span className="text-xs font-bold text-emerald-600 uppercase">₹{item.priceAtPurchase}/unit</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ));
+                                                        })()}
+                                                    </div>
+
+                                                    <div className="flex flex-wrap items-center gap-4">
+                                                        {order.adminApprovalStatus === 'PENDING' && order.isSpecialDelivery ? (
+                                                            <Button 
+                                                                variant="outline" 
+                                                                className="flex-1 md:flex-none rounded-2xl h-14 px-8 bg-indigo-50 border-indigo-100 text-indigo-700 hover:bg-indigo-100 font-black uppercase tracking-widest text-xs gap-3"
+                                                                onClick={() => {
+                                                                    setInquiryProduct(order.items[0]?.product);
+                                                                    setIsInquiryOpen(true);
+                                                                }}
+                                                            >
+                                                                <MessageCircle className="h-5 w-5" /> Chat with Admin
+                                                            </Button>
+                                                        ) : (
+                                                            <Button 
+                                                                className="flex-1 md:flex-none rounded-2xl h-14 px-8 bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-widest text-xs gap-3 shadow-xl shadow-slate-900/10"
+                                                                onClick={() => handleResumeOrder(order)}
+                                                            >
+                                                                <RotateCcw className="h-5 w-5" /> Resume Order
+                                                            </Button>
+                                                        )}
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            className="flex-1 md:flex-none rounded-2xl h-14 px-8 text-slate-500 hover:text-rose-600 hover:bg-rose-50 font-black uppercase tracking-widest text-xs gap-3"
+                                                            onClick={() => handleCancelOrder(order.id)}
+                                                        >
+                                                            <Trash2 className="h-5 w-5" /> Cancel Order
+                                                        </Button>
+                                                        <Button 
+                                                            variant="outline" 
+                                                            className="flex-1 md:flex-none rounded-2xl h-14 px-8 border-slate-200 text-slate-600 hover:bg-slate-50 font-black uppercase tracking-widest text-xs gap-3"
+                                                            onClick={() => openPendingDetails(order)}
+                                                        >
+                                                            <Eye className="h-5 w-5" /> View Details
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+
+                                    {/* Pagination */}
+                                    {pendingOrders.length > ordersPerPage && (
+                                        <div className="flex justify-center items-center gap-4 py-8">
+                                            <Button
+                                                variant="outline"
+                                                disabled={currentPage === 1}
+                                                onClick={() => setCurrentPage(prev => prev - 1)}
+                                                className="rounded-xl h-12 w-12 p-0 border-slate-200"
+                                            >
+                                                <ArrowLeft className="h-5 w-5" />
+                                            </Button>
+                                            <span className="font-black text-slate-900 uppercase tracking-widest text-xs">
+                                                Page {currentPage} of {Math.ceil(pendingOrders.length / ordersPerPage)}
+                                            </span>
+                                            <Button
+                                                variant="outline"
+                                                disabled={currentPage === Math.ceil(pendingOrders.length / ordersPerPage)}
+                                                onClick={() => setCurrentPage(prev => prev + 1)}
+                                                className="rounded-xl h-12 w-12 p-0 border-slate-200"
+                                            >
+                                                <ArrowRight className="h-5 w-5" />
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </TabsContent>
+
                     <TabsContent value="cart" className="m-0 focus-visible:ring-0">
                         {cartItems.length === 0 ? (
                             <div className="text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-slate-200 shadow-sm">
@@ -466,86 +699,133 @@ export default function CartClient({ initialCart, user }) {
                         ) : (
                             <div className="grid grid-cols-1 xl:grid-cols-3 gap-10 items-start">
                                 {/* Left: Cart Items */}
-                                <div className="xl:col-span-2 space-y-6">
-                                    <AnimatePresence mode="popLayout">
-                                        {cartItems.map((item) => (
-                                            <motion.div
-                                                key={item.id}
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, scale: 0.95 }}
-                                                className={`p-6 bg-white border border-slate-100 rounded-3xl shadow-sm transition-all duration-300 ${!selectedItemIds.includes(item.id) ? 'opacity-40 grayscale-[0.5] scale-[0.98] border-dashed bg-slate-50/50' : 'hover:shadow-md'}`}
-                                            >
-                                                <div className="flex items-center gap-6">
-                                                    <div className="flex-shrink-0">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedItemIds.includes(item.id)}
-                                                            onChange={() => toggleSelect(item.id)}
-                                                            className="w-6 h-6 rounded-lg accent-emerald-600 cursor-pointer"
-                                                        />
-                                                    </div>
+                                <div className="xl:col-span-2 space-y-10">
+                                    {/* --- ACTIVE CART ITEMS --- */}
+                                    {cartItems.length > 0 && (
+                                        <div className="space-y-6">
+                                            <div className="flex items-center gap-3 px-4">
+                                                <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm"><ShoppingBag className="h-5 w-5" /></div>
+                                                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Active Cart</h3>
+                                            </div>
+                                            <AnimatePresence mode="popLayout">
+                                                {cartItems.map((item) => {
+                                                    const isUnserviceable = unserviceableIds.includes(item.id);
+                                                    return (
+                                                        <motion.div
+                                                            key={item.id}
+                                                            initial={{ opacity: 0, y: 10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, scale: 0.95 }}
+                                                            onClick={() => !isUnserviceable && toggleSelect(item.id)}
+                                                            className={`p-6 bg-white border rounded-3xl shadow-sm transition-all duration-300 cursor-pointer relative overflow-hidden ${isUnserviceable ? 'grayscale opacity-60 border-amber-200 bg-amber-50/20' : selectedItemIds.includes(item.id) ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/30 shadow-md scale-[1.02]' : 'border-slate-100 hover:shadow-md opacity-40 grayscale-[0.5] scale-[0.98] border-dashed bg-slate-50/50'}`}
+                                                        >
+                                                            {selectedItemIds.includes(item.id) && !isUnserviceable && (
+                                                                <div className="absolute top-0 right-0 w-12 h-12 flex items-center justify-center">
+                                                                    <div className="bg-emerald-500 text-white p-1 rounded-bl-2xl shadow-lg">
+                                                                        <CheckCircle2 className="h-4 w-4" />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {isUnserviceable && (
+                                                                <div className="mb-4 p-3 bg-amber-100 border border-amber-200 rounded-xl flex items-center justify-between gap-3">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <ShieldAlert className="h-4 w-4 text-amber-600" />
+                                                                        <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest leading-tight">
+                                                                            This product can only be bought after admin approves because it is out of delivery range.
+                                                                        </p>
+                                                                    </div>
+                                                                    <Button 
+                                                                        variant="outline" 
+                                                                        size="sm" 
+                                                                        onClick={(e) => { 
+                                                                            e.stopPropagation(); 
+                                                                            setInquiryProduct(item.product); 
+                                                                            setIsInquiryOpen(true); 
+                                                                        }}
+                                                                        className="h-8 rounded-lg bg-amber-200 border-amber-300 text-amber-800 hover:bg-amber-300 font-bold text-[10px] uppercase gap-2 px-3 shrink-0"
+                                                                    >
+                                                                        <MessageCircle className="h-3.5 w-3.5" /> Chat with Admin
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex items-center gap-6">
+                                                                <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        disabled={isUnserviceable}
+                                                                        checked={selectedItemIds.includes(item.id) && !isUnserviceable}
+                                                                        onChange={() => toggleSelect(item.id)}
+                                                                        className={`w-6 h-6 rounded-lg accent-emerald-600 ${isUnserviceable ? 'opacity-40' : 'cursor-pointer'}`}
+                                                                    />
+                                                                </div>
 
-                                                    <div className="relative w-32 h-32 rounded-2xl overflow-hidden bg-slate-50 border border-slate-100">
-                                                        {item.product?.images?.[0] ? (
-                                                            <Image src={item.product.images[0]} alt={item.product.productName} fill className="object-cover" />
-                                                        ) : (
-                                                            <div className="w-full h-full flex items-center justify-center text-slate-300"><ShoppingBag className="h-10 w-10" /></div>
-                                                        )}
-                                                    </div>
+                                                                <div className="relative w-32 h-32 rounded-2xl overflow-hidden bg-slate-50 border border-slate-100">
+                                                                    {item.product?.images?.[0] ? (
+                                                                        <Image src={item.product.images[0]} alt={item.product.productName} fill className="object-cover" />
+                                                                    ) : (
+                                                                        <div className="w-full h-full flex items-center justify-center text-slate-300"><ShoppingBag className="h-10 w-10" /></div>
+                                                                    )}
+                                                                </div>
 
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <div>
-                                                                <h3 className="text-xl font-black text-slate-900 truncate uppercase tracking-tight">{item.product?.productName || "Product"}</h3>
-                                                                <div className="flex items-center gap-2 mt-1">
-                                                                    <Badge variant="outline" className="bg-slate-50 border-slate-200 text-slate-500 font-bold text-[10px] uppercase">
-                                                                        {item.product?.sellerType === 'farmer' ? item.product?.farmer?.name : (item.product?.agent?.companyName || item.product?.agent?.name)}
-                                                                    </Badge>
-                                                                    <span className="text-slate-300">•</span>
-                                                                    <span className="text-slate-500 text-xs font-bold uppercase">{item.product?.category || "Category"}</span>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-start mb-2">
+                                                                        <div>
+                                                                            <h3 className="text-xl font-black text-slate-900 truncate uppercase tracking-tight">{item.product?.productName || "Product"}</h3>
+                                                                            <div className="flex items-center gap-2 mt-1">
+                                                                                <Badge variant="outline" className="bg-slate-50 border-slate-200 text-slate-500 font-bold text-[10px] uppercase">
+                                                                                    {item.product?.sellerType === 'farmer' ? item.product?.farmer?.name : (item.product?.agent?.companyName || item.product?.agent?.name)}
+                                                                                </Badge>
+                                                                                <span className="text-slate-300">•</span>
+                                                                                <span className="text-slate-500 text-xs font-bold uppercase">{item.product?.category || "Category"}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() => handleRemove(item.id)}
+                                                                            className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl"
+                                                                        >
+                                                                            <Trash2 className="h-5 w-5" />
+                                                                        </Button>
+                                                                    </div>
+
+                                                                    <div className="flex items-end justify-between mt-6">
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity ({item.product?.unit || 'Units'})</p>
+                                                                            <div className="flex items-center bg-slate-50 rounded-2xl p-1 border border-slate-100 shadow-inner">
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-10 w-10 rounded-xl hover:bg-white hover:shadow-sm"
+                                                                                    onClick={() => handleUpdateQty(item, -1)}
+                                                                                >
+                                                                                    <Minus className="h-4 w-4" />
+                                                                                </Button>
+                                                                                <span className="w-12 text-center font-black text-slate-900">{item.quantity}</span>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-10 w-10 rounded-xl hover:bg-white hover:shadow-sm text-emerald-600"
+                                                                                    onClick={() => handleUpdateQty(item, 1)}
+                                                                                >
+                                                                                    <Plus className="h-4 w-4" />
+                                                                                </Button>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-right">
+                                                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Subtotal</p>
+                                                                            <p className="text-2xl font-black text-slate-900">₹{(item.quantity * (item.product?.pricePerUnit || 0)).toLocaleString()}</p>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() => handleRemove(item.id)}
-                                                                className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl"
-                                                            >
-                                                                <Trash2 className="h-5 w-5" />
-                                                            </Button>
-                                                        </div>
+                                                        </motion.div>
+                                                    );
+                                                })}
+                                            </AnimatePresence>
+                                        </div>
+                                    )}
 
-                                                        <div className="flex items-end justify-between mt-6">
-                                                            <div className="flex items-center bg-slate-50 rounded-2xl p-1 border border-slate-100 shadow-inner">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-10 w-10 rounded-xl hover:bg-white hover:shadow-sm"
-                                                                    onClick={() => handleUpdateQty(item, -1)}
-                                                                >
-                                                                    <Minus className="h-4 w-4" />
-                                                                </Button>
-                                                                <span className="w-12 text-center font-black text-slate-900">{item.quantity}</span>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-10 w-10 rounded-xl hover:bg-white hover:shadow-sm text-emerald-600"
-                                                                    onClick={() => handleUpdateQty(item, 1)}
-                                                                >
-                                                                    <Plus className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Subtotal</p>
-                                                                <p className="text-2xl font-black text-slate-900">₹{(item.quantity * (item.product?.pricePerUnit || 0)).toLocaleString()}</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </motion.div>
-                                        ))}
-                                    </AnimatePresence>
                                 </div>
 
                                 {/* Right: Order Summary */}
@@ -659,7 +939,7 @@ export default function CartClient({ initialCart, user }) {
                                                 <span className="uppercase tracking-widest text-[10px]">Delivery Logistics</span>
                                                 <div className="flex items-center gap-2">
                                                     {isCalculatingFee && <Loader2 className="h-3 w-3 animate-spin text-emerald-500" />}
-                                                    <span className={`text-slate-900 font-black ${isCalculatingFee ? 'opacity-50' : ''}`}>₹{deliveryTotal.toLocaleString()}</span>
+                                                    <span className={`text-slate-900 font-black ${isCalculatingFee ? 'opacity-50' : ''}`}>₹{(deliveryTotal || 0).toLocaleString()}</span>
                                                     {deliveryTotal > productSubtotal && productSubtotal > 0 && (
                                                         <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200 text-[8px] font-black py-0 px-1">Long Distance</Badge>
                                                     )}
@@ -723,97 +1003,6 @@ export default function CartClient({ initialCart, user }) {
                         )}
                     </TabsContent>
 
-                    <TabsContent value="pending" className="m-0 focus-visible:ring-0">
-                        {pendingOrders.length === 0 ? (
-                            <div className="text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-slate-200 shadow-sm">
-                                <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <Clock className="h-10 w-10 text-slate-300" />
-                                </div>
-                                <h2 className="text-2xl font-black text-slate-900 mb-2 uppercase">No Pending Orders</h2>
-                                <p className="text-slate-500 mb-8 max-w-xs mx-auto font-medium">All your orders are either paid or you haven't started any yet.</p>
-                                <Button asChild variant="outline" className="rounded-2xl px-10 h-14 font-black uppercase tracking-widest text-xs transition-all border-slate-200" onClick={() => setActiveTab('cart')}>
-                                    Return to Cart
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                <AnimatePresence>
-                                    {pendingOrders.map(order => (
-                                        <motion.div
-                                            key={order.id}
-                                            initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.95 }}
-                                        >
-                                            <Card className="border-0 shadow-xl rounded-[2.5rem] bg-white overflow-hidden hover:shadow-2xl transition-all group">
-                                                <div className="bg-amber-500 p-6 text-white flex justify-between items-center">
-                                                    <div>
-                                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Pending Payment</p>
-                                                        <h3 className="text-lg font-black tracking-tight">ORD #{order.id.slice(-6).toUpperCase()}</h3>
-                                                    </div>
-                                                    <Clock className="h-6 w-6 opacity-40 group-hover:rotate-12 transition-transform" />
-                                                </div>
-                                                <CardContent className="p-8">
-                                                    <div className="space-y-6">
-                                                        <div className="flex justify-between items-start">
-                                                            <div className="space-y-1">
-                                                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Amount Due</p>
-                                                                <p className="text-3xl font-black text-slate-900 tracking-tighter">₹{(order?.totalAmount || 0).toLocaleString('en-IN')}</p>
-                                                            </div>
-                                                            <div className="text-right space-y-1">
-                                                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Variety</p>
-                                                                <p className="text-lg font-black text-slate-900">{(order?.items?.length || 0)} {(order?.items?.length === 1 ? 'Item' : 'Items')}</p>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="space-y-3">
-                                                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Items Preview</p>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {order?.items?.slice(0, 3).map((it, idx) => (
-                                                                    <Badge key={idx} variant="outline" className="bg-slate-50 border-slate-100 text-slate-600 font-bold py-1">
-                                                                        {it?.product?.productName || "Product"}
-                                                                    </Badge>
-                                                                ))}
-                                                                {(order?.items?.length || 0) > 3 && (
-                                                                    <Badge variant="outline" className="bg-slate-50 border-slate-100 text-slate-400 font-bold">
-                                                                        +{(order?.items?.length || 0) - 3} more
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </CardContent>
-                                                <CardFooter className="px-8 pb-8 pt-0 grid grid-cols-2 gap-3">
-                                                    <Button
-                                                        onClick={() => handleResumeOrder(order)}
-                                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl h-14 uppercase tracking-widest text-[10px] shadow-xl shadow-emerald-500/10 transition-all"
-                                                    >
-                                                        <CreditCard className="h-4 w-4 mr-2" /> Resume
-                                                    </Button>
-                                                    <div className="flex gap-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            onClick={() => openPendingDetails(order)}
-                                                            className="flex-1 rounded-2xl h-14 border-slate-200 text-slate-600 hover:bg-slate-50"
-                                                        >
-                                                            <Eye className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            onClick={() => handleCancelOrder(order.id)}
-                                                            className="flex-1 rounded-2xl h-14 border-rose-100 text-rose-500 hover:bg-rose-50 hover:border-rose-200"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                </CardFooter>
-                                            </Card>
-                                        </motion.div>
-                                    ))}
-                                </AnimatePresence>
-                            </div>
-                        )}
-                    </TabsContent>
                 </Tabs>
             </div>
 
@@ -873,30 +1062,41 @@ export default function CartClient({ initialCart, user }) {
                                         <ShoppingBag className="h-4 w-4 text-amber-500" /> Items in this Order
                                     </h4>
                                     <div className="bg-white rounded-[2.5rem] border-2 border-slate-50 divide-y divide-slate-50 shadow-sm overflow-hidden">
-                                        {selectedPendingOrder?.items?.map((item) => (
-                                            <div key={item.id} className="flex items-center gap-6 p-6 hover:bg-slate-50/50 transition-colors">
-                                                <div className="w-20 h-20 rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden shrink-0 relative">
-                                                    {item.product?.images?.[0] ? (
-                                                        <Image src={item.product.images[0]} alt={item.product.productName || "Product"} fill className="object-cover" />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center bg-slate-100"><Package className="h-8 w-8 text-slate-300" /></div>
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h5 className="font-black text-slate-900 text-lg uppercase tracking-tight truncate">{item.product?.productName || "Product"}</h5>
-                                                    <div className="flex items-center gap-3 mt-1">
-                                                        <Badge variant="outline" className="bg-white border-slate-200 text-slate-500 font-black text-[10px] uppercase">
-                                                            {item.quantity} {item.product?.unit || "Units"}
-                                                        </Badge>
-                                                        <span className="text-slate-300 font-bold">×</span>
-                                                        <span className="text-slate-500 font-black">₹{(item.priceAtPurchase || item.product?.pricePerUnit || 0).toLocaleString()}</span>
+                                        {(() => {
+                                            const mergedItems = selectedPendingOrder?.items?.reduce((acc, item) => {
+                                                const existing = acc.find(i => i.productId === item.productId);
+                                                if (existing) {
+                                                    existing.quantity += item.quantity;
+                                                    return acc;
+                                                }
+                                                return [...acc, { ...item }];
+                                            }, []) || [];
+
+                                            return mergedItems.map((item) => (
+                                                <div key={item.id} className="flex items-center gap-6 p-6 hover:bg-slate-50/50 transition-colors">
+                                                    <div className="w-20 h-20 rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden shrink-0 relative">
+                                                        {item.product?.images?.[0] ? (
+                                                            <Image src={item.product.images[0]} alt={item.product.productName || "Product"} fill className="object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center bg-slate-100"><Package className="h-8 w-8 text-slate-300" /></div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h5 className="font-black text-slate-900 text-lg uppercase tracking-tight truncate">{item.product?.productName || "Product"}</h5>
+                                                        <div className="flex items-center gap-3 mt-1">
+                                                            <Badge variant="outline" className="bg-white border-slate-200 text-slate-500 font-black text-[10px] uppercase">
+                                                                {item.quantity} {item.product?.unit || "Units"}
+                                                            </Badge>
+                                                            <span className="text-slate-300 font-bold">×</span>
+                                                            <span className="text-slate-500 font-black">₹{(item.priceAtPurchase || item.product?.pricePerUnit || 0).toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-xl font-black text-slate-900">₹{(item.quantity * (item.priceAtPurchase || item.product?.pricePerUnit || 0)).toLocaleString()}</p>
                                                     </div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className="text-xl font-black text-slate-900">₹{(item.quantity * (item.priceAtPurchase || item.product?.pricePerUnit || 0)).toLocaleString()}</p>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            ));
+                                        })()}
                                     </div>
                                 </div>
                             </>
@@ -905,14 +1105,14 @@ export default function CartClient({ initialCart, user }) {
 
                     <div className="p-10 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
                         <Button variant="ghost" onClick={() => setIsDetailsModalOpen(false)} className="flex-1 rounded-2xl h-16 font-black text-slate-500 hover:bg-white hover:text-slate-900 uppercase tracking-widest text-[10px] transition-all">Close</Button>
-                                        <Button
-                                            disabled={isPending}
-                                            onClick={() => handleResumeOrder(selectedPendingOrder)}
-                                            className="flex-[2] rounded-[1.5rem] h-16 font-black bg-slate-900 text-white shadow-2xl shadow-slate-900/20 hover:scale-[1.02] active:scale-95 transition-all uppercase tracking-widest text-[10px]"
-                                        >
-                                            {isPending ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <CreditCard className="h-5 w-5 mr-3" />}
-                                            Complete Payment Now
-                                        </Button>
+                        <Button
+                            disabled={isPending}
+                            onClick={() => handleResumeOrder(selectedPendingOrder)}
+                            className="flex-[2] rounded-[1.5rem] h-16 font-black bg-slate-900 text-white shadow-2xl shadow-slate-900/20 hover:scale-[1.02] active:scale-95 transition-all uppercase tracking-widest text-[10px]"
+                        >
+                            {isPending ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <CreditCard className="h-5 w-5 mr-3" />}
+                            Complete Payment Now
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>
@@ -957,6 +1157,14 @@ export default function CartClient({ initialCart, user }) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {inquiryProduct && (
+                <InquiryModal
+                    isOpen={isInquiryOpen}
+                    onClose={() => setIsInquiryOpen(false)}
+                    product={inquiryProduct}
+                />
+            )}
         </div>
     );
 }
