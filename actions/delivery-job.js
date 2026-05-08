@@ -156,16 +156,8 @@ export async function hireDeliveryBoy(orderId, deliveryBoyId, distance) {
       if (!isNaN(osrmDist)) roadDistance = osrmDist;
     }
 
-    // Calculate dynamic pricing: (Distance * Rate) + (Sum of Product Delivery Charges)
     const travelCost = roadDistance * (boy.pricePerKm || 0);
-    const cargoCost = orderWithItems.items.reduce((sum, item) => {
-      const charge = item.deliveryChargeAtPurchase || item.product?.deliveryCharge || 0;
-      // If flat, we count it once per listing. If per_unit, we multiply.
-      const type = item.deliveryChargeTypeAtPurchase || item.product?.deliveryChargeType || 'per_unit';
-      return sum + (type === 'flat' ? charge : charge * item.quantity);
-    }, 0);
-
-    const totalPrice = Math.max(0, travelCost + cargoCost);
+    const totalPrice = Math.max(0, travelCost);
     const otp = generateOTP();
 
     // Use a transaction to handle the potential state transitions gracefully
@@ -470,15 +462,8 @@ export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null
           }
         }
 
-        // Recalculate cargoCost (product-specific delivery charges) to ensure it's not lost
-        const cargoCost = job.order.items.reduce((sum, item) => {
-          const charge = item.deliveryChargeAtPurchase || item.product?.deliveryCharge || 0;
-          const type = item.deliveryChargeTypeAtPurchase || item.product?.deliveryChargeType || 'per_unit';
-          return sum + (type === 'flat' ? charge : charge * item.quantity);
-        }, 0);
-
         updateData.actualDistance = actualDist;
-        updateData.totalPrice = (actualDist * job.deliveryBoy.pricePerKm) + cargoCost;
+        updateData.totalPrice = actualDist * job.deliveryBoy.pricePerKm;
       }
 
       const updatedJob = await tx.deliveryJob.update({
