@@ -18,11 +18,23 @@ export default async function DeliveryDashboardPage(props) {
   let initialJobs = [];
   let totalJobs = 0;
   let hasMore = false;
+  let lifetimeEarnings = 0;
 
   if (profileExists && user?.deliveryProfile) {
     totalJobs = await db.deliveryJob.count({
       where: { deliveryBoyId: user.deliveryProfile.id }
     });
+
+    const earningsResult = await db.deliveryJob.aggregate({
+      where: { 
+        deliveryBoyId: user.deliveryProfile.id,
+        status: "DELIVERED"
+      },
+      _sum: {
+        totalPrice: true
+      }
+    });
+    lifetimeEarnings = earningsResult._sum.totalPrice || 0;
 
     initialJobs = await db.deliveryJob.findMany({
       where: { deliveryBoyId: user.deliveryProfile.id },
@@ -70,6 +82,7 @@ export default async function DeliveryDashboardPage(props) {
       total={totalJobs}
       hasMore={hasMore}
       currentPage={page}
+      lifetimeEarnings={lifetimeEarnings}
     />
   );
 }

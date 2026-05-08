@@ -12,10 +12,8 @@ import { isSellerOfOrder, isAssignedDeliveryPartner, apiResponse } from "@/lib/p
 /**
  * Fetch available delivery boys within range of the delivery location.
  */
-export async function getAvailableDeliveryBoys(lat, lng, orderId = null) {
-  if (!lat || !lng) {
-    return apiResponse.error("Location coordinates are required to find delivery partners.");
-  }
+export async function getAvailableDeliveryBoys(lat = null, lng = null, orderId = null) {
+  // Coords are now optional to prevent UI blackout
   try {
     // Get all approved delivery partners (including offline)
     const deliveryBoys = await db.deliveryProfile.findMany({
@@ -30,8 +28,7 @@ export async function getAvailableDeliveryBoys(lat, lng, orderId = null) {
         isOnline: true,
         pricePerKm: true,
         vehicleType: true,
-        averageRating: true,
-        totalJobs: true,
+        vehicleType: true,
         jobs: {
           where: {
             status: { notIn: ["DELIVERED", "CANCELLED", "REJECTED"] }
@@ -104,7 +101,7 @@ export async function getAvailableDeliveryBoys(lat, lng, orderId = null) {
 
     return apiResponse.success(eligible);
   } catch (error) {
-    return apiResponse.error("Failed to load delivery partners.");
+    return apiResponse.error("Failed: " + error.message);
   }
 }
 
@@ -142,16 +139,48 @@ export async function hireDeliveryBoy(orderId, deliveryBoyId, distance) {
     const safeDistance = parseFloat(distance?.toString() || "0");
     let roadDistance = isNaN(safeDistance) ? 0 : Math.max(0, safeDistance);
 
-    if (order.lat && order.lng && boy.lat && boy.lng) {
-      const osrmDist = await getOSRMDistance(boy.lat, boy.lng, order.lat, order.lng);
+    // Fetch full order with items and products for delivery charge calculation
+    const orderWithItems = await db.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: { product: true }
+        }
+      }
+    });
+
+    if (!orderWithItems) throw new Error("Order not found");
+
+    if (orderWithItems.lat && orderWithItems.lng && boy.lat && boy.lng) {
+      const osrmDist = await getOSRMDistance(boy.lat, boy.lng, orderWithItems.lat, orderWithItems.lng);
       if (!isNaN(osrmDist)) roadDistance = osrmDist;
     }
 
-    const totalPrice = Math.max(0, roadDistance * (boy.pricePerKm || 0));
+    // Calculate dynamic pricing: (Distance * Rate) + (Sum of Product Delivery Charges)
+    const travelCost = roadDistance * (boy.pricePerKm || 0);
+    const cargoCost = orderWithItems.items.reduce((sum, item) => {
+      const charge = item.deliveryChargeAtPurchase || item.product?.deliveryCharge || 0;
+      // If flat, we count it once per listing. If per_unit, we multiply.
+      const type = item.deliveryChargeTypeAtPurchase || item.product?.deliveryChargeType || 'per_unit';
+      return sum + (type === 'flat' ? charge : charge * item.quantity);
+    }, 0);
+
+    const totalPrice = Math.max(0, travelCost + cargoCost);
     const otp = generateOTP();
 
     // Use a transaction to handle the potential state transitions gracefully
     const job = await db.$transaction(async (tx) => {
+      const currentActive = await tx.deliveryJob.findFirst({
+        where: {
+          orderId,
+          status: { in: ["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"] }
+        }
+      });
+
+      if (currentActive) {
+        throw new Error(`Order already assigned to ${currentActive.id.slice(-6)}. Revoke it first.`);
+      }
+
       const existing = await tx.deliveryJob.findUnique({
         where: { orderId_deliveryBoyId: { orderId, deliveryBoyId } }
       });
@@ -426,7 +455,6 @@ export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null
              const firstItem = job.order.items?.[0];
              const seller = firstItem?.product?.farmer || firstItem?.product?.agent;
              if (seller?.lat && seller?.lng && job.order.lat && job.order.lng) {
-                console.log(`[Delivery] Detected late pickup click. Falling back to baseline.`);
                 actualDist = await getOSRMDistance(seller.lat, seller.lng, job.order.lat, job.order.lng);
              }
           }
@@ -436,15 +464,21 @@ export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null
           const seller = firstItem?.product?.farmer || firstItem?.product?.agent;
           
           if (seller?.lat && seller?.lng && job.order.lat && job.order.lng) {
-            console.log(`[Delivery] Pickup update skipped. Falling back to Seller-Buyer distance.`);
             actualDist = await getOSRMDistance(seller.lat, seller.lng, job.order.lat, job.order.lng);
           } else {
             actualDist = job.distance || 0; // Last resort: use the initial estimate
           }
         }
 
+        // Recalculate cargoCost (product-specific delivery charges) to ensure it's not lost
+        const cargoCost = job.order.items.reduce((sum, item) => {
+          const charge = item.deliveryChargeAtPurchase || item.product?.deliveryCharge || 0;
+          const type = item.deliveryChargeTypeAtPurchase || item.product?.deliveryChargeType || 'per_unit';
+          return sum + (type === 'flat' ? charge : charge * item.quantity);
+        }, 0);
+
         updateData.actualDistance = actualDist;
-        updateData.totalPrice = actualDist * job.deliveryBoy.pricePerKm;
+        updateData.totalPrice = (actualDist * job.deliveryBoy.pricePerKm) + cargoCost;
       }
 
       const updatedJob = await tx.deliveryJob.update({
@@ -488,7 +522,6 @@ export async function completeDeliveryWithOtp(jobId, otp, lat = null, lng = null
         );
       }
     } catch (err) {
-      console.error("[Delivery] Failed to notify seller:", err.message);
     }
 
     revalidatePath("/delivery-dashboard");

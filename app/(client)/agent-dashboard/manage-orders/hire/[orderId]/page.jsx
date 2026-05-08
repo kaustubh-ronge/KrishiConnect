@@ -3,6 +3,7 @@ import { db } from "@/lib/prisma";
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 import HireDeliveryClient from "@/components/Dashboard/HireDeliveryClient";
+import { getAvailableDeliveryBoys } from "@/actions/delivery-job";
 
 export default async function HireDeliveryPage({ params }) {
     const { orderId } = await params;
@@ -34,7 +35,6 @@ export default async function HireDeliveryPage({ params }) {
     const lng = order.lng || order.buyerUser.farmerProfile?.lng || order.buyerUser.agentProfile?.lng;
 
     // Fetch delivery boys nearby
-    const { getAvailableDeliveryBoys } = await import("@/actions/delivery-job");
     const boysRes = await getAvailableDeliveryBoys(lat, lng, orderId);
 
     return (

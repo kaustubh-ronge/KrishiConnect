@@ -89,18 +89,7 @@ export async function getAllOrders({ onlyPendingPayouts = false } = {}) {
 
   try {
     await ensureAdmin(user.id);
-
-    const where = onlyPendingPayouts 
-      ? { paymentStatus: "PAID", payoutStatus: "PENDING" } 
-      : {
-          OR: [
-            { NOT: { paymentMethod: "ONLINE" } },
-            { paymentStatus: { not: "PENDING" } }
-          ]
-        };
-
     const orders = await db.order.findMany({
-      where,
       orderBy: { createdAt: "desc" },
       include: {
         buyerUser: { include: { farmerProfile: true, agentProfile: true } },
@@ -130,6 +119,7 @@ export async function getAllOrders({ onlyPendingPayouts = false } = {}) {
         shippingAddress: o.shippingAddress,
         buyerPhone: o.buyerPhone,
         buyerName: o.buyerName,
+        buyerEmail: o.buyerUser?.email || 'N/A',
         items: o.items.map(it => {
           const p = it.product;
           const seller = p.farmer || p.agent;
@@ -594,6 +584,101 @@ export async function adminDeleteOrder(orderId) {
     });
   } catch (err) {
     console.error("Admin Delete Order Error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function getAdminDeliveryJobs() {
+  const user = await currentUser();
+  if (!user) return { success: false, error: "Not logged in" };
+
+  try {
+    await ensureAdmin(user.id);
+
+    const jobs = await db.deliveryJob.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        deliveryBoy: true,
+        order: {
+          select: {
+            id: true,
+            buyerName: true,
+            shippingAddress: true,
+            totalAmount: true
+          }
+        }
+      }
+    });
+
+    return { success: true, data: JSON.parse(JSON.stringify(jobs)) };
+  } catch (err) {
+    console.error("Get Admin Delivery Jobs Error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function getAdminReviews() {
+  const user = await currentUser();
+  if (!user) return { success: false, error: "Not logged in" };
+
+  try {
+    await ensureAdmin(user.id);
+
+    const reviews = await db.review.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: { select: { name: true, email: true } },
+        product: { 
+          select: { 
+            productName: true,
+            farmer: { select: { name: true } },
+            agent: { select: { name: true, companyName: true } }
+          } 
+        }
+      }
+    });
+
+    return { success: true, data: JSON.parse(JSON.stringify(reviews)) };
+  } catch (err) {
+    console.error("Get Admin Reviews Error:", err);
+    return { success: false, error: err.message };
+  }
+}
+export async function clearStaleOrders() {
+  const user = await currentUser();
+  if (!user) return { success: false, error: "Not logged in" };
+
+  try {
+    await ensureAdmin(user.id);
+
+    // Stale orders: PENDING for more than 24 hours
+    const threshold = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const staleOrders = await db.order.findMany({
+      where: {
+        paymentStatus: 'PENDING',
+        createdAt: { lt: threshold }
+      },
+      select: { id: true }
+    });
+
+    if (staleOrders.length === 0) {
+      return { success: true, message: "No stale orders found." };
+    }
+
+    const count = await db.$transaction(async (tx) => {
+      let deletedCount = 0;
+      for (const order of staleOrders) {
+        await tx.orderItem.deleteMany({ where: { orderId: order.id } });
+        await tx.order.delete({ where: { id: order.id } });
+        deletedCount++;
+      }
+      return deletedCount;
+    });
+
+    return { success: true, message: `Successfully cleared ${count} stale orders.` };
+  } catch (err) {
+    console.error("Clear Stale Orders Error:", err);
     return { success: false, error: err.message };
   }
 }

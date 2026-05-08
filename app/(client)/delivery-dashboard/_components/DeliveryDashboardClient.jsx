@@ -1,6 +1,5 @@
 "use client";
-
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
@@ -20,13 +19,16 @@ import {
   ChevronRight, ChevronLeft, MapPin, Truck, IndianRupee, Navigation, Clock, User, Phone, CheckCircle2,
   Settings, Power, Package, Calendar, BarChart3, Star, ArrowUpRight, TrendingUp,
   Zap, Shield, Award, Crown, Sparkles, Heart, Target, Layers, Gift,
-  MessageCircle, AlertCircle, RotateCcw, Search, Filter, X, Loader2, ShieldCheck
+  MessageCircle, AlertCircle, RotateCcw, Search, Filter, X, Loader2, ShieldCheck,
+  CreditCard
 } from "lucide-react";
 import { motion, AnimatePresence } from 'framer-motion';
 import LocationPicker from '@/components/LocationPicker';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { toast } from "sonner";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import jsPDF from "jspdf";
+import autoTable from 'jspdf-autotable';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function DeliveryDashboardClient({
   user,
@@ -34,7 +36,8 @@ export default function DeliveryDashboardClient({
   initialJobs = [],
   total,
   hasMore,
-  currentPage
+  currentPage,
+  lifetimeEarnings = 0
 }) {
   const router = useRouter();
   const [profileExists, setProfileExists] = useState(initialProfileExists);
@@ -79,6 +82,8 @@ export default function DeliveryDashboardClient({
   const [isCompletingDelivery, setIsCompletingDelivery] = useState(false);
   const [isMarkingPaymentId, setIsMarkingPaymentId] = useState(null);
   const [isTogglingOnline, setIsTogglingOnline] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
 
   useEffect(() => {
     setMounted(true);
@@ -124,7 +129,7 @@ export default function DeliveryDashboardClient({
         const now = Date.now();
         // Throttle to once every 30 seconds
         if (now - lastLocationUpdate.current < 30000) return;
-        
+
         const { latitude, longitude } = position.coords;
         await updateLiveLocation(activeJob.id, latitude, longitude);
         lastLocationUpdate.current = now;
@@ -287,6 +292,48 @@ export default function DeliveryDashboardClient({
     setResendingJobId(null);
   };
 
+  // --- NEW: Suggested Order & PDF Generation ---
+  const sortedJobs = useMemo(() => {
+    if (!jobs || jobs.length === 0) return [];
+    const active = jobs.filter(j => ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'].includes(j.status));
+
+    // Simple Greedy Path: Sort by distance from delivery boy's base or current lat/lng
+    return [...active].sort((a, b) => (a.distance || 0) - (b.distance || 0));
+  }, [jobs]);
+
+  const downloadDeliveryRunPdf = () => {
+    const doc = new jsPDF();
+    const tableColumn = ["Order", "Status", "Pickup", "Drop-off", "Contact", "Payment"];
+    const tableRows = [];
+
+    sortedJobs.forEach((job) => {
+      const pickup = job.order.items[0]?.product?.farmer?.address || job.order.items[0]?.product?.agent?.address || "N/A";
+      const jobData = [
+        `#${job.orderId.slice(-6).toUpperCase()}`,
+        job.status,
+        pickup.slice(0, 30) + "...",
+        job.order.shippingAddress.slice(0, 30) + "...",
+        job.order.buyerPhone || "N/A",
+        `Rs. ${job.totalPrice?.toFixed(2)}`
+      ];
+      tableRows.push(jobData);
+    });
+
+    doc.setFontSize(18);
+    doc.text("Suggested Delivery Run", 14, 22);
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+
+    autoTable(doc, { 
+      head: [tableColumn], 
+      body: tableRows, 
+      startY: 35, 
+      theme: 'grid' 
+    });
+    doc.save(`delivery-run-${new Date().getTime()}.pdf`);
+    toast.success("Delivery Run PDF Downloaded!");
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'REQUESTED': return 'bg-amber-100 text-amber-700 border-amber-200';
@@ -334,8 +381,8 @@ export default function DeliveryDashboardClient({
                 <DialogDescription className="text-white/70 text-xs font-medium">
                   Step {formStep} of 4: {
                     formStep === 1 ? "Identity" :
-                    formStep === 2 ? "Logistics" :
-                    formStep === 3 ? "Location" : "Documents"
+                      formStep === 2 ? "Logistics" :
+                        formStep === 3 ? "Location" : "Documents"
                   }
                 </DialogDescription>
               </div>
@@ -546,7 +593,6 @@ export default function DeliveryDashboardClient({
 
   if (!mounted) return null;
 
-  const totalEarnings = jobs.reduce((sum, j) => sum + (j.status === 'DELIVERED' ? (j.totalPrice || 0) : 0), 0);
 
   // --- WELCOME / SETUP SCREEN ---
   if (!profileExists) {
@@ -604,7 +650,7 @@ export default function DeliveryDashboardClient({
             </Button>
           </div>
         </motion.div>
-        
+
         {/* Dialog rendered inside the Welcome Screen */}
         {profileDialogContent}
       </div>
@@ -729,7 +775,7 @@ export default function DeliveryDashboardClient({
                   <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total Earnings</p>
                   <h3 className="text-3xl font-black flex items-center gap-2">
                     <IndianRupee className="h-6 w-6 text-emerald-400" />
-                    {totalEarnings.toFixed(2)}
+                    {lifetimeEarnings.toFixed(2)}
                   </h3>
                 </div>
                 <div className="p-6 space-y-4">
@@ -783,11 +829,45 @@ export default function DeliveryDashboardClient({
             {/* Main Content: Jobs */}
             <div className="lg:col-span-3 space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-black text-gray-900">Active Tasks</h3>
+                <div className="flex items-center gap-4">
+                  <h3 className="text-2xl font-black text-gray-900">Active Tasks</h3>
+                  {sortedJobs.length > 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={downloadDeliveryRunPdf}
+                      className="rounded-xl border-2 border-emerald-100 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 font-bold h-9 text-xs"
+                    >
+                      <Zap className="h-3 w-3 mr-1.5" /> Download Delivery Run (PDF)
+                    </Button>
+                  )}
+                </div>
                 <Badge className="bg-white text-gray-600 border-2 border-gray-200 px-4 py-2 rounded-full font-bold">
                   {total} Total
                 </Badge>
               </div>
+
+              {sortedJobs.length > 0 && (
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-3xl border border-indigo-100 mb-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-indigo-100 rounded-xl">
+                      <Target className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-gray-900">Suggested Delivery Sequence</h4>
+                      <p className="text-[10px] text-indigo-600 font-bold uppercase tracking-widest">Optimized for shortest travel distance</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {sortedJobs.map((j, i) => (
+                      <div key={j.id} className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl shadow-sm border border-indigo-50">
+                        <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black">{i + 1}</span>
+                        <span className="text-xs font-bold text-gray-700">#{j.orderId.slice(-6).toUpperCase()}</span>
+                        {i < sortedJobs.length - 1 && <ChevronRight className="h-3 w-3 text-gray-300" />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {jobs.length === 0 ? (
                 <Card className="border-2 border-dashed border-gray-300 rounded-3xl p-20 text-center bg-white/60 backdrop-blur-xl">
@@ -855,6 +935,25 @@ export default function DeliveryDashboardClient({
                                     </div>
                                     <p className="text-sm font-bold text-gray-700 truncate">{job.order.shippingAddress}</p>
                                   </div>
+                                  <div className="space-y-1 md:col-span-3 pt-3 mt-3 border-t border-gray-50">
+                                    <div className="flex items-center gap-1.5 text-gray-400 mb-2">
+                                      <Layers className="h-3.5 w-3.5" />
+                                      <span className="text-[10px] font-bold uppercase">Product Manifest</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      {job.order.items.map((item, i) => (
+                                        <div key={i} className="flex items-center gap-3 bg-gray-50/50 p-2 rounded-xl border border-gray-100">
+                                          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-[10px] font-black text-emerald-600 border border-emerald-50">
+                                            {item.quantity}
+                                          </div>
+                                          <div>
+                                            <p className="text-xs font-bold text-gray-800">{item.product?.productName}</p>
+                                            <p className="text-[10px] text-gray-400 font-medium">{item.product?.variety || item.product?.category}</p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
                                   <div className="space-y-1">
                                     <div className="flex items-center gap-1.5 text-gray-400">
                                       <IndianRupee className="h-3.5 w-3.5" />
@@ -886,12 +985,22 @@ export default function DeliveryDashboardClient({
                                 {/* Action Buttons */}
                                 <div className="flex flex-wrap gap-3 items-center justify-end">
                                   {job.status === 'REQUESTED' && (
-                                    <>
+                                    <div className="flex flex-wrap gap-3 items-center">
+                                      <Button 
+                                        variant="outline" 
+                                        className="rounded-xl text-indigo-600 font-bold border-2 border-indigo-100 hover:bg-indigo-50" 
+                                        onClick={() => {
+                                          setSelectedJob(job);
+                                          setIsDetailDialogOpen(true);
+                                        }}
+                                      >
+                                        View Details
+                                      </Button>
                                       <Button variant="outline" className="rounded-xl text-gray-600 font-bold border-2 border-gray-200 hover:bg-gray-50" onClick={() => handleJobStatus(job.id, 'REJECTED')}>Decline</Button>
                                       <Button className="rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white font-bold shadow-lg shadow-indigo-500/25" onClick={() => handleJobStatus(job.id, 'ACCEPTED')}>
                                         {statusUpdatingJobId === job.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />} Accept Task
                                       </Button>
-                                    </>
+                                    </div>
                                   )}
                                   {job.status === 'ACCEPTED' && (
                                     <>
@@ -985,6 +1094,24 @@ export default function DeliveryDashboardClient({
             </DialogDescription>
           </div>
           <div className="p-8 space-y-6">
+            {/* Current Order Payment Info for Delivery Boy */}
+            {jobs.find(j => j.id === currentJobId)?.order && (
+              <div className="flex flex-wrap gap-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+                <div className="flex-1">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Payment Method</p>
+                  <p className="text-sm font-black text-emerald-900">
+                    {jobs.find(j => j.id === currentJobId).order.paymentMethod === 'ONLINE' ? 'ONLINE' : 'COD / CASH'}
+                  </p>
+                </div>
+                <div className="flex-1 text-right">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Payment Status</p>
+                  <Badge className={`${jobs.find(j => j.id === currentJobId).order.paymentStatus === 'PAID' ? 'bg-emerald-500' : 'bg-amber-500'} text-white border-0 font-bold`}>
+                    {jobs.find(j => j.id === currentJobId).order.paymentStatus === 'PAID' ? 'PAID' : 'PENDING'}
+                  </Badge>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-6">
               <div className="space-y-4">
                 <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
@@ -999,15 +1126,13 @@ export default function DeliveryDashboardClient({
                       key={m.id}
                       type="button"
                       onClick={() => setDeliveryMethod(m.id)}
-                      className={`p-3 rounded-xl border-2 transition-all text-left ${
-                        deliveryMethod === m.id 
-                          ? 'border-emerald-500 bg-emerald-50' 
-                          : 'border-gray-100 bg-white hover:border-emerald-200'
-                      }`}
+                      className={`p-3 rounded-xl border-2 transition-all text-left ${deliveryMethod === m.id
+                        ? 'border-emerald-500 bg-emerald-50'
+                        : 'border-gray-100 bg-white hover:border-emerald-200'
+                        }`}
                     >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-1 ${
-                        deliveryMethod === m.id ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400'
-                      }`}>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-1 ${deliveryMethod === m.id ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400'
+                        }`}>
                         <m.icon className="h-4 w-4" />
                       </div>
                       <p className="font-black text-[10px] uppercase">{m.label}</p>
@@ -1029,15 +1154,13 @@ export default function DeliveryDashboardClient({
                       key={s.id}
                       type="button"
                       onClick={() => setDeliveryPaymentStatus(s.id)}
-                      className={`p-3 rounded-xl border-2 transition-all text-left ${
-                        deliveryPaymentStatus === s.id 
-                          ? `border-${s.id === 'PAID' ? 'emerald' : 'amber'}-500 bg-${s.id === 'PAID' ? 'emerald' : 'amber'}-50` 
-                          : 'border-gray-100 bg-white hover:border-gray-200'
-                      }`}
+                      className={`p-3 rounded-xl border-2 transition-all text-left ${deliveryPaymentStatus === s.id
+                        ? `border-${s.id === 'PAID' ? 'emerald' : 'amber'}-500 bg-${s.id === 'PAID' ? 'emerald' : 'amber'}-50`
+                        : 'border-gray-100 bg-white hover:border-gray-200'
+                        }`}
                     >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-1 ${
-                        deliveryPaymentStatus === s.id ? s.bg : 'bg-gray-100'
-                      } text-white`}>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-1 ${deliveryPaymentStatus === s.id ? s.bg : 'bg-gray-100'
+                        } text-white`}>
                         <s.icon className="h-4 w-4" />
                       </div>
                       <p className="font-black text-[10px] uppercase">{s.label}</p>
@@ -1050,9 +1173,9 @@ export default function DeliveryDashboardClient({
             <div className={`space-y-4 transition-all ${(!deliveryMethod || !deliveryPaymentStatus) ? 'opacity-30 pointer-events-none grayscale' : 'opacity-100'}`}>
               <div className="flex items-center justify-between">
                 <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">OTP Code *</Label>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleResendOtp(currentJobId)}
                   className="h-6 text-[9px] font-black uppercase text-emerald-600 hover:text-emerald-700 p-0"
                 >
@@ -1067,7 +1190,7 @@ export default function DeliveryDashboardClient({
                 onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, ""))}
               />
             </div>
-            
+
             <Button
               onClick={confirmDeliveryWithOtp}
               disabled={otpValue.length !== 6 || !deliveryMethod || !deliveryPaymentStatus}
@@ -1081,6 +1204,143 @@ export default function DeliveryDashboardClient({
 
       {/* Settings Dialog rendered in Main Dashboard as well */}
       {profileDialogContent}
+      {/* Job Details Modal - Premium Overlay */}
+      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+        <DialogContent className="sm:max-w-xl rounded-3xl border-0 shadow-2xl p-0 overflow-hidden bg-white">
+          <div className="bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-700 p-8 text-white">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
+                  <Package className="h-6 w-6" />
+                </div>
+                <div>
+                  <DialogTitle className="text-2xl font-black">Job Specifications</DialogTitle>
+                  <p className="text-indigo-100/80 text-xs font-bold uppercase tracking-widest">Order ID: #{selectedJob?.orderId.slice(-8).toUpperCase()}</p>
+                </div>
+              </div>
+              <Badge className="bg-white/20 hover:bg-white/30 text-white border-0 px-4 py-1.5 rounded-full font-black text-[10px]">
+                {selectedJob?.status.replace('_', ' ')}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
+            {/* Location Flow */}
+            <div className="relative">
+              <div className="absolute left-4 top-8 bottom-8 w-0.5 bg-gradient-to-b from-emerald-400 via-indigo-400 to-rose-400 border-dashed border-l-2" />
+              
+              <div className="space-y-10 relative">
+                <div className="flex items-start gap-6">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 border-4 border-white shadow-sm z-10">
+                    <MapPin className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div className="flex-1 pt-1">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Pickup From (Seller)</p>
+                    <p className="font-black text-gray-900">{selectedJob?.order.items[0]?.product?.farmer?.name || selectedJob?.order.items[0]?.product?.agent?.name || "Seller Hub"}</p>
+                    <p className="text-xs font-medium text-gray-500 leading-relaxed mt-1">
+                      {selectedJob?.order.items[0]?.product?.farmer?.address || selectedJob?.order.items[0]?.product?.agent?.address || "Location Details Available on Accept"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-6">
+                  <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center shrink-0 border-4 border-white shadow-sm z-10">
+                    <Navigation className="h-4 w-4 text-rose-600" />
+                  </div>
+                  <div className="flex-1 pt-1">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Deliver To (Buyer)</p>
+                    <p className="font-black text-gray-900">{selectedJob?.order.buyerUser?.name || "Premium Buyer"}</p>
+                    <p className="text-xs font-medium text-gray-500 leading-relaxed mt-1">{selectedJob?.order.shippingAddress}</p>
+                    <div className="flex items-center gap-4 mt-3">
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 rounded-lg text-gray-600">
+                        <Phone className="h-3 w-3" />
+                        <span className="text-[10px] font-bold">{selectedJob?.order.buyerPhone}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator className="bg-gray-100" />
+
+            {/* Product Manifest */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-indigo-600" />
+                  <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Product Manifest</h4>
+                </div>
+                <Badge variant="outline" className="text-[10px] font-bold border-indigo-100 text-indigo-600">
+                  {selectedJob?.order.items.length} Items
+                </Badge>
+              </div>
+              
+              <div className="space-y-2">
+                {selectedJob?.order.items.map((item, i) => (
+                  <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100 group hover:border-indigo-200 transition-all">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-600 font-black shadow-sm border border-gray-100">
+                        {item.quantity}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-gray-900">{item.product?.productName}</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{item.product?.variety || item.product?.category}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-black text-gray-900">{item.quantity} {item.product?.unit}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Financial Summary */}
+            <div className="bg-indigo-50/50 rounded-3xl p-6 border border-indigo-100">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <IndianRupee className="h-4 w-4 text-indigo-600" />
+                  <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Your Earnings</h4>
+                </div>
+              </div>
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 font-medium">Estimated Payout ({selectedJob?.distance} KM)</p>
+                  <h3 className="text-3xl font-black text-indigo-700">₹{selectedJob?.totalPrice?.toFixed(2)}</h3>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Status</p>
+                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 font-black">
+                    {selectedJob?.order.paymentStatus === 'PAID' ? 'PRE-PAID' : 'COD'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-4">
+            <Button 
+              variant="ghost" 
+              className="flex-1 h-12 rounded-2xl font-bold text-gray-500" 
+              onClick={() => setIsDetailDialogOpen(false)}
+            >
+              Close
+            </Button>
+            {selectedJob?.status === 'REQUESTED' && (
+              <Button 
+                className="flex-[2] h-12 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg shadow-indigo-600/20"
+                onClick={() => {
+                  handleJobStatus(selectedJob.id, 'ACCEPTED');
+                  setIsDetailDialogOpen(false);
+                }}
+              >
+                Accept This Job
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

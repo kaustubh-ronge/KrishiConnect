@@ -1,7 +1,7 @@
 "use server";
 
 import { currentUser } from "@clerk/nextjs/server";
-import { revalidatePath, unstable_cache } from "next/cache";
+import { revalidatePath, unstable_cache, revalidateTag } from "next/cache";
 import { db } from "@/lib/prisma";
 import { sanitizeContent } from "@/lib/utils";
 
@@ -139,6 +139,7 @@ export async function createProductListing(formData) {
 
   revalidatePath(`/${sellerType}-dashboard/my-listings`);
   revalidatePath(`/marketplace`);
+  revalidateTag('marketplace');
   return { success: true };
 }
 
@@ -296,6 +297,7 @@ export async function updateProductListing(listingId, formData) {
   revalidatePath("/agent-dashboard/my-listings");
   revalidatePath("/farmer-dashboard/my-listings");
   revalidatePath("/marketplace");
+  revalidateTag('marketplace');
   return { success: true };
 }
 
@@ -337,6 +339,7 @@ export async function deleteListing(listingId) {
     revalidatePath('/agent-dashboard/my-listings');
     revalidatePath('/farmer-dashboard/my-listings');
     revalidatePath('/marketplace');
+    revalidateTag('marketplace');
     return { success: true };
 
   } catch (err) {

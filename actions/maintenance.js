@@ -35,7 +35,6 @@ export async function reclaimAbandonedStock() {
             return { success: true, reclaimedCount: 0 };
         }
 
-        console.log(`[Maintenance] Found ${expiredOrders.length} expired orders. Reclaiming stock...`);
 
         let totalReclaimed = 0;
 
@@ -55,7 +54,6 @@ export async function reclaimAbandonedStock() {
                 });
 
                 if (updateRes.count === 0) {
-                    console.log(`[Maintenance] Order ${order.id} already processed by another task. Skipping.`);
                     return;
                 }
 
@@ -80,7 +78,6 @@ export async function reclaimAbandonedStock() {
 
         return { success: true, reclaimedCount: totalReclaimed };
     } catch (error) {
-        console.error("[Maintenance] Stock Reclamation Error:", error.message);
         return { success: false, error: error.message };
     }
 }

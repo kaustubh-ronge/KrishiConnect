@@ -150,8 +150,8 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
   const openUpdateDialog = (order) => {
     setSelectedOrder(order);
     setNewStatus(order.orderStatus);
-    setUpdateMethod("");
-    setUpdatePaymentStatus("");
+    setUpdateMethod(order.paymentMethod || "");
+    setUpdatePaymentStatus(order.paymentStatus || "");
     setOtpValue("");
     setIsUpdateDialogOpen(true);
   };
@@ -627,6 +627,22 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-6 p-8 bg-gradient-to-br from-emerald-50/50 via-white to-green-50/50 rounded-3xl border-2 border-emerald-100 shadow-inner"
                   >
+                    {/* Current Payment Status Display */}
+                    <div className="flex flex-wrap gap-4 p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-emerald-100 mb-2">
+                      <div className="flex-1">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current Method</p>
+                        <Badge variant="outline" className="bg-white font-bold text-emerald-700 border-emerald-200">
+                          {selectedOrder.paymentMethod === 'ONLINE' ? 'ONLINE PAYMENT' : 'CASH ON DELIVERY'}
+                        </Badge>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current Status</p>
+                        <Badge className={`${selectedOrder.paymentStatus === 'PAID' ? 'bg-emerald-500' : 'bg-amber-500'} text-white border-0 font-bold`}>
+                          {selectedOrder.paymentStatus === 'PAID' ? 'PAID' : 'PENDING'}
+                        </Badge>
+                      </div>
+                    </div>
+
                     <div className="space-y-6">
                       <div className="space-y-4">
                         <Label className="text-emerald-900 font-black text-xs uppercase tracking-[0.2em] flex items-center gap-2">
@@ -799,13 +815,26 @@ export default function ManageOrdersClient({ initialOrders, userType, total, has
                 </motion.div>
               )}
 
+              {newStatus === selectedOrder.orderStatus && updatePaymentStatus === selectedOrder.paymentStatus && updateMethod === selectedOrder.paymentMethod && (
+                <p className="text-[10px] text-amber-600 font-black uppercase tracking-widest text-center animate-pulse">Status already set to {newStatus.replace('_', ' ')}</p>
+              )}
+
               <div className="flex gap-4 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsUpdateDialogOpen(false)} disabled={isPending}
                   className="flex-1 rounded-2xl h-14 font-bold border-2 border-gray-200 hover:bg-gray-50 transition-all">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isPending || (newStatus === "DELIVERED" && selectedOrder.deliveryJobs?.some(j => ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'].includes(j.status)))}
-                  className="flex-1 rounded-2xl h-14 font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-xl shadow-emerald-500/25 transition-all">
+                <Button 
+                  type="submit" 
+                  disabled={
+                    isPending || 
+                    (newStatus === selectedOrder.orderStatus && 
+                     updatePaymentStatus === selectedOrder.paymentStatus && 
+                     updateMethod === selectedOrder.paymentMethod) ||
+                    (newStatus === "DELIVERED" && selectedOrder.deliveryJobs?.some(j => ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'].includes(j.status)))
+                  }
+                  className="flex-1 rounded-2xl h-14 font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-xl shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   {isPending ? (
                     <span className="flex items-center gap-2">
                       <Loader2 className="h-5 w-5 animate-spin" /> Updating...

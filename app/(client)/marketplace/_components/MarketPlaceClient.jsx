@@ -21,7 +21,12 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export default function MarketplaceClient({ initialListings, userRole, recentlyViewed }) {
+import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
+export default function MarketplaceClient({ initialListings, metadata, userRole, recentlyViewed }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState("grid"); // grid or list
 
@@ -103,6 +108,85 @@ export default function MarketplaceClient({ initialListings, userRole, recentlyV
     setFreshnessFilter("all");
   };
 
+  const handlePageChange = (newPage) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("page", newPage);
+    router.push(`/marketplace?${params.toString()}`);
+  };
+
+  const PaginationUI = () => {
+    if (!metadata) return null;
+
+    const { page, totalPages, total } = metadata;
+    
+    if (totalPages <= 1) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 py-12">
+          <Separator className="w-24 bg-emerald-100" />
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            End of results • Showing all {total} products
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-12">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={page === 1}
+            onClick={() => handlePageChange(page - 1)}
+            className="rounded-xl border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-30"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+
+          <div className="flex items-center gap-1.5 mx-2">
+            {[...Array(totalPages)].map((_, i) => {
+              const p = i + 1;
+              if (totalPages > 7) {
+                if (p > 1 && p < totalPages && (p < page - 1 || p > page + 1)) {
+                  if (p === page - 2 || p === page + 2) return <span key={p} className="text-slate-400 px-1">...</span>;
+                  return null;
+                }
+              }
+              return (
+                <Button
+                  key={p}
+                  variant={page === p ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => handlePageChange(p)}
+                  className={`h-9 w-9 rounded-xl font-bold text-xs ${
+                    page === p 
+                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200" 
+                      : "text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
+                  }`}
+                >
+                  {p}
+                </Button>
+              );
+            })}
+          </div>
+
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={page === totalPages}
+            onClick={() => handlePageChange(page + 1)}
+            className="rounded-xl border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-30"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+          Showing results {(page - 1) * metadata.limit + 1} - {Math.min(page * metadata.limit, total)} of {total}
+        </p>
+      </div>
+    );
+  };
+
   const activeFiltersCount = [
     selectedCategory !== "All",
     priceRange.min || priceRange.max,
@@ -114,7 +198,7 @@ export default function MarketplaceClient({ initialListings, userRole, recentlyV
   if (!mounted) return <div className="min-h-screen bg-slate-50" />;
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-emerald-50/20 to-teal-50/30">
+    <div className="min-h-screen relative bg-gradient-to-br from-slate-50 via-emerald-50/20 to-teal-50/30">
       {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -493,6 +577,7 @@ export default function MarketplaceClient({ initialListings, userRole, recentlyV
                 </Button>
               </motion.div>
             )}
+            <PaginationUI />
           </div>
         </div>
       </div>

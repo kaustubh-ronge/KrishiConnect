@@ -68,7 +68,6 @@ export default function CartClient({ initialCart, user }) {
     }, []);
 
     useEffect(() => {
-        console.log("[Cart] Client Component Mounted");
     }, []);
 
     const fetchPending = async () => {
@@ -207,14 +206,12 @@ export default function CartClient({ initialCart, user }) {
                         toast.success("Location detected!");
                     }
                 } catch (err) {
-                    console.error("Reverse geocoding failed:", err);
                     toast.success("Location pinned (Address could not be fetched)");
                 } finally {
                     setIsLocating(false);
                 }
             },
             (err) => {
-                console.error("Geolocation error:", err);
                 toast.error("Could not get your location. Please check permissions.");
                 setIsLocating(false);
             },
@@ -234,17 +231,6 @@ export default function CartClient({ initialCart, user }) {
         const checkoutId = toast.loading(isFresh ? "Creating fresh order..." : "Processing your order...");
 
         try {
-            console.log("[Cart] Sending initiateCheckout with:", {
-                addressData: {
-                    name: shippingName,
-                    phone: shippingPhone,
-                    address: shippingAddress,
-                    paymentMethod
-                },
-                selectedItemIds,
-                forceFresh: isFresh,
-                forceResumeId: resumeId
-            });
 
             const initRes = await initiateCheckout({
                 addressData: {
@@ -260,15 +246,6 @@ export default function CartClient({ initialCart, user }) {
                 forceResumeId: resumeId
             });
 
-            console.log("[Cart] Server Raw Response:", initRes);
-
-            console.log("[Cart] Checkout Response Parsed:", { 
-                success: initRes?.success, 
-                isCollision: initRes?.data?.isCollision, 
-                resumeId, 
-                isFresh 
-            });
-
             if (!initRes.success) {
                 toast.error(initRes.error || "Failed to start checkout", { id: checkoutId });
                 setIsPending(false);
@@ -278,19 +255,13 @@ export default function CartClient({ initialCart, user }) {
             // --- Choice Logic ---
             const isCollision = !!initRes.data.isCollision;
             
-            // We only show the modal if it's a collision AND we aren't already trying to resume it
-            // CRITICAL: If resumeId is present, we NEVER show the modal, even if the server says collision.
-            console.log("[Cart] Is Collision:", isCollision, "ResumeId:", resumeId);
-            
             if (isCollision && !resumeId && !isFresh) {
-                console.log("[Checkout] Collision detected - showing modal");
                 toast.dismiss(checkoutId);
                 setCollisionOrder(initRes.data);
                 setShowCollisionModal(true);
                 setIsPending(false);
                 return;
             } else {
-                console.log("[Checkout] Bypassing/Closing modal. Success Path.");
                 setShowCollisionModal(false);
             }
 
@@ -316,17 +287,14 @@ export default function CartClient({ initialCart, user }) {
             const { orderId, razorpayOrderId, amount } = initRes.data;
             await processRazorpayPayment(orderId, razorpayOrderId, amount, checkoutId);
         } catch (err) {
-            console.error("[Checkout] CRITICAL CLIENT ERROR:", err);
             toast.error(`Something went wrong: ${err.message || "Unknown error"}`, { id: checkoutId });
             setIsPending(false);
         }
     };
 
     const processRazorpayPayment = async (orderId, razorpayOrderId, amount, toastId) => {
-        console.log("[Razorpay] Initiating payment with:", { orderId, razorpayOrderId, amount });
         
         if (!razorpayOrderId || !amount || !orderId) {
-            console.error("[Razorpay] Missing data:", { orderId, razorpayOrderId, amount });
             toast.error("Invalid payment session. Please try again.", { id: toastId });
             setIsPending(false);
             return;
@@ -334,7 +302,6 @@ export default function CartClient({ initialCart, user }) {
 
         const rzpKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
         if (!rzpKey) {
-            console.error("[Razorpay] NEXT_PUBLIC_RAZORPAY_KEY_ID is missing!");
             toast.error("Payment system configuration error", { id: toastId });
             setIsPending(false);
             return;
@@ -408,15 +375,12 @@ export default function CartClient({ initialCart, user }) {
 
     const handleResumeOrder = async (order) => {
         if (!order) {
-            console.error("[Cart] Attempted to resume null order");
             return;
         }
         
         const targetId = order.id || order.orderId;
-        console.log("[Cart] Resuming order. Routing through handleCheckout. ID:", targetId);
 
         if (!targetId) {
-            console.error("[Cart] Could not find ID in order object:", order);
             toast.error("Failed to identify order to resume");
             return;
         }
@@ -938,11 +902,8 @@ export default function CartClient({ initialCart, user }) {
                         <Button
                             disabled={isPending}
                             onClick={() => {
-                                console.log("[Cart] Resume Button Clicked in Modal");
                                 if (collisionOrder) {
                                     handleResumeOrder(collisionOrder);
-                                } else {
-                                    console.error("[Cart] No collisionOrder found in state!");
                                 }
                             }}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-500/10 px-6"

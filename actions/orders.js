@@ -199,13 +199,10 @@ export const cancelPendingOrder = async (orderId) => {
 
 
 export async function initiateCheckout(params) {
-  console.log("[Checkout] RAW PARAMS RECEIVED:", JSON.stringify(params, null, 2));
   const { addressData, selectedItemIds = [], forceFresh = false, forceResumeId = null } = params || {};
 
   const user = await currentUser();
   if (!user) return { success: false, error: "Not logged in" };
-
-  console.log(`[Checkout] Initiating for user ${user.id}. ForceResumeId: ${forceResumeId}`);
 
   if (!addressData || !addressData.address || !addressData.phone || !addressData.name) {
     return { success: false, error: "Shipping details are mandatory" };
@@ -260,8 +257,6 @@ export async function initiateCheckout(params) {
     const salt = forceFresh ? `_${Date.now().toString().slice(-4)}` : "";
     const idempotencyId = `ord_${user.id.slice(-4)}_${cartVersion}_${hash}${salt}`;
 
-    console.log(`[Checkout] Generated IdempotencyId: ${idempotencyId}`);
-
 
 
     // STOCK VALIDATION & CALCULATION
@@ -293,10 +288,8 @@ export async function initiateCheckout(params) {
       }
       
       if (forceResumeId === existing.id) {
-          console.log(`[Checkout] Verified resumption of existing order: ${existing.id}`);
           // Fall through to the Razorpay flow below
       } else {
-          console.log(`[Checkout] Collision detected. Existing ID: ${existing.id}, ForceResumeId: ${forceResumeId}`);
           return { success: true, data: { ...existing, isCollision: true } };
       }
     }
@@ -445,7 +438,6 @@ export async function initiateCheckout(params) {
     let finalRazorpayOrderId = created.razorpayOrderId;
 
     if (!finalRazorpayOrderId) {
-        console.log("[Checkout] Creating new Razorpay Order...");
         const auth = Buffer.from(`${razorpayKey}:${razorpaySecret}`).toString("base64");
         const response = await fetch("https://api.razorpay.com/v1/orders", {
           method: "POST",
@@ -474,7 +466,6 @@ export async function initiateCheckout(params) {
           data: { razorpayOrderId: finalRazorpayOrderId }
         });
     } else {
-        console.log(`[Checkout] Reusing existing Razorpay Order: ${finalRazorpayOrderId}`);
     }
 
     return {
@@ -620,7 +611,6 @@ export async function confirmOrderPayment({ orderId, razorpayPaymentId, razorpay
     if (err.code === 'P2002') {
       const checkOrd = await db.order.findUnique({ where: { id: orderId } });
       if (checkOrd?.paymentStatus === 'PAID') {
-        console.log(`Webhook beat us to it. Order ${orderId} already paid.`);
         return { success: true };
       }
       return { success: false, error: 'Database busy. Payment received, but status update pending. Refresh page.' };

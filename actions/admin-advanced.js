@@ -140,25 +140,64 @@ export async function getExportableUsers(roleType) {
     
     let data = [];
     if (roleType === 'farmer') {
-      data = await db.farmerProfile.findMany({
+      const farmers = await db.farmerProfile.findMany({
         include: { 
           user: { select: { email: true, createdAt: true, isDisabled: true } },
-          listings: { select: { id: true, productName: true, pricePerUnit: true } }
+          listings: { 
+            include: { orderItems: { select: { quantity: true } } }
+          }
         }
       });
+      
+      data = await Promise.all(farmers.map(async (p) => {
+         const purchasedCount = await db.order.count({ where: { buyerId: p.userId } });
+         const unitsSold = p.listings.reduce((sum, l) => sum + l.orderItems.reduce((s, it) => s + it.quantity, 0), 0);
+         return {
+            ...p,
+            listingsCount: p.listings.length,
+            unitsSold,
+            purchasedCount,
+            listings: undefined // Clean up
+         };
+      }));
+      
     } else if (roleType === 'agent') {
-      data = await db.agentProfile.findMany({
+      const agents = await db.agentProfile.findMany({
         include: { 
           user: { select: { email: true, createdAt: true, isDisabled: true } },
-          listings: { select: { id: true, productName: true, pricePerUnit: true } }
+          listings: { 
+            include: { orderItems: { select: { quantity: true } } }
+          }
         }
       });
+      
+      data = await Promise.all(agents.map(async (p) => {
+         const purchasedCount = await db.order.count({ where: { buyerId: p.userId } });
+         const unitsSold = p.listings.reduce((sum, l) => sum + l.orderItems.reduce((s, it) => s + it.quantity, 0), 0);
+         return {
+            ...p,
+            listingsCount: p.listings.length,
+            unitsSold,
+            purchasedCount,
+            listings: undefined // Clean up
+         };
+      }));
+
     } else if (roleType === 'delivery') {
-      data = await db.deliveryProfile.findMany({
+      const partners = await db.deliveryProfile.findMany({
         include: { 
-          user: { select: { email: true, createdAt: true, isDisabled: true } }
+          user: { select: { email: true, createdAt: true, isDisabled: true } },
+          jobs: { select: { status: true } }
         }
       });
+      
+      data = partners.map(p => ({
+         ...p,
+         totalDeliveries: p.jobs.filter(j => j.status === 'DELIVERED').length,
+         activeJobs: p.jobs.filter(j => !['DELIVERED', 'CANCELLED', 'REJECTED'].includes(j.status)).length,
+         jobs: undefined
+      }));
+
     } else if (roleType === 'admin') {
       data = await db.user.findMany({
         where: { role: 'admin' }
@@ -168,6 +207,7 @@ export async function getExportableUsers(roleType) {
     return { success: true, data: JSON.parse(JSON.stringify(data)) };
 
   } catch (error) {
+    console.error("[ExportUsers] Error:", error.message);
     return { success: false, error: error.message };
   }
 }
@@ -178,10 +218,19 @@ export async function getExportableProducts() {
     const products = await db.productListing.findMany({
       include: {
         farmer: { select: { name: true } },
-        agent: { select: { name: true } }
+        agent: { select: { name: true, companyName: true } },
+        orderItems: { select: { quantity: true } }
       }
     });
-    return { success: true, data: JSON.parse(JSON.stringify(products)) };
+
+    const mapped = products.map(p => ({
+       ...p,
+       sellerName: p.farmer?.name || p.agent?.companyName || p.agent?.name || 'N/A',
+       unitsSold: p.orderItems.reduce((sum, it) => sum + it.quantity, 0),
+       orderItems: undefined
+    }));
+
+    return { success: true, data: JSON.parse(JSON.stringify(mapped)) };
   } catch (error) {
     return { success: false, error: error.message };
   }

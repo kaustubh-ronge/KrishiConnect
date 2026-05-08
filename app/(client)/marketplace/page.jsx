@@ -7,7 +7,10 @@ import MarketplaceClient from "./_components/MarketPlaceClient";
 
 export const dynamic = 'force-dynamic'; // Ensure fresh data
 
-export default async function MarketplacePage() {
+export default async function MarketplacePage({ searchParams }) {
+  const params = await searchParams;
+  const page = parseInt(params.page) || 1;
+  const limit = parseInt(params.limit) || 12;
   // 1. Security Check: Must be logged in
   const user = await currentUser();
   if (!user) redirect("/sign-in");
@@ -23,13 +26,19 @@ export default async function MarketplacePage() {
   }
 
   // 3. Fetch Data
-  const { data: listings, success } = await getMarketplaceListings();
+  const { data: listings, success, pagination } = await getMarketplaceListings({ page, limit });
   const { data: recentlyViewed } = await getRecentlyViewedProducts();
 
   return (
     <div className="min-h-screen bg-gray-50/50">
       <MarketplaceClient 
-        initialListings={success ? listings : []} 
+        initialListings={success ? (listings || []) : []} 
+        metadata={success ? {
+          total: pagination?.total || 0,
+          totalPages: pagination?.pages || 0,
+          page: pagination?.currentPage || 1,
+          limit: 12
+        } : { total: 0, totalPages: 0, page: 1, limit: 12 }}
         userRole={dbUser.role}
         recentlyViewed={recentlyViewed || []}
       />

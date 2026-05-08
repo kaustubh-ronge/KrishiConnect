@@ -5,7 +5,7 @@ import { currentUser } from '@clerk/nextjs/server';
 import { db } from '@/lib/prisma';
 import AdminCommandCenterClient from './_components/AdminCommandCenterClient';
 import { getAdvancedAdminStats } from '@/actions/admin-advanced';
-import { adminDeleteOrder, approveProfile, getAdminStats, getAllOrders, getPendingProfiles, getSellerBankDetailsForOrder, markOrderItemSettled, rejectProfile } from '@/actions/admin';
+import { adminDeleteOrder, approveProfile, getAdminStats, getAllOrders, getPendingProfiles, getSellerBankDetailsForOrder, markOrderItemSettled, rejectProfile, getAdminDeliveryJobs, getAdminReviews, clearStaleOrders } from '@/actions/admin';
 
 export default async function AdminPage() {
   const user = await currentUser();
@@ -40,6 +40,9 @@ export default async function AdminPage() {
       rejectAction={rejectProfile}
       getPendingAction={getPendingProfiles}
       deleteOrderAction={adminDeleteOrder}
+      clearStaleAction={clearStaleOrders}
+      deliveryJobsAction={getAdminDeliveryJobs}
+      reviewsAction={getAdminReviews}
     />
   );
 }

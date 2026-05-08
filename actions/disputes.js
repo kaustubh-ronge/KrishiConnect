@@ -90,7 +90,6 @@ export async function createDispute(formData) {
     return { success: true, message: "Issue reported. Support team will contact you shortly." };
 
   } catch (error) {
-    console.error("Dispute Error:", error);
     return { success: false, error: "Failed to submit report." };
   }
 }
@@ -136,7 +135,6 @@ export async function getAllDisputes() {
 
     return { success: true, data: disputes };
   } catch (error) {
-    console.error("Get Disputes Error:", error);
     return { success: false, error: "Failed to fetch disputes" };
   }
 }
@@ -187,7 +185,6 @@ export async function resolveDispute(formData) {
 
       // 3. Restore Stock if Buyer Wins (RESOLVED)
       if (resolution === 'RESOLVED') {
-        console.log(`[Dispute] Restoring stock for order ${orderId}`);
         for (const item of order.items) {
           await tx.productListing.update({
             where: { id: item.productId },
@@ -217,7 +214,6 @@ export async function resolveDispute(formData) {
     return { success: true, message: `Dispute marked as ${resolution}` };
 
   } catch (error) {
-    console.error("Resolve Error:", error);
     return { success: false, error: "Failed to resolve dispute." };
   }
 }

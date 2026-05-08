@@ -701,22 +701,24 @@ export default function HireDeliveryClient({ order, initialBoys, deliveryCoords,
     const router = useRouter();
     const [hiringId, setHiringId] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
-    const [maxDistance, setMaxDistance] = useState(50);
-    const [maxPrice, setMaxPrice] = useState(100);
+    const [maxDistance, setMaxDistance] = useState(100);
+    const [maxPrice, setMaxPrice] = useState(200);
 
     // Theme configuration based on userType from central data
     const isFarmer = userType === "farmer";
     const theme = DASHBOARD_THEMES[userType] || DASHBOARD_THEMES.farmer;
 
     // Track status locally for optimistic updates
-    const [partners, setPartners] = useState(initialBoys);
+    const [partners, setPartners] = useState(Array.isArray(initialBoys) ? initialBoys : []);
 
     const filteredBoys = useMemo(() => {
+        if (!Array.isArray(partners)) return [];
         return partners.filter(boy => {
-            const matchesSearch = boy.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                boy.vehicleType?.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesDistance = boy.distance <= maxDistance;
-            const matchesPrice = boy.pricePerKm <= maxPrice;
+            if (!boy) return false;
+            const matchesSearch = (boy.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (boy.vehicleType || "").toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesDistance = (boy.distance || 0) <= maxDistance;
+            const matchesPrice = (boy.pricePerKm || 0) <= maxPrice;
             return matchesSearch && matchesDistance && matchesPrice;
         });
     }, [partners, searchTerm, maxDistance, maxPrice]);
@@ -938,10 +940,10 @@ export default function HireDeliveryClient({ order, initialBoys, deliveryCoords,
                                                                     ? 'bg-gradient-to-br from-emerald-100 to-green-100 text-emerald-700 border border-emerald-200'
                                                                     : 'bg-gradient-to-br from-indigo-100 to-blue-100 text-indigo-700 border border-indigo-200'
                                                                     }`}>
-                                                                    {boy.fullName?.[0]}
+                                                                    {boy.name?.[0]}
                                                                 </div>
                                                                 <div>
-                                                                    <h3 className="font-black text-gray-900 text-sm">{boy.fullName}</h3>
+                                                                    <h3 className={`font-black text-slate-900 text-sm group-hover:text-emerald-600 transition-colors`}>{boy.name}</h3>
                                                                     <div className="flex items-center gap-1 text-[10px] text-amber-500">
                                                                         <Star className="h-3 w-3 fill-current" />
                                                                         <span className="font-black text-amber-600">4.8</span>
@@ -953,7 +955,7 @@ export default function HireDeliveryClient({ order, initialBoys, deliveryCoords,
                                                                 boy.availability === 'AVAILABLE_SOON' ? 'bg-indigo-100 text-indigo-700' :
                                                                     'bg-gray-100 text-gray-600'
                                                                 }`}>
-                                                                {boy.availability.replace('_', ' ')}
+                                                                {(boy.availability || "AVAILABLE").replace('_', ' ')}
                                                             </Badge>
                                                         </div>
 
@@ -975,34 +977,33 @@ export default function HireDeliveryClient({ order, initialBoys, deliveryCoords,
                                                             </div>
                                                             <div className="text-right">
                                                                 <p className="text-[8px] text-gray-400 font-black uppercase tracking-tighter">Est. Cost</p>
-                                                                <p className={`text-lg font-black ${isFarmer ? 'text-emerald-700' : 'text-indigo-700'}`}>₹{(boy.distance * boy.pricePerKm).toFixed(0)}</p>
+                                                                <p className={`text-lg font-black ${isFarmer ? 'text-emerald-700' : 'text-indigo-700'}`}>₹{((boy.distance || 0) * (boy.pricePerKm || 0)).toFixed(0)}</p>
                                                             </div>
                                                         </div>
 
-                                                        <Button
-                                                            onClick={() => handleHireAction(boy.id, boy.distance)}
-                                                            disabled={hiringId === boy.id || (boy.hiringStatus && boy.hiringStatus !== 'REJECTED' && boy.hiringStatus !== 'CANCELLED')}
-                                                            className={`w-full h-11 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${boy.hiringStatus === 'REQUESTED' ? 'bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200' :
-                                                                boy.hiringStatus === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200' :
-                                                                    boy.hiringStatus === 'REJECTED' ? 'bg-rose-50 text-rose-600 border border-rose-200' :
-                                                                        `bg-gray-900 hover:bg-gray-800 text-white shadow-lg shadow-gray-900/20`
-                                                                }`}
-                                                        >
+                                                        <div className="w-full">
                                                             {hiringId === boy.id ? (
-                                                                <><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Transmitting...</>
+                                                                <Button disabled className="w-full h-11 rounded-xl font-black text-[10px] uppercase tracking-widest bg-gray-900 text-white shadow-lg shadow-gray-900/20">
+                                                                    <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Transmitting...
+                                                                </Button>
                                                             ) : boy.hiringStatus ? (
-                                                                <div className="flex items-center justify-between w-full">
+                                                                <div className={`flex items-center justify-between w-full h-11 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest border transition-all ${
+                                                                    boy.hiringStatus === 'REQUESTED' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                                                                    boy.hiringStatus === 'ACCEPTED' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                                                                    boy.hiringStatus === 'REJECTED' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                                                    'bg-gray-100 text-gray-600 border-gray-200'
+                                                                }`}>
                                                                     <div className="flex items-center gap-2">
                                                                         {boy.hiringStatus === 'REQUESTED' && <Clock className="h-3.5 w-3.5" />}
                                                                         {boy.hiringStatus === 'ACCEPTED' && <CheckCircle2 className="h-3.5 w-3.5" />}
                                                                         {boy.hiringStatus === 'REJECTED' && <X className="h-3.5 w-3.5" />}
-                                                                        {boy.hiringStatus.replace('_', ' ')}
+                                                                        {(boy.hiringStatus || "").replace('_', ' ')}
                                                                     </div>
                                                                     {boy.hiringStatus === 'REQUESTED' && (
                                                                         <Button 
                                                                             size="sm" 
                                                                             variant="ghost" 
-                                                                            className="h-7 px-2 text-[8px] hover:bg-red-50 hover:text-red-600 border border-transparent hover:border-red-100 rounded-lg transition-all"
+                                                                            className="h-7 px-3 text-[9px] hover:bg-white hover:text-red-600 border border-amber-200 hover:border-red-200 rounded-lg transition-all font-black bg-amber-100/50"
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 handleRevokeAction(boy.hiringJobId, boy.id);
@@ -1013,9 +1014,14 @@ export default function HireDeliveryClient({ order, initialBoys, deliveryCoords,
                                                                     )}
                                                                 </div>
                                                             ) : (
-                                                                <><Sparkles className="mr-1.5 h-3 w-3" /> Request Hire <ChevronRight className="ml-1 h-3 w-3" /></>
+                                                                <Button
+                                                                    onClick={() => handleHireAction(boy.id, boy.distance)}
+                                                                    className={`w-full h-11 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all bg-gray-900 hover:bg-gray-800 text-white shadow-lg shadow-gray-900/20`}
+                                                                >
+                                                                    <Sparkles className="mr-1.5 h-3 w-3" /> Request Hire <ChevronRight className="ml-1 h-3 w-3" />
+                                                                </Button>
                                                             )}
-                                                        </Button>
+                                                        </div>
                                                     </div>
                                                 </CardContent>
                                             </Card>
@@ -1028,12 +1034,20 @@ export default function HireDeliveryClient({ order, initialBoys, deliveryCoords,
                                     animate={{ opacity: 1 }}
                                     className="bg-white rounded-3xl p-12 border-2 border-dashed border-gray-200 text-center shadow-lg"
                                 >
-                                    <div className="bg-gradient-to-br from-gray-100 to-gray-200 h-20 w-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                    <motion.div
+                                        animate={{ y: [0, -10, 0] }}
+                                        transition={{ duration: 3, repeat: Infinity }}
+                                        className="bg-gradient-to-br from-gray-100 to-gray-200 h-20 w-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner"
+                                    >
                                         <AlertCircle className="h-10 w-10 text-gray-400" />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-gray-900 mb-2">No Partners Found</h3>
+                                    </motion.div>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                        {partners.length === 0 ? "No Partners Found" : "No Matches Found"}
+                                    </h3>
                                     <p className="text-gray-500 max-w-sm mx-auto">
-                                        We couldn't find any available delivery partners matching your current filters. Try increasing the search radius or price range.
+                                        {partners.length === 0 
+                                            ? "We couldn't find any available delivery partners near this location. Ensure partners are online and approved." 
+                                            : "We found partners near you, but none match your current distance or price filters. Try expanding your search."}
                                     </p>
                                     <Button
                                         variant="outline"
