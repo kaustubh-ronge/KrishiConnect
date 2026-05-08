@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Sprout, ShieldCheck, TrendingUp, Users, Globe } from 'lucide-react';
+import Image from 'next/image';
 
 export default function AboutClient() {
   const stats = [
@@ -96,12 +97,15 @@ export default function AboutClient() {
               initial={{ opacity: 0, scale: 0.9 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
-              className="relative rounded-3xl overflow-hidden shadow-2xl"
+              className="relative rounded-3xl overflow-hidden shadow-2xl h-[500px]"
             >
-              <img
+              <Image
                 src="https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?auto=format&fit=crop&q=80&w=800"
                 alt="Farmers working"
-                className="w-full h-[500px] object-cover"
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                priority
+                className="object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-12">
                 <blockquote className="text-2xl font-medium text-white italic">
