@@ -95,9 +95,15 @@ export default function AgentEditClient({ product }) {
       return;
     }
 
+    // Explicitly set values to ensure they are captured from state or form
     formData.set("productName", productName.trim());
     formData.set("category", category);
-
+    
+    // Ensure Select values are captured (sometimes Shadcn Select needs explicit setting in formData)
+    if (!formData.get("qualityGrade") && product.qualityGrade) formData.set("qualityGrade", product.qualityGrade);
+    if (!formData.get("unit") && product.unit) formData.set("unit", product.unit);
+    if (!formData.get("deliveryChargeType") && product.deliveryChargeType) formData.set("deliveryChargeType", product.deliveryChargeType);
+    
     // 2. Append Images
     formData.delete("images");
     images.forEach(url => formData.append("images", url));
