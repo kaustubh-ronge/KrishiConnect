@@ -261,15 +261,74 @@ export async function initiateCheckout(params) {
 
     // STOCK VALIDATION & CALCULATION
     const productSubtotal = checkoutItems.reduce((sum, it) => sum + (it.quantity * it.product.pricePerUnit), 0);
-    const deliveryTotal = checkoutItems.reduce((sum, it) => {
-      if (it.product.deliveryChargeType === 'per_unit') {
-        return sum + (it.quantity * (it.product.deliveryCharge || 0));
+    // --- DYNAMIC DISTANCE-BASED DELIVERY CALCULATION ---
+    // Instead of flat fees per product, we calculate based on Road Distance * Seller's rate
+    // This protects the seller from "forced losses" when hiring dynamic partners.
+    
+    // Group items by seller to handle multi-seller carts
+    const sellerMap = new Map();
+    for (const it of checkoutItems) {
+      const sellerId = it.product.farmerId || it.product.agentId;
+      if (!sellerMap.has(sellerId)) {
+        sellerMap.set(sellerId, {
+          id: sellerId,
+          type: it.product.sellerType,
+          items: []
+        });
       }
-      return sum + (it.product.deliveryCharge || 0);
-    }, 0);
+      sellerMap.get(sellerId).items.push(it);
+    }
 
-    const platformRateFor = (price) => (price < 20 ? 0.01 : 0.02);
-    const platformFee = Math.round(checkoutItems.reduce((sum, it) => sum + (it.product.pricePerUnit * it.quantity * platformRateFor(it.product.pricePerUnit)), 0));
+    let deliveryTotal = 0;
+    const { getOSRMDistance } = await import('@/lib/utils');
+    const { getAvailableDeliveryBoys } = await import('./delivery-job');
+
+    for (const seller of sellerMap.values()) {
+      let sellerProfile;
+      if (seller.type === 'farmer') {
+        sellerProfile = await db.farmerProfile.findUnique({ where: { id: seller.id } });
+      } else {
+        sellerProfile = await db.agentProfile.findUnique({ where: { id: seller.id } });
+      }
+
+      if (sellerProfile && sellerProfile.lat && sellerProfile.lng && addressData.lat && addressData.lng) {
+        const dist = await getOSRMDistance(sellerProfile.lat, sellerProfile.lng, addressData.lat, addressData.lng);
+        
+        // Real-time market scan for partners within 100km of the seller
+        const partnersRes = await getAvailableDeliveryBoys(sellerProfile.lat, sellerProfile.lng);
+        let marketRate = sellerProfile.deliveryPricePerKm || 10;
+        
+        if (partnersRes.success && partnersRes.data.length > 0) {
+            const localPartners = partnersRes.data.filter(p => p.isOnline && p.distance <= 100);
+            if (localPartners.length > 0) {
+                const nearestPartner = localPartners[0]; // Nearest online partner
+                marketRate = Math.max(marketRate, nearestPartner.pricePerKm);
+            }
+        }
+
+        deliveryTotal += Math.round(dist * marketRate);
+      } else {
+        // Fallback to product-defined flat fees if location is missing
+        deliveryTotal += seller.items.reduce((sum, it) => {
+          if (it.product.deliveryChargeType === 'per_unit') {
+            return sum + (it.quantity * (it.product.deliveryCharge || 0));
+          }
+          return sum + (it.product.deliveryCharge || 0);
+        }, 0);
+      }
+    }
+
+    // --- REFINED PLATFORM FEE LOGIC ---
+    // 1. Online: 3% (2% Razorpay + 1% Platform)
+    // 2. COD: 1.5% (Slightly less as requested)
+    // Applied only if product subtotal exceeds Rs 100
+    const isOnline = addressData.paymentMethod !== 'COD';
+    let platformFee = 0;
+    if (productSubtotal > 100) {
+      const rate = isOnline ? 0.03 : 0.015;
+      platformFee = Math.round(productSubtotal * rate);
+    }
+
     const total = productSubtotal + deliveryTotal + platformFee;
 
 
@@ -303,7 +362,7 @@ export async function initiateCheckout(params) {
           totalAmount: total,
           platformFee: platformFee,
           deliveryFee: deliveryTotal,
-          sellerAmount: Math.max(0, productSubtotal - platformFee),
+          sellerAmount: productSubtotal + deliveryTotal,
           paymentStatus: addressData.paymentMethod === 'COD' ? 'PENDING' : "PENDING",
           orderStatus: "PROCESSING",
           paymentMethod: addressData.paymentMethod || "ONLINE",
@@ -619,4 +678,90 @@ export async function confirmOrderPayment({ orderId, razorpayPaymentId, razorpay
     console.error('confirmOrderPayment Error:', err);
     return { success: false, error: err.message || 'Payment confirmation failed' };
   }
+}
+
+/**
+ * Dynamic delivery fee calculation for frontend preview
+ */
+export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, targetLng, productId = null) {
+    try {
+        if (!targetLat || !targetLng) return { success: true, fee: 0 };
+
+        let items = [];
+        if (productId) {
+            // Single product preview (Product Detail Page)
+            const product = await db.productListing.findUnique({
+                where: { id: productId }
+            });
+            if (product) items = [{ product }];
+        } else if (cartItemIds.length > 0) {
+            // Standard Cart calculation
+            items = await db.cartItem.findMany({
+                where: { id: { in: cartItemIds } },
+                include: { product: true }
+            });
+        }
+
+        if (items.length === 0) return { success: true, fee: 0 };
+
+        // Group by seller
+        const sellerMap = new Map();
+        for (const it of items) {
+            const sellerId = it.product.farmerId || it.product.agentId;
+            if (!sellerId) continue;
+            if (!sellerMap.has(sellerId)) {
+                sellerMap.set(sellerId, {
+                    id: sellerId,
+                    type: it.product.farmerId ? 'farmer' : 'agent'
+                });
+            }
+        }
+
+        let totalFee = 0;
+        let isLongDistance = false;
+        const { getOSRMDistance } = await import('@/lib/utils');
+        const { getAvailableDeliveryBoys } = await import('./delivery-job');
+
+        for (const seller of sellerMap.values()) {
+            let profile;
+            if (seller.type === 'farmer') {
+                profile = await db.farmerProfile.findUnique({ where: { id: seller.id } });
+            } else {
+                profile = await db.agentProfile.findUnique({ where: { id: seller.id } });
+            }
+
+            if (profile?.lat && profile?.lng) {
+                const dist = await getOSRMDistance(profile.lat, profile.lng, targetLat, targetLng);
+                
+                // If distance is beyond 100km, we will FLAG it to hide the price in UI,
+                // but we still calculate the baseline fee for the back-end.
+                if (dist > 100) isLongDistance = true;
+
+                // Real-time market scan for partners within 100km of the seller
+                const partnersRes = await getAvailableDeliveryBoys(profile.lat, profile.lng);
+                let marketRate = profile.deliveryPricePerKm || 10;
+                
+                if (partnersRes.success && partnersRes.data.length > 0) {
+                    // Filter: Online partners within 100km
+                    const localPartners = partnersRes.data.filter(p => p.isOnline && p.distance <= 100);
+                    
+                    if (localPartners.length > 0) {
+                        // Use the rate of the NEAREST available partner
+                        const nearestPartner = localPartners[0]; // Already sorted by distance in getAvailableDeliveryBoys
+                        const nearestPartnerRate = nearestPartner.pricePerKm;
+                        
+                        // Charge the buyer the HIGHER of seller's rate or the NEAREST partner's rate
+                        marketRate = Math.max(marketRate, nearestPartnerRate);
+                    }
+                }
+
+                totalFee += Math.round(dist * marketRate);
+            }
+        }
+
+        return { success: true, fee: totalFee, isLongDistance };
+    } catch (err) {
+        console.error("Calculate Fee Error:", err);
+        return { success: false, error: err.message };
+    }
 }

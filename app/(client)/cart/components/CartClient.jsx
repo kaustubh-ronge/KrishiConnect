@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/useCartStore";
-import { initiateCheckout, confirmOrderPayment, getUserPendingOrders, cancelPendingOrder } from '@/actions/orders';
+import { initiateCheckout, confirmOrderPayment, getUserPendingOrders, cancelPendingOrder, calculateDynamicDeliveryFee } from '@/actions/orders';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -98,7 +98,30 @@ export default function CartClient({ initialCart, user }) {
         return acc + (item.quantity * price);
     }, 0);
 
-    const deliveryTotal = selectedItems.reduce((acc, item) => {
+    const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState(0);
+    const [isCalculatingFee, setIsCalculatingFee] = useState(false);
+
+    // Fetch dynamic fee when selection or location changes
+    useEffect(() => {
+        const updateFee = async () => {
+            if (selectedItemIds.length === 0) {
+                setDynamicDeliveryFee(0);
+                return;
+            }
+            if (lat && lng) {
+                setIsCalculatingFee(true);
+                const res = await calculateDynamicDeliveryFee(selectedItemIds, lat, lng);
+                if (res.success) {
+                    setDynamicDeliveryFee(res.fee);
+                }
+                setIsCalculatingFee(false);
+            }
+        };
+        updateFee();
+    }, [selectedItemIds, lat, lng]);
+
+    // Final calculations
+    const deliveryTotal = (lat && lng) ? dynamicDeliveryFee : selectedItems.reduce((acc, item) => {
         if (!item.product) return acc;
         if (item.product.deliveryChargeType === 'per_unit') {
             return acc + (item.quantity * (item.product.deliveryCharge || 0));
@@ -106,11 +129,12 @@ export default function CartClient({ initialCart, user }) {
         return acc + (item.product.deliveryCharge || 0);
     }, 0);
 
-    const platformRateFor = (price) => (price < 20 ? 0.01 : 0.02);
-    const platformFee = Math.round(selectedItems.reduce((acc, item) => {
-        const price = item.product?.pricePerUnit || 0;
-        return acc + (price * item.quantity * platformRateFor(price));
-    }, 0));
+    const isOnline = paymentMethod === "ONLINE";
+    let platformFee = 0;
+    if (productSubtotal > 100) {
+        const rate = isOnline ? 0.03 : 0.015;
+        platformFee = Math.round(productSubtotal * rate);
+    }
     const total = productSubtotal + deliveryTotal + platformFee;
 
     const toggleSelect = (itemId) => {
@@ -633,10 +657,29 @@ export default function CartClient({ initialCart, user }) {
                                             </div>
                                             <div className="flex justify-between text-slate-500 font-bold text-sm">
                                                 <span className="uppercase tracking-widest text-[10px]">Delivery Logistics</span>
-                                                <span className="text-slate-900 font-black">₹{deliveryTotal.toLocaleString()}</span>
+                                                <div className="flex items-center gap-2">
+                                                    {isCalculatingFee && <Loader2 className="h-3 w-3 animate-spin text-emerald-500" />}
+                                                    <span className={`text-slate-900 font-black ${isCalculatingFee ? 'opacity-50' : ''}`}>₹{deliveryTotal.toLocaleString()}</span>
+                                                    {deliveryTotal > productSubtotal && productSubtotal > 0 && (
+                                                        <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200 text-[8px] font-black py-0 px-1">Long Distance</Badge>
+                                                    )}
+                                                </div>
                                             </div>
+                                            {deliveryTotal > productSubtotal && productSubtotal > 0 && (
+                                                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex gap-3">
+                                                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                                                    <p className="text-[10px] text-rose-700 font-bold leading-tight">
+                                                        Logistics cost exceeds product value due to extreme distance. Consider finding a local seller to save on shipping.
+                                                    </p>
+                                                </div>
+                                            )}
                                             <div className="flex justify-between text-slate-500 font-bold text-sm">
-                                                <span className="uppercase tracking-widest text-[10px]">Platform Protocol</span>
+                                                <div>
+                                                    <span className="uppercase tracking-widest text-[10px]">Platform Protocol</span>
+                                                    <p className="text-[8px] text-slate-400 font-medium">
+                                                        {platformFee > 0 ? (paymentMethod === 'ONLINE' ? "(Includes 3% Online Fee)" : "(Includes 1.5% COD Fee)") : "(Free for orders under ₹100)"}
+                                                    </p>
+                                                </div>
                                                 <span className="text-slate-900 font-black">₹{platformFee.toLocaleString()}</span>
                                             </div>
 

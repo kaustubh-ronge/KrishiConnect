@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   MapPin, Scale, User, MessageCircle, ImageIcon,
   Calendar, Truck, Star, Heart, Eye, ShoppingCart,
-  Leaf, Award, Zap, Flame, BadgeCheck
+  Leaf, Award, Zap, Flame, BadgeCheck,
+  Navigation
 } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -176,8 +177,8 @@ export default function ProductCard({ product, index }) {
                 <span>Min: {product.minOrderQuantity || 1}</span>
               </div>
               <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-600">
-                <Calendar className="h-3.5 w-3.5 text-orange-500" />
-                <span>{harvestDate || "N/A"}</span>
+                <Navigation className="h-3.5 w-3.5 text-emerald-500" />
+                <span>₹{isFarmer ? (product.farmer?.deliveryPricePerKm || 10) : (product.agent?.deliveryPricePerKm || 10)}/km</span>
               </div>
               {product.deliveryCharge === 0 && (
                 <div className="flex items-center gap-1.5 bg-green-50 px-2.5 py-1.5 rounded-lg text-xs font-medium text-green-700">

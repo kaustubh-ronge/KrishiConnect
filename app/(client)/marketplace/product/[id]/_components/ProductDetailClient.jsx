@@ -11,7 +11,7 @@ import {
   Truck, User, Calendar, ShoppingCart, CheckCircle2, Heart,
   Share2, Star, Award, Clock, Package, Leaf, Sparkles,
   ChevronRight, Minus, Plus, RotateCcw, Zap, TrendingUp,
-  BadgeCheck, Phone, Navigation, IndianRupee, AlertCircle
+  BadgeCheck, Phone, Navigation, IndianRupee, AlertCircle, Loader2
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -35,10 +35,30 @@ export default function ProductDetailClient({ product, userRole }) {
 
   const { addItem } = useCartStore();
 
-  // Track product view & Handle Mounting
+  const [dynamicFee, setDynamicFee] = useState(null);
+  const [isFeeLoading, setIsFeeLoading] = useState(false);
+  const [isLongDistance, setIsLongDistance] = useState(false);
+
+  // Track product view & Fetch dynamic fee
   useEffect(() => {
     setMounted(true);
     trackProductView(product.id);
+
+    const fetchFee = async () => {
+      const { calculateDynamicDeliveryFee } = await import("@/actions/orders");
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          setIsFeeLoading(true);
+          const res = await calculateDynamicDeliveryFee([], pos.coords.latitude, pos.coords.longitude, product.id);
+          if (res.success) {
+            setDynamicFee(res.fee);
+            setIsLongDistance(res.isLongDistance);
+          }
+          setIsFeeLoading(false);
+        });
+      }
+    };
+    fetchFee();
   }, [product.id]);
 
   const isFarmer = product.sellerType === 'farmer';
@@ -75,10 +95,15 @@ export default function ProductDetailClient({ product, userRole }) {
     }
   };
 
-  const deliveryCost = product.deliveryChargeType === 'per_unit'
-    ? qty * (product.deliveryCharge || 0)
-    : (product.deliveryCharge || 0);
-  const totalPrice = (qty * product.pricePerUnit) + deliveryCost;
+  const deliveryCost = dynamicFee !== null 
+    ? dynamicFee 
+    : (product.deliveryChargeType === 'per_unit' ? qty * (product.deliveryCharge || 0) : (product.deliveryCharge || 0));
+
+  // Platform Fee Preview (Assuming Online 3% as default for preview)
+  const productSubtotal = qty * product.pricePerUnit;
+  const platformFee = productSubtotal > 100 ? Math.round(productSubtotal * 0.03) : 0;
+
+  const totalPrice = productSubtotal + (deliveryCost || 0) + platformFee;
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-gray-50 via-emerald-50/30 to-teal-50/40">
@@ -344,17 +369,38 @@ export default function ProductDetailClient({ product, userRole }) {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-orange-100">
-                        <Truck className="h-5 w-5 text-orange-600" />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-orange-100">
+                          <Truck className="h-5 w-5 text-orange-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 font-semibold uppercase">Delivery Logistics</p>
+                          <div className="flex items-center gap-2">
+                            {isFeeLoading && <Loader2 className="h-3 w-3 animate-spin text-orange-500" />}
+                            <p className={`text-sm font-bold text-gray-900 ${isFeeLoading ? 'opacity-50' : ''}`}>
+                                {isLongDistance ? 'Calculated at Checkout' : (dynamicFee !== null ? `₹${dynamicFee}` : (product.deliveryCharge ? `₹${product.deliveryCharge} ${product.deliveryChargeType === 'per_unit' ? `/ ${product.unit}` : '(Flat)'}` : 'Check at Checkout'))}
+                            </p>
+                            {isLongDistance ? (
+                                <Badge variant="outline" className="border-rose-200 text-rose-600 bg-rose-50 text-[8px] font-black uppercase">Long Distance</Badge>
+                            ) : (
+                                <Badge variant="outline" className="border-orange-200 text-orange-600 bg-orange-50 text-[8px] font-black uppercase">
+                                    {dynamicFee !== null ? "Market Matched" : "Starting Rate"}
+                                </Badge>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-gray-500 font-semibold uppercase">Delivery</p>
-                        <p className="text-sm font-semibold text-gray-900">
-                          {product.deliveryCharge
-                            ? `₹${product.deliveryCharge} ${product.deliveryChargeType === 'per_unit' ? `/ ${product.unit}` : '(Flat)'}`
-                            : 'Free Delivery'}
-                        </p>
+                      <div className="group relative">
+                         <Info className="h-4 w-4 text-gray-300 cursor-help" />
+                         <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-gray-900 text-white text-[10px] rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl">
+                            <p className="font-bold mb-1 border-b border-white/10 pb-1">Logistics Transparency</p>
+                            {isLongDistance ? (
+                                <span className="text-rose-300">This seller is very far from your location. Exact logistics cost will be finalized at checkout based on your specific address.</span>
+                            ) : (
+                                "Delivery fee is calculated based on road distance and real-time partner availability to ensure fair pay for delivery partners."
+                            )}
+                         </div>
                       </div>
                     </div>
                   </div>
@@ -400,10 +446,23 @@ export default function ProductDetailClient({ product, userRole }) {
 
                       <div className="flex-1 text-right">
                         <p className="text-xs text-gray-500">Total Amount</p>
-                        <p className="text-2xl font-black text-gray-900">₹{totalPrice.toFixed(2)}</p>
-                        {deliveryCost > 0 && (
-                          <p className="text-xs text-gray-400">incl. delivery ₹{deliveryCost}</p>
-                        )}
+                        <p className="text-2xl font-black text-gray-900">
+                            ₹{(isLongDistance ? productSubtotal + platformFee : totalPrice).toLocaleString()}
+                        </p>
+                        <div className="flex flex-col items-end gap-0.5">
+                            {isLongDistance ? (
+                                <p className="text-[10px] text-rose-600 font-bold tracking-tight">Logistics to be added at checkout</p>
+                            ) : (
+                                <>
+                                    {deliveryCost > 0 && (
+                                        <p className="text-[10px] text-gray-400 font-medium tracking-tight">incl. delivery ₹{deliveryCost.toLocaleString()}</p>
+                                    )}
+                                </>
+                            )}
+                            {platformFee > 0 && (
+                                <p className="text-[10px] text-gray-400 font-medium tracking-tight">incl. platform fee ₹{platformFee.toLocaleString()}</p>
+                            )}
+                        </div>
                       </div>
                     </div>
                   </div>

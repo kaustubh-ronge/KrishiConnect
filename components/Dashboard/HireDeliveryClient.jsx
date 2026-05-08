@@ -798,10 +798,14 @@ export default function HireDeliveryClient({ order, initialBoys, deliveryCoords,
                             </Link>
                         </Button>
                         <h1 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">Hire Delivery Partner</h1>
-                        <div className="text-gray-500 flex items-center gap-2 mt-0.5 text-[10px] font-bold uppercase">
+                        <div className="text-gray-500 flex flex-wrap items-center gap-2 mt-0.5 text-[10px] font-bold uppercase">
                             Order <Badge variant="secondary" className="font-mono text-[9px] px-2 py-0 bg-gray-100 text-gray-700">#{order.id.slice(-8).toUpperCase()}</Badge>
                             <Separator orientation="vertical" className="h-3" />
                             <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-rose-500" /> {order.shippingAddress || "N/A"}</span>
+                            <Separator orientation="vertical" className="h-3" />
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-black text-[9px] py-0 px-2 flex items-center gap-1">
+                                <Truck className="h-2.5 w-2.5" /> Collected: ₹{order.deliveryFee || 0}
+                            </Badge>
                         </div>
                     </div>
                 </div>
@@ -973,7 +977,21 @@ export default function HireDeliveryClient({ order, initialBoys, deliveryCoords,
                                                         <div className="flex items-center justify-between p-3 bg-gradient-to-r from-white to-gray-50 rounded-xl border border-gray-200 mb-4">
                                                             <div className="flex items-center gap-2">
                                                                 <MapPin className={`h-4 w-4 ${isFarmer ? 'text-emerald-600' : 'text-indigo-600'}`} />
-                                                                <span className="text-[10px] font-bold text-gray-600">Dist: <span className="text-gray-900 font-black">{boy.distance} km</span></span>
+                                                                <div className="space-y-0.5">
+                                                                    <span className="text-[10px] font-bold text-gray-600 block">Dist: <span className="text-gray-900 font-black">{boy.distance} km</span></span>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <div className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                                                                            (order.deliveryFee || 0) >= (boy.distance * boy.pricePerKm) 
+                                                                            ? 'bg-emerald-100 text-emerald-700' 
+                                                                            : 'bg-rose-100 text-rose-700'
+                                                                        }`}>
+                                                                            {(order.deliveryFee || 0) >= (boy.distance * boy.pricePerKm) ? 'PROFIT' : 'LOSS'}
+                                                                        </div>
+                                                                        <span className="text-[9px] font-bold text-gray-400">
+                                                                            ₹{Math.abs((order.deliveryFee || 0) - (boy.distance * boy.pricePerKm)).toFixed(0)} {(order.deliveryFee || 0) >= (boy.distance * boy.pricePerKm) ? 'surplus' : 'deficit'}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                             <div className="text-right">
                                                                 <p className="text-[8px] text-gray-400 font-black uppercase tracking-tighter">Est. Cost</p>
