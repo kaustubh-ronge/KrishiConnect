@@ -135,6 +135,7 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
             )}
 
             <Link href="/how-it-works" className="text-gray-600 hover:text-green-600 font-medium transition-colors">How It Works</Link>
+            <Link href="/about" className="text-gray-600 hover:text-green-600 font-medium transition-colors">About Us</Link>
 
             {/* Language Selector Desktop */}
             {mounted ? (

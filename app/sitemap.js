@@ -1,19 +1,26 @@
 export default function sitemap() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://krishiconnect.com';
 
-  // Public routes defined in proxy.js
   const routes = [
-    '',
-    '/about',
-    '/how-it-works',
-    '/sign-in',
-    '/sign-up'
-  ].map((route) => ({
-    url: `${baseUrl}${route}`,
-    lastModified: new Date().toISOString(),
-    changeFrequency: 'weekly',
-    priority: route === '' ? 1 : 0.8,
-  }));
+    {
+      url: baseUrl,
+      lastModified: new Date().toISOString(),
+      changeFrequency: 'daily',
+      priority: 1.0,
+    },
+    {
+      url: `${baseUrl}/about`,
+      lastModified: new Date().toISOString(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/how-it-works`,
+      lastModified: new Date().toISOString(),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    }
+  ];
 
-  return [...routes];
+  return routes;
 }

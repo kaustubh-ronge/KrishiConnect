@@ -146,7 +146,7 @@ export default function CreateListingPage() {
     const formData = new FormData(event.currentTarget);
 
     const category = selectedCategory === "Other" ? customCategory.trim() : selectedCategory;
-    
+
     if (!productName || productName.length < 3) {
       toast.error("Please enter a valid product name (min 3 chars).", {
         icon: <AlertCircle className="h-5 w-5" />
@@ -1031,7 +1031,7 @@ export default function CreateListingPage() {
                             <div className="space-y-1">
                               <span className="text-gray-500">Product</span>
                               <p className="font-semibold text-gray-800">
-                                 {productName || "—"}
+                                {productName || "—"}
                               </p>
                             </div>
                             <div className="space-y-1">

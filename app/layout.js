@@ -10,35 +10,45 @@ import Chatbot from "@/components/Chatbot";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://krishiconnect.com'),
   title: {
     template: "%s | KrishiConnect",
     default: "KrishiConnect | Direct Farm-to-Agent Marketplace",
   },
-  description: "Connecting farmers directly with agents and delivery partners for a transparent and efficient agricultural supply chain.",
-  keywords: ["agriculture", "farming", "B2B marketplace", "farm-to-agent", "agri-supply chain", "delivery", "KrishiConnect"],
-  authors: [{ name: "KrishiConnect Team" }],
+  description: "Empowering agriculture through technology. KrishiConnect links farmers with verified agents and reliable delivery partners for a seamless supply chain.",
+  keywords: ["agriculture", "farming", "B2B marketplace", "farm-to-agent", "agri-supply chain", "delivery logistics", "KrishiConnect", "India agriculture"],
+  authors: [{ name: "KrishiConnect Team", url: "https://krishiconnect.com" }],
   creator: "KrishiConnect",
+  publisher: "KrishiConnect",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     type: "website",
-    locale: "en_US",
+    locale: "en_IN",
     url: "/",
     siteName: "KrishiConnect",
     title: "KrishiConnect | Direct Farm-to-Agent Marketplace",
-    description: "Connecting farmers directly with agents and delivery partners for a transparent and efficient agricultural supply chain.",
+    description: "The most trusted platform for farmers to connect with agents and logistics providers. Join the agricultural revolution today.",
     images: [
       {
-        url: "/og-image.jpg", // Needs to be generated or placed in public
+        url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "KrishiConnect Marketplace",
+        alt: "KrishiConnect - Direct Farm-to-Agent Marketplace",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
     title: "KrishiConnect | Direct Farm-to-Agent Marketplace",
-    description: "Connecting farmers directly with agents and delivery partners for a transparent and efficient agricultural supply chain.",
+    description: "Empowering farmers with direct market access and logistics support.",
+    site: "@KrishiConnect",
     creator: "@KrishiConnect",
     images: ["/og-image.jpg"],
   },

@@ -3,6 +3,32 @@ import { getProductDetail } from "@/actions/products";
 import ProductDetailClient from "./_components/ProductDetailClient";
 import { redirect } from "next/navigation";
 
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const { data: product } = await getProductDetail(id);
+
+  if (!product) {
+    return {
+      title: "Product Not Found",
+      robots: { index: false },
+    };
+  }
+
+  return {
+    title: `${product.name} | Marketplace`,
+    description: `Buy ${product.name} directly from farmers. ${product.description?.substring(0, 100)}...`,
+    robots: {
+      index: false, // Protected route
+      follow: false,
+    },
+    openGraph: {
+      title: `${product.name} | KrishiConnect Marketplace`,
+      description: product.description,
+      images: product.images?.[0] ? [{ url: product.images[0] }] : [],
+    },
+  };
+}
+
 export default async function ProductPage({ params }) {
   const { id } = await params;
   const { data: product, success } = await getProductDetail(id);
