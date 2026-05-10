@@ -140,7 +140,8 @@ export default function AdminCommandCenterClient({
    // Lazy load data based on view
    useEffect(() => {
       if (!mounted) return;
-      if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support', 'disputes', 'orders'].includes(activeView)) {
+      setStatusFilter("ALL"); // Ensure 'ALL' is default for every section
+      if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support', 'disputes', 'orders', 'verifications'].includes(activeView)) {
          fetchDirectoryData(activeView);
     }
  }, [activeView, mounted]);
@@ -386,15 +387,33 @@ export default function AdminCommandCenterClient({
           let bVal = b[sortConfig.key];
 
           // Handle nested fields or fallbacks
-          if (sortConfig.key === 'createdAt') {
-             aVal = new Date(a.createdAt || a.user?.createdAt || 0).getTime();
-             bVal = new Date(b.createdAt || b.user?.createdAt || 0).getTime();
-          } else if (sortConfig.key === 'name') {
+          if (sortConfig.key === 'createdAt' || sortConfig.key === 'recent') {
+             aVal = new Date(a.createdAt || a.user?.createdAt || a.updatedAt || 0).getTime();
+             bVal = new Date(b.createdAt || b.user?.createdAt || b.updatedAt || 0).getTime();
+          } else if (sortConfig.key === 'updatedAt') {
+             aVal = new Date(a.updatedAt || a.createdAt || 0).getTime();
+             bVal = new Date(b.updatedAt || b.createdAt || 0).getTime();
+          } else if (sortConfig.key === 'name' || sortConfig.key === 'az') {
              aVal = (a.productName || a.name || a.displayName || a.userName || "").toLowerCase();
              bVal = (b.productName || b.name || b.displayName || b.userName || "").toLowerCase();
-          } else if (sortConfig.key === 'price') {
-             aVal = a.pricePerUnit || a.totalAmount || 0;
-             bVal = b.pricePerUnit || b.totalAmount || 0;
+          } else if (sortConfig.key === 'za') {
+             aVal = (b.productName || b.name || b.displayName || b.userName || "").toLowerCase();
+             bVal = (a.productName || a.name || a.displayName || a.userName || "").toLowerCase();
+          } else if (sortConfig.key === 'price' || sortConfig.key === 'value') {
+             aVal = a.pricePerUnit || a.totalAmount || a.finance?.totalGMV || 0;
+             bVal = b.pricePerUnit || b.totalAmount || b.finance?.totalGMV || 0;
+          } else if (sortConfig.key === 'rating') {
+             aVal = a.rating || 0;
+             bVal = b.rating || 0;
+          } else if (sortConfig.key === 'stock') {
+             aVal = a.availableStock || a.quantity || 0;
+             bVal = b.availableStock || b.quantity || 0;
+          } else if (sortConfig.key === 'popularity' || sortConfig.key === 'sold') {
+             aVal = a.unitsSold || a.purchasedCount || 0;
+             bVal = b.unitsSold || b.purchasedCount || 0;
+          } else if (sortConfig.key === 'status') {
+             aVal = a.orderStatus || a.sellingStatus || a.approvalStatus || "";
+             bVal = b.orderStatus || b.sellingStatus || b.approvalStatus || "";
           }
 
           if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -509,7 +528,6 @@ export default function AdminCommandCenterClient({
 
    const Pagination = ({ totalItems }) => {
       const totalPages = Math.ceil(totalItems / itemsPerPage);
-      if (totalPages <= 1) return null;
       return (
          <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-slate-100 sticky bottom-0 z-20">
             <p className="text-[9px] font-black text-slate-400 uppercase">Records {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems}</p>
@@ -619,7 +637,7 @@ export default function AdminCommandCenterClient({
                                     <Card className="rounded-3xl border-0 shadow-sm bg-rose-50 p-6 flex flex-col justify-center"><p className="text-[9px] font-black text-rose-600 uppercase mb-2">Pending Verify</p><h4 className="text-2xl font-black text-rose-900">{pendingProfiles.length}</h4></Card>
                                  </div>
                               </div>
-                              <Card className="rounded-[2rem] border-0 shadow-sm bg-white overflow-hidden flex flex-col h-[600px]">
+                              <Card className="rounded-[2rem] border-0 shadow-sm bg-white overflow-hidden flex flex-col">
                                  <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0"><h4 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-3"><LucideHistory className="h-4 w-4 text-indigo-500" /> Recent Platform Activity</h4></div>
                                  <div className="flex-grow overflow-y-auto custom-scrollbar">
                                     <Table>
@@ -688,9 +706,14 @@ export default function AdminCommandCenterClient({
                                        onChange={(e) => setSortConfig(prev => ({ ...prev, key: e.target.value }))}
                                        className="bg-transparent text-[9px] font-black uppercase tracking-widest text-slate-600 outline-none cursor-pointer px-2"
                                     >
-                                       <option value="createdAt">By Date</option>
-                                       <option value="name">By Name</option>
-                                       <option value="price">By Value</option>
+                                       <option value="createdAt">Date Created</option>
+                                       <option value="updatedAt">Recently Updated</option>
+                                       <option value="name">Alphabetical</option>
+                                       <option value="price">Price/Value</option>
+                                       <option value="rating">Rating</option>
+                                       <option value="stock">Stock/Qty</option>
+                                       <option value="popularity">Popularity</option>
+                                       <option value="status">Status</option>
                                     </select>
                                  </div>
 
@@ -725,7 +748,7 @@ export default function AdminCommandCenterClient({
                            </div>
                         )}
 
-                        <Card className="rounded-[2rem] border-0 shadow-sm bg-white overflow-hidden flex flex-col h-[600px]">
+                        <Card className="rounded-[2rem] border-0 shadow-sm bg-white overflow-hidden flex flex-col">
                            <div className="flex-grow overflow-y-auto custom-scrollbar">
                               <Table>
                                  <TableHeader className="bg-slate-50/50 text-[9px] font-black uppercase text-slate-400 h-12 border-slate-50 sticky top-0 z-20 backdrop-blur-md">
