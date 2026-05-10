@@ -139,7 +139,7 @@ export default function AdminCommandCenterClient({
    // Lazy load data based on view
    useEffect(() => {
       if (!mounted) return;
-      if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews'].includes(activeView)) {
+      if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support', 'disputes', 'orders'].includes(activeView)) {
          fetchDirectoryData(activeView);
     }
  }, [activeView, mounted]);
@@ -669,7 +669,7 @@ export default function AdminCommandCenterClient({
                                           {activeView === 'orders' || activeView === 'disputes' ? 'ORDER ID & BUYER' :
                                              activeView === 'logistics' ? 'DELIVERY BOY & ORDER' :
                                                 activeView === 'reviews' ? 'REVIEWER & PRODUCT' :
-                                                   'IDENTITY & NAME'}
+                                                   activeView === 'support' ? 'SUPPORT USER' : 'IDENTITY & NAME'}
                                        </TableHead>
                                        <TableHead>
                                           {activeView === 'orders' || activeView === 'disputes' ? 'PAYMENT' :
@@ -708,23 +708,23 @@ export default function AdminCommandCenterClient({
                                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-sm border ${activeView === 'catalog' ? 'bg-purple-50 text-purple-600 border-purple-100' :
                                                    activeView === 'logistics' ? 'bg-amber-50 text-amber-600 border-amber-100' :
                                                       activeView === 'reviews' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
-                                                         item.role === 'farmer' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                         activeView === 'support' ? 'bg-rose-50 text-rose-600 border-rose-100' : item.role === 'farmer' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                                             'bg-indigo-50 text-indigo-600 border-indigo-100'
                                                  }`}>
-                                                   {(item.productName || item.name || item.displayName || item.buyerName)?.[0] || 'O'}
+                                                   {(item.productName || item.name || item.displayName || item.buyerName || item.userName)?.[0] || 'O'}
                                                 </div>
                                                 <div className="flex flex-col">
                                                    <span className="font-black text-slate-900 text-sm leading-tight">
                                                       {activeView === 'logistics' ? item.deliveryBoy?.name :
                                                          activeView === 'reviews' ? item.user?.name :
-                                                            s(item.productName || item.name || item.displayName || item.buyerName)}
+                                                            s(item.productName || item.name || item.displayName || item.buyerName || item.userName)}
                                                    </span>
                                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                                                       {activeView === 'orders' ? <>Bill: ₹{item.totalAmount}</> :
                                                          activeView === 'catalog' ? <>Price: ₹{item.pricePerUnit} / {item.unit}</> :
                                                             activeView === 'logistics' ? <>Order ID: #{item.orderId?.slice(-6).toUpperCase()}</> :
                                                                activeView === 'reviews' ? <>Product: {item.product?.productName}</> :
-                                                                  `ID: #${(item.userId || item.id)?.slice(-6).toUpperCase()}`}
+                                                                  activeView === 'support' ? item.userEmail : `ID: #${(item.userId || item.id)?.slice(-6).toUpperCase()}`}
                                                    </span>
                                                 </div>
                                              </div>
@@ -753,8 +753,8 @@ export default function AdminCommandCenterClient({
                                                       </div>
                                                    ) : (
                                                       <>
-                                                         <span className="text-[10px] font-black text-slate-900 leading-none">{s(item.city || item.category || item.vehicleType)}</span>
-                                                         <span className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">{s(item.district)}</span>
+                                                         <span className="text-[10px] font-black text-slate-900 leading-none">{activeView === 'support' ? item.message : s(item.city || item.category || item.vehicleType)}</span>
+                                                         <span className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">{activeView === 'support' ? (item.isRead ? 'READ' : 'NEW MESSAGE') : s(item.district)}</span>
                                                       </>
                                                    )}
                                                 </div>
@@ -774,13 +774,13 @@ export default function AdminCommandCenterClient({
                                           ) : activeView === 'farmers' || activeView === 'agents' ? (
                                              <Badge className={`text-[8px] font-black uppercase px-3 py-1 border-0 rounded-lg ${item.usagePurpose === 'buy_and_sell' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{item.usagePurpose === 'buy_and_sell' ? 'BUY & SELL' : 'BUY ONLY'}</Badge>
                                           ) : (
-                                             <Badge variant="outline" className={`text-[8px] font-black uppercase px-3 py-1 border-0 rounded-lg ${item.user?.isDisabled ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'}`}>{item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'}</Badge>
+                                             <Badge variant="outline" className={`text-[8px] font-black uppercase px-3 py-1 border-0 rounded-lg ${item.user?.isDisabled ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'}`}>{activeView === 'support' ? (item.userRole || 'USER') : (item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE')}</Badge>
                                           )}</TableCell>
                                           <TableCell className="pr-8 text-right">
                                              <div className="flex justify-end gap-2 transition-all">
                                                 <Button size="icon" variant="outline" className="h-8 w-8 rounded-lg bg-white border-slate-200 shadow-sm hover:border-indigo-600 hover:text-indigo-600" onClick={() => {
                                                    if (activeView === 'orders' || activeView === 'disputes') openOrderAudit(item.id);
-                                                   else if (activeView === 'catalog') openProductAudit(item);
+                                                   else if (activeView === 'catalog') openProductAudit(item); else if (activeView === 'support') openSupportAudit(item);
                                                    else openProfileAudit(item);
                                               }}><Eye className="h-4 w-4 text-slate-400" /></Button>
                                                 {activeView === 'orders' && (
