@@ -122,9 +122,10 @@ export default function AdminCommandCenterClient({
    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
    const [selectedMessage, setSelectedMessage] = useState(null);
 
-   // Filters
+   // Sorting & Filtering
    const [search, setSearch] = useState("");
    const [statusFilter, setStatusFilter] = useState("ALL");
+   const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
 
    useEffect(() => {
       setMounted(true);
@@ -379,8 +380,30 @@ export default function AdminCommandCenterClient({
        });
     }
 
-      return filtered;
- };
+       // 3. APPLY SORTING
+       const sorted = [...filtered].sort((a, b) => {
+          let aVal = a[sortConfig.key];
+          let bVal = b[sortConfig.key];
+
+          // Handle nested fields or fallbacks
+          if (sortConfig.key === 'createdAt') {
+             aVal = new Date(a.createdAt || a.user?.createdAt || 0).getTime();
+             bVal = new Date(b.createdAt || b.user?.createdAt || 0).getTime();
+          } else if (sortConfig.key === 'name') {
+             aVal = (a.productName || a.name || a.displayName || a.userName || "").toLowerCase();
+             bVal = (b.productName || b.name || b.displayName || b.userName || "").toLowerCase();
+          } else if (sortConfig.key === 'price') {
+             aVal = a.pricePerUnit || a.totalAmount || 0;
+             bVal = b.pricePerUnit || b.totalAmount || 0;
+          }
+
+          if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+          return 0;
+       });
+
+       return sorted;
+    };
 
 
    const openOrderAudit = async (orderId) => {
@@ -649,7 +672,28 @@ export default function AdminCommandCenterClient({
                               {activeView === 'verifications' && selectedIds.length > 0 && (
                                  <Button className="h-10 px-8 bg-emerald-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20" onClick={handleBulkApprove}><ListChecks className="mr-2 h-4 w-4" /> Approve Selected ({selectedIds.length})</Button>
                               )}
-                              <div className="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border border-slate-200 overflow-x-auto custom-scrollbar no-scrollbar">
+                              <div className="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border border-slate-200 overflow-x-auto no-scrollbar">
+                                 {/* SORTING UI */}
+                                 <div className="flex items-center gap-1 border-r border-slate-200 pr-2 mr-2">
+                                    <Button 
+                                       variant="ghost" 
+                                       size="sm" 
+                                       className={`h-10 px-4 rounded-xl text-[9px] font-black uppercase tracking-widest ${sortConfig.direction === 'desc' ? 'text-indigo-600' : 'text-slate-400'}`}
+                                       onClick={() => setSortConfig(prev => ({ ...prev, direction: prev.direction === 'asc' ? 'desc' : 'asc' }))}
+                                    >
+                                       {sortConfig.direction === 'desc' ? 'Newest' : 'Oldest'}
+                                    </Button>
+                                    <select 
+                                       value={sortConfig.key}
+                                       onChange={(e) => setSortConfig(prev => ({ ...prev, key: e.target.value }))}
+                                       className="bg-transparent text-[9px] font-black uppercase tracking-widest text-slate-600 outline-none cursor-pointer px-2"
+                                    >
+                                       <option value="createdAt">By Date</option>
+                                       <option value="name">By Name</option>
+                                       <option value="price">By Value</option>
+                                    </select>
+                                 </div>
+
                                  {(activeView === 'orders' ?
                                     ['ALL', 'PROCESSING', 'PACKED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'PENDING_PAYMENT'] :
                                     activeView === 'catalog' ?
@@ -661,6 +705,25 @@ export default function AdminCommandCenterClient({
                               </div>
                            </div>
                         </div>
+
+                        {/* ACTIVE FILTER TAGS */}
+                        {(search || statusFilter !== 'ALL') && (
+                           <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
+                              {search && (
+                                 <Badge variant="secondary" className="bg-white border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 shadow-sm">
+                                    Search: {search}
+                                    <X className="h-3 w-3 cursor-pointer hover:text-rose-500" onClick={() => setSearch("")} />
+                                 </Badge>
+                              )}
+                              {statusFilter !== 'ALL' && (
+                                 <Badge variant="secondary" className="bg-white border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 shadow-sm">
+                                    Status: {statusFilter.replace('_', ' ')}
+                                    <X className="h-3 w-3 cursor-pointer hover:text-rose-500" onClick={() => setStatusFilter("ALL")} />
+                                 </Badge>
+                              )}
+                              <Button variant="ghost" size="sm" className="h-7 text-[9px] font-black uppercase text-rose-500 hover:bg-rose-50 px-3 rounded-lg" onClick={() => { setSearch(""); setStatusFilter("ALL"); }}>Clear All Filters</Button>
+                           </div>
+                        )}
 
                         <Card className="rounded-[2rem] border-0 shadow-sm bg-white overflow-hidden flex flex-col h-[600px]">
                            <div className="flex-grow overflow-y-auto custom-scrollbar">
@@ -834,37 +897,39 @@ export default function AdminCommandCenterClient({
 
                {/* PRODUCT AUDIT MODAL */}
                <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
-                  <DialogContent className="sm:max-w-xl p-0 border-0 bg-white shadow-2xl rounded-[2.5rem] overflow-hidden">
+                  <DialogContent className="sm:max-w-xl p-0 border-0 bg-white shadow-2xl rounded-[2.5rem] overflow-hidden max-h-[85vh] flex flex-col custom-scrollbar">
                      <div className="bg-purple-600 p-8 text-white relative">
                         <Badge className="bg-white/10 text-white border-0 text-[8px] font-black uppercase px-4 py-1 rounded-full mb-3 tracking-widest">CATALOG AUDIT</Badge>
                         <DialogTitle className="text-3xl font-black tracking-tighter leading-none">{selectedProduct?.productName}</DialogTitle>
                         <p className="text-purple-100 font-bold mt-2 text-sm uppercase tracking-widest">ID: #{selectedProduct?.id?.slice(-8).toUpperCase()}</p>
                      </div>
-                     <div className="p-8 space-y-8 bg-slate-50/50">
-                        <div className="grid grid-cols-2 gap-6">
-                           <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase mb-1">Market Price</p><p className="text-2xl font-black text-slate-900">₹{selectedProduct?.pricePerUnit}<span className="text-xs text-slate-400 ml-1">/{selectedProduct?.unit}</span></p></div>
-                           <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase mb-1">Units Sold</p><p className="text-2xl font-black text-indigo-600">{sNum(selectedProduct?.unitsSold)} <span className="text-xs text-slate-400">total</span></p></div>
-                        </div>
-                        <div className="space-y-4">
-                           <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seller Node Information</h5>
-                           <div className="p-6 bg-slate-900 rounded-[2rem] text-white flex items-center justify-between">
-                              <div className="flex items-center gap-4">
-                                 <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center font-black text-indigo-400">SN</div>
-                                 <div><p className="text-lg font-black leading-none">{selectedProduct?.sellerName}</p><p className="text-[9px] font-bold text-slate-500 uppercase mt-1">Verified Marketplace Seller</p></div>
-                              </div>
-                              <Badge className="bg-indigo-600 text-white border-0 text-[8px] px-3 py-1 uppercase font-black rounded-lg">TRUSTED</Badge>
+                     <div className="flex-grow overflow-y-auto custom-scrollbar bg-slate-50/50">
+                        <div className="p-8 space-y-8">
+                           <div className="grid grid-cols-2 gap-6">
+                              <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase mb-1">Market Price</p><p className="text-2xl font-black text-slate-900">₹{selectedProduct?.pricePerUnit}<span className="text-xs text-slate-400 ml-1">/{selectedProduct?.unit}</span></p></div>
+                              <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase mb-1">Units Sold</p><p className="text-2xl font-black text-indigo-600">{sNum(selectedProduct?.unitsSold)} <span className="text-xs text-slate-400">total</span></p></div>
                            </div>
-                        </div>
-                        <div className="space-y-4">
-                           <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inventory & Delivery</h5>
-                           <div className="p-6 bg-white border border-slate-100 rounded-3xl grid grid-cols-2 gap-4 shadow-sm">
-                              <div><p className="text-[9px] font-black text-slate-400 uppercase">Available Stock</p><p className="text-xl font-black text-slate-900">{selectedProduct?.availableStock} {selectedProduct?.unit}</p></div>
-                              <div><p className="text-[9px] font-black text-slate-400 uppercase">Max Delivery Range</p><p className="text-xl font-black text-indigo-600">{selectedProduct?.maxDeliveryRange ? `${selectedProduct.maxDeliveryRange} KM` : "Profile Default"}</p></div>
-                              <div className="pt-2 border-t border-slate-50"><p className="text-[9px] font-black text-slate-400 uppercase">Listing State</p><Badge className={selectedProduct?.isDisabled ? "bg-rose-100 text-rose-600 border-0 text-[8px] font-black" : "bg-emerald-100 text-emerald-600 border-0 text-[8px] font-black"}>{selectedProduct?.isDisabled ? "DEACTIVATED" : "LIVE"}</Badge></div>
+                           <div className="space-y-4">
+                              <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seller Node Information</h5>
+                              <div className="p-6 bg-slate-900 rounded-[2rem] text-white flex items-center justify-between">
+                                 <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center font-black text-indigo-400">SN</div>
+                                    <div><p className="text-lg font-black leading-none">{selectedProduct?.sellerName}</p><p className="text-[9px] font-bold text-slate-500 uppercase mt-1">Verified Marketplace Seller</p></div>
+                                 </div>
+                                 <Badge className="bg-indigo-600 text-white border-0 text-[8px] px-3 py-1 uppercase font-black rounded-lg">TRUSTED</Badge>
+                              </div>
+                           </div>
+                           <div className="space-y-4">
+                              <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inventory & Delivery</h5>
+                              <div className="p-6 bg-white border border-slate-100 rounded-3xl grid grid-cols-2 gap-4 shadow-sm">
+                                 <div><p className="text-[9px] font-black text-slate-400 uppercase">Available Stock</p><p className="text-xl font-black text-slate-900">{selectedProduct?.availableStock} {selectedProduct?.unit}</p></div>
+                                 <div><p className="text-[9px] font-black text-slate-400 uppercase">Max Delivery Range</p><p className="text-xl font-black text-indigo-600">{selectedProduct?.maxDeliveryRange ? `${selectedProduct.maxDeliveryRange} KM` : "Profile Default"}</p></div>
+                                 <div className="pt-2 border-t border-slate-50"><p className="text-[9px] font-black text-slate-400 uppercase">Listing State</p><Badge className={selectedProduct?.isDisabled ? "bg-rose-100 text-rose-600 border-0 text-[8px] font-black" : "bg-emerald-100 text-emerald-600 border-0 text-[8px] font-black"}>{selectedProduct?.isDisabled ? "DEACTIVATED" : "LIVE"}</Badge></div>
+                              </div>
                            </div>
                         </div>
                      </div>
-                     <DialogFooter className="p-6 bg-white border-t border-slate-100">
+                     <DialogFooter className="p-6 bg-white border-t border-slate-100 shrink-0">
                         <Button className="w-full h-12 rounded-2xl bg-slate-900 text-white font-black uppercase text-xs tracking-widest" onClick={() => setIsProductModalOpen(false)}>Audit Complete</Button>
                      </DialogFooter>
                   </DialogContent>
