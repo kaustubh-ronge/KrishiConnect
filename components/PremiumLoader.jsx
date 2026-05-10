@@ -99,10 +99,9 @@ export default function PremiumLoader({ message = "Processing...", fullPage = tr
   );
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
-      <div className="absolute inset-0 bg-white/5 pointer-events-auto" />
+    <div className={`${fullPage ? "fixed inset-0 z-[9999]" : "absolute inset-0 z-50 bg-white"} flex items-center justify-center`}>
       <motion.div
-        className="pointer-events-auto"
+        className="relative z-10"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 1.05 }}

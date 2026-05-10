@@ -500,9 +500,6 @@ export default function AdminCommandCenterClient({
       <div className="flex h-screen overflow-hidden bg-slate-50 text-[13px] font-sans selection:bg-indigo-100 selection:text-indigo-900">
          <style>{CUSTOM_SCROLLBAR_CSS}</style>
 
-         <AnimatePresence>
-            {isLoading && <PremiumLoader message="Syncing Command Center..." />}
-         </AnimatePresence>
 
          <aside className={`bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300 shadow-2xl sticky top-0 h-screen shrink-0 z-50 ${isSidebarOpen ? "w-60" : "w-20"}`}>
             <div className="h-16 px-6 flex items-center justify-between border-b border-slate-800 shrink-0">
@@ -548,7 +545,10 @@ export default function AdminCommandCenterClient({
                </div>
             </header>
 
-            <div className="flex-grow overflow-y-auto custom-scrollbar">
+            <div className="flex-grow overflow-y-auto custom-scrollbar relative">
+               <AnimatePresence>
+                  {isLoading && <PremiumLoader fullPage={false} message="Syncing Command Center..." />}
+               </AnimatePresence>
                <div className="p-8 max-w-[1500px] mx-auto w-full space-y-10 pb-40 custom-scrollbar">
                   {activeView === 'dashboard' && (
                      <div className="space-y-10 animate-in fade-in duration-500">
