@@ -188,13 +188,16 @@ export default function AdminCommandCenterClient({
        } else if (view === 'support') {
             const { getSupportMessages } = await import('@/actions/support');
             const res = await getSupportMessages();
-            if (res.success) setSupportMessages(res.data.messages);
+            if (res.success) {
+                const fetchedMessages = res.data?.messages || res.data || [];
+                setSupportMessages(Array.isArray(fetchedMessages) ? fetchedMessages : []);
+             }
        }
     } catch (err) { console.error(`Fetch ${view} failed:`, err); } finally { setIsLoading(false); }
  };
 
    const refreshData = async () => {
-      if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support'].includes(activeView)) {
+      if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support', 'disputes', 'orders'].includes(activeView)) {
          await fetchDirectoryData(activeView);
     }
       await fetchInitialData();
@@ -348,7 +351,7 @@ export default function AdminCommandCenterClient({
             (item.name || "").toLowerCase().includes(searchLower) ||
             (item.displayName || "").toLowerCase().includes(searchLower) ||
             (item.buyerName || "").toLowerCase().includes(searchLower) ||
-            (item.userEmail || "").toLowerCase().includes(searchLower) ||
+            (item.userEmail || "").toLowerCase().includes(searchLower) || (item.userName || "").toLowerCase().includes(searchLower) ||
             (item.user?.email || "").toLowerCase().includes(searchLower) ||
             (item.id || "").toLowerCase().includes(searchLower) ||
             (item.phone || "").toLowerCase().includes(searchLower) ||
@@ -357,12 +360,12 @@ export default function AdminCommandCenterClient({
             (item.comment || "").toLowerCase().includes(searchLower) ||
             (item.deliveryBoy?.name || "").toLowerCase().includes(searchLower);
 
-         if (statusFilter === 'ALL') return matchesSearch;
+         if (statusFilter === 'ALL' || !statusFilter) return matchesSearch;
          
          if (activeView === 'mediation') return matchesSearch && item.isSpecialDelivery && (statusFilter === 'ALL' || item.adminApprovalStatus === statusFilter);
          if (activeView === 'orders') return matchesSearch && item.orderStatus === statusFilter;
          if (activeView === 'catalog') return matchesSearch && (statusFilter === 'ACTIVE' ? !item.isDeactivated : item.isDeactivated);
-         if (activeView === 'support') return matchesSearch && (statusFilter === 'ALL' ? true : (statusFilter === 'PENDING' ? !item.isRead : item.isRead));
+         if (activeView === 'support') return matchesSearch && (statusFilter === 'ALL' ? true : (statusFilter === 'UNREAD' ? !item.isRead : item.isRead));
          if (statusFilter === 'PENDING_PAYMENT' && item.paymentStatus === 'Waiting for Payment') return matchesSearch;
          
          return matchesSearch && (item.status === statusFilter || item.approvalStatus === statusFilter);
@@ -651,7 +654,7 @@ export default function AdminCommandCenterClient({
                                     ['ALL', 'PROCESSING', 'PACKED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'PENDING_PAYMENT'] :
                                     activeView === 'catalog' ?
                                        ['ALL', 'ACTIVE', 'DEACTIVATED'] :
-                                       ['ALL', 'PENDING', 'APPROVED', 'REJECTED']
+                                       (activeView === 'support' ? ['ALL', 'UNREAD', 'READ'] : ['ALL', 'PENDING', 'APPROVED', 'REJECTED'])
                                  ).map(f => (
                                     <Button key={f} variant={statusFilter === f ? "default" : "ghost"} size="sm" className={`h-10 px-5 rounded-xl text-[9px] font-black shrink-0 ${statusFilter === f ? "bg-slate-900 text-white shadow-xl" : "text-slate-400 hover:text-slate-900"}`} onClick={() => setStatusFilter(f)}>{f.replace('_', ' ')}</Button>
                                  ))}
@@ -753,7 +756,7 @@ export default function AdminCommandCenterClient({
                                                       </div>
                                                    ) : (
                                                       <>
-                                                         <span className="text-[10px] font-black text-slate-900 leading-none">{activeView === 'support' ? item.message : s(item.city || item.category || item.vehicleType)}</span>
+                                                         <span className="text-[10px] font-black text-slate-900 leading-none">{activeView === 'support' ? (item.type?.replace('_', ' ') || 'SUPPORT REQUEST') : s(item.city || item.category || item.vehicleType)}</span>
                                                          <span className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">{activeView === 'support' ? (item.isRead ? 'READ' : 'NEW MESSAGE') : s(item.district)}</span>
                                                       </>
                                                    )}
