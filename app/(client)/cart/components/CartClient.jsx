@@ -128,30 +128,39 @@ export default function CartClient({ initialCart, user }) {
 
     const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState(0);
     const [isCalculatingFee, setIsCalculatingFee] = useState(false);
-    const [isOutOfRange, setIsOutOfRange] = useState(false);
     const [unserviceableIds, setUnserviceableIds] = useState([]);
 
     // Fetch dynamic fee when selection or location changes
     useEffect(() => {
         const updateFee = async () => {
-            if (selectedItemIds.length === 0) {
-                setDynamicDeliveryFee(0);
-                return;
-            }
             if (lat && lng) {
-                setIsCalculatingFee(true);
-                const res = await calculateDynamicDeliveryFee(selectedItemIds, lat, lng);
-                if (res.success) {
-                    setDynamicDeliveryFee(res.fee || 0);
-                    setIsOutOfRange(!!res.isOutOfRange);
-                    const unserviceable = res.unserviceableIds || [];
-                    setUnserviceableIds(unserviceable);
+                // 1. Calculate fee for SELECTED items
+                if (selectedItemIds.length > 0) {
+                    setIsCalculatingFee(true);
+                    const res = await calculateDynamicDeliveryFee(selectedItemIds, lat, lng);
+                    if (res.success) {
+                        setDynamicDeliveryFee(res.fee || 0);
+                    }
+                    setIsCalculatingFee(false);
+                } else {
+                    setDynamicDeliveryFee(0);
                 }
-                setIsCalculatingFee(false);
+
+                // 2. Identify ALL unserviceable items in the cart for grayscaling
+                const allItemIds = cartItems.map(it => it.id);
+                if (allItemIds.length > 0) {
+                    const resAll = await calculateDynamicDeliveryFee(allItemIds, lat, lng);
+                    if (resAll.success) {
+                        setUnserviceableIds(resAll.unserviceableIds || []);
+                    }
+                }
             }
         };
         updateFee();
-    }, [selectedItemIds, lat, lng]);
+    }, [selectedItemIds, lat, lng, cartItems.length]);
+
+    // Derived state: Is any SELECTED item unserviceable?
+    const isOutOfRange = selectedItemIds.some(id => unserviceableIds.includes(id));
 
     // Final calculations
     const activeDeliveryTotal = selectedActiveItems.reduce((acc, item) => {
