@@ -32,7 +32,7 @@ export async function createSpecialDeliveryRequest(productId, quantity, sellerId
             if (existing.status === 'REJECTED' && existing.rejectedAt) {
                 const now = new Date();
                 const cooldownEnd = new Date(existing.rejectedAt.getTime() + COOLDOWN_MINUTES * 60 * 1000);
-                
+
                 if (now < cooldownEnd) {
                     const remaining = Math.ceil((cooldownEnd - now) / 1000 / 60);
                     return apiResponse.error(`This request was recently rejected. Please wait ${remaining} minutes before re-requesting.`);
@@ -51,7 +51,7 @@ export async function createSpecialDeliveryRequest(productId, quantity, sellerId
                     negotiatedFee: null // Clear old fee
                 }
             });
-            
+
             revalidatePath("/cart");
             return apiResponse.success(updated, "Request re-submitted for approval.");
         }
@@ -71,6 +71,72 @@ export async function createSpecialDeliveryRequest(productId, quantity, sellerId
         revalidatePath("/cart");
         return apiResponse.success(request, "Special delivery request submitted for admin approval.");
     } catch (error) {
+        return apiResponse.error(error.message);
+    }
+}
+
+/**
+ * Create bulk special delivery requests for multiple items.
+ */
+export async function bulkCreateSpecialDeliveryRequests(items) {
+    try {
+        const user = await currentUser();
+        if (!user) throw new Error("Unauthorized");
+
+        console.log(`[Special Delivery] Bulk creating ${items.length} requests for user ${user.id}`);
+
+        const results = [];
+
+        for (const it of items) {
+            const productId = it.productId;
+            const quantity = it.quantity;
+            const sellerId = it.product.farmerId || it.product.agentId;
+
+            // Check for existing request
+            const existing = await db.specialDeliveryRequest.findFirst({
+                where: {
+                    userId: user.id,
+                    productId: productId
+                }
+            });
+
+            if (existing) {
+                if (existing.status === 'PENDING') {
+                    results.push(existing);
+                    continue;
+                }
+
+                const updated = await db.specialDeliveryRequest.update({
+                    where: { id: existing.id },
+                    data: {
+                        quantity: parseFloat(quantity),
+                        status: "PENDING",
+                        inquirySent: false,
+                        rejectedAt: null,
+                        adminNotes: null,
+                        negotiatedFee: null
+                    }
+                });
+                results.push(updated);
+            } else {
+                const request = await db.specialDeliveryRequest.create({
+                    data: {
+                        userId: user.id,
+                        productId: productId,
+                        quantity: parseFloat(quantity),
+                        sellerId: sellerId,
+                        status: "PENDING",
+                        inquirySent: false
+                    }
+                });
+                results.push(request);
+            }
+        }
+
+        revalidatePath("/cart");
+        return apiResponse.success(results, "Special delivery requests submitted for all selected items.");
+    } catch (error) {
+        console.error("[Special Delivery] Bulk Error:", error);
         return apiResponse.error(error.message);
     }
 }
@@ -143,7 +209,7 @@ export async function getUserSpecialDeliveryRequests() {
 
         // CLEANUP STEP: Remove rejected requests (and cart items) older than 1 hour
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-        
+
         const staleRequests = await db.specialDeliveryRequest.findMany({
             where: {
                 userId: user.id,
@@ -154,7 +220,7 @@ export async function getUserSpecialDeliveryRequests() {
 
         if (staleRequests.length > 0) {
             const productIdsToRemove = staleRequests.map(r => r.productId);
-            
+
             // 1. Remove from Cart
             await db.cartItem.deleteMany({
                 where: {

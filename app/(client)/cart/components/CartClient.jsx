@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     AlertDialog,
 
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
@@ -33,7 +32,6 @@ import {
 
 
 import Image from "next/image";
-import Link from "next/link";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -82,14 +80,14 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     const [isMounted, setIsMounted] = useState(false);
     const [isPending, setIsPending] = useState(false);
     const [selectedItemIds, setSelectedItemIds] = useState((initialCart?.items || []).map(it => it.id));
-    
+
     useEffect(() => {
         // Sync server-side cart data to store on mount
         if (initialCart?.items) {
-           useCartStore.setState({ 
-             cartItems: initialCart.items,
-             cartCount: initialCart.items.reduce((sum, it) => sum + (it.quantity || 0), 0)
-           });
+            useCartStore.setState({
+                cartItems: initialCart.items,
+                cartCount: initialCart.items.reduce((sum, it) => sum + (it.quantity || 0), 0)
+            });
         }
         fetchCart();
     }, []);
@@ -149,7 +147,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     const pendingProductIds = new Set(selectedPending.flatMap(o => o.items.map(it => it.productId)));
 
     // Active items: Only count those NOT already covered by a selected pending order
-    const selectedActiveItems = cartItems.filter(it => 
+    const selectedActiveItems = cartItems.filter(it =>
         selectedItemIds.includes(it.id) && !pendingProductIds.has(it.productId)
     );
 
@@ -201,29 +199,29 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     }, [cartItems.length, lat, lng]);
 
     // Derived state: Categorize items for UI
-    const rejectedItems = cartItems.filter(it => 
+    const rejectedItems = cartItems.filter(it =>
         specialRequests.some(r => r.productId === it.product.id && r.status === 'REJECTED')
     );
-    const approvedItems = cartItems.filter(it => 
+    const approvedItems = cartItems.filter(it =>
         specialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED')
     );
-    
+
     // Items that are out of range but NOT approved
-    const unserviceableWaitlist = cartItems.filter(it => 
-        unserviceableIds.includes(it.productId) && 
+    const unserviceableWaitlist = cartItems.filter(it =>
+        unserviceableIds.includes(it.productId) &&
         !specialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED')
     );
 
     // Derived state: Is any SELECTED item currently blocking checkout?
     // We only care about selected items that are unserviceable AND not approved
-    const selectedUnserviceableItems = cartItems.filter(it => 
-        selectedItemIds.includes(it.id) && 
+    const selectedUnserviceableItems = cartItems.filter(it =>
+        selectedItemIds.includes(it.id) &&
         unserviceableIds.includes(it.productId) &&
         !specialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED')
     );
 
     const isOutOfRange = selectedUnserviceableItems.length > 0;
-    
+
     // We don't want hasRejectedRequest to refer to SELECTED items, but ANY items in cart
     // to show the "Rejected" warning section
     const hasRejectedInCart = rejectedItems.length > 0;
@@ -266,16 +264,10 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                     });
                     return prev;
                 }
-                if (unserviceableIds.includes(id) && !isApproved) {
-                    toast.error("This item is out of range. Request approval to purchase.", {
-                        icon: <ShieldAlert className="h-4 w-4 text-amber-500" />
-                    });
-                    return prev;
-                }
             }
 
-            let newSelection = isCurrentlySelected 
-                ? prev.filter(prevId => prevId !== id) 
+            let newSelection = isCurrentlySelected
+                ? prev.filter(prevId => prevId !== id)
                 : [...prev, id];
 
             // If this ID is a pending order, also try to toggle its cart items for collision detection
@@ -303,9 +295,9 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
             const isRejected = specialRequests.some(r => r.productId === it.product.id && r.status === 'REJECTED');
             const isUnserviceable = unserviceableIds.includes(it.productId);
             const isApproved = specialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED');
-            
-            // Only allow selecting if NOT rejected AND (NOT unserviceable OR isApproved)
-            return !isRejected && (!isUnserviceable || isApproved);
+
+            // Allow selecting if NOT rejected (unserviceable items can be selected for mediation requests)
+            return !isRejected;
         });
 
         if (selectedItemIds.length === selectableItems.length) {
@@ -320,24 +312,15 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
 
     // --- Handlers ---
     const handleRemove = async (itemId) => {
-        if (isPending) return;
-        setIsPending(true);
-        toast.promise(removeItem(itemId), {
-            loading: "Removing item...",
-            success: () => {
-                setIsPending(false);
-                router.refresh();
-                return "Item removed";
-            },
-            error: () => {
-                setIsPending(false);
-                return "Failed to remove";
-            }
-        });
+        // No more isPending lock for removal, trust optimistic store
+        try {
+            await removeItem(itemId);
+        } catch (err) {
+            console.error("Removal failed:", err);
+        }
     };
 
     const handleUpdateQty = async (item, change) => {
-        if (isPending) return;
         const newQty = item.quantity + change;
         const minQty = item.product.minOrderQuantity || 1;
 
@@ -351,19 +334,8 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
             return;
         }
 
-        setIsPending(true);
-        toast.promise(updateQuantity(item.id, newQty), {
-            loading: "Updating quantity...",
-            success: () => {
-                setIsPending(false);
-                router.refresh();
-                return "Quantity updated";
-            },
-            error: () => {
-                setIsPending(false);
-                return "Failed to update";
-            }
-        });
+        // Call store update - it's already optimistic and handles errors internally
+        updateQuantity(item.id, newQty);
     };
 
     const handleRequestForSingleItem = async (item) => {
@@ -455,7 +427,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                 // For now, we process only one out-of-range item at a time for simplicity, 
                 // or all selected ones that are unserviceable.
                 const itemsToRequest = selectedActiveItems.filter(it => unserviceableIds.includes(it.productId));
-                
+
                 if (itemsToRequest.length === 0) {
                     toast.error("No unserviceable items found in selection.");
                     return;
@@ -498,7 +470,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                 selectedItemIds: selectedItemIds,
                 forceFresh: isFresh,
                 // Only pass forceResumeId if it was explicitly passed (from the resume button in modal)
-                forceResumeId: resumeId 
+                forceResumeId: resumeId
             });
 
             if (!initRes.success) {
@@ -545,6 +517,8 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
 
             if (initRes.data.isCod) {
                 toast.success("Order Placed successfully (COD)!", { id: checkoutId });
+                // Explicitly clear the store items to prevent persistence issues
+                selectedItemIds.forEach(id => useCartStore.getState().removeItem(id));
                 fetchCart();
                 fetchPending();
                 router.push('/my-orders');
@@ -785,8 +759,8 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
 
                                                     <div className="flex flex-wrap items-center gap-4">
                                                         {order.adminApprovalStatus === 'PENDING' && order.isSpecialDelivery ? (
-                                                            <Button 
-                                                                variant="outline" 
+                                                            <Button
+                                                                variant="outline"
                                                                 className="flex-1 md:flex-none rounded-2xl h-14 px-8 bg-indigo-50 border-indigo-100 text-indigo-700 hover:bg-indigo-100 font-black uppercase tracking-widest text-xs gap-3"
                                                                 onClick={() => {
                                                                     setInquiryProduct(order.items[0]?.product);
@@ -796,22 +770,22 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                                 <MessageCircle className="h-5 w-5" /> Chat with Admin
                                                             </Button>
                                                         ) : (
-                                                            <Button 
+                                                            <Button
                                                                 className="flex-1 md:flex-none rounded-2xl h-14 px-8 bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-widest text-xs gap-3 shadow-xl shadow-slate-900/10"
                                                                 onClick={() => handleResumeOrder(order)}
                                                             >
                                                                 <RotateCcw className="h-5 w-5" /> Resume Order
                                                             </Button>
                                                         )}
-                                                        <Button 
-                                                            variant="ghost" 
+                                                        <Button
+                                                            variant="ghost"
                                                             className="flex-1 md:flex-none rounded-2xl h-14 px-8 text-slate-500 hover:text-rose-600 hover:bg-rose-50 font-black uppercase tracking-widest text-xs gap-3"
                                                             onClick={() => handleCancelOrder(order.id)}
                                                         >
                                                             <Trash2 className="h-5 w-5" /> Cancel Order
                                                         </Button>
-                                                        <Button 
-                                                            variant="outline" 
+                                                        <Button
+                                                            variant="outline"
                                                             className="flex-1 md:flex-none rounded-2xl h-14 px-8 border-slate-200 text-slate-600 hover:bg-slate-50 font-black uppercase tracking-widest text-xs gap-3"
                                                             onClick={() => openPendingDetails(order)}
                                                         >
@@ -874,136 +848,207 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                             <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm"><ShoppingBag className="h-5 w-5" /></div>
                                             <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Your Items</h3>
                                         </div>
+                                        <AnimatePresence mode="popLayout">
+                                            {cartItems.map((item) => {
+                                                const isUnserviceable = unserviceableIds.includes(item.id);
+                                                const activeRequest = specialRequests.find(r => r.productId === item.productId);
+                                                const isRejected = activeRequest?.status === 'REJECTED';
+                                                const isApproved = activeRequest?.status === 'APPROVED';
+                                                const isPendingReq = activeRequest?.status === 'PENDING';
+
+                                                if (isRejected) return null;
+
+                                                const isDisabled = isUnserviceable && !isApproved;
+
+                                                return (
+                                                    <motion.div
+                                                        key={item.id}
+                                                        layout
+                                                        initial={{ opacity: 0, y: 10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, scale: 0.95 }}
+                                                        onClick={() => toggleSelect(item.id)}
+                                                        className={`p-6 bg-white border rounded-[2rem] shadow-sm transition-all duration-300 relative overflow-hidden ${isDisabled ? 'grayscale-[0.8] opacity-70 border-amber-100 bg-amber-50/10 cursor-pointer' : selectedItemIds.includes(item.id) ? 'border-emerald-500 ring-4 ring-emerald-500/10 bg-emerald-50/30 shadow-xl scale-[1.01]' : 'border-slate-100 hover:border-slate-200 hover:shadow-md cursor-pointer'}`}
+                                                    >
+                                                        {selectedItemIds.includes(item.id) && (
+                                                            <div className="absolute top-0 right-0 w-12 h-12 flex items-center justify-center">
+                                                                <div className="bg-emerald-500 text-white p-1 rounded-bl-2xl shadow-lg">
+                                                                    <CheckCircle2 className="h-4 w-4" />
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {isApproved && (
+                                                            <div className="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between gap-3 shadow-inner">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm"><Truck className="h-4 w-4 text-emerald-600" /></div>
+                                                                    <div>
+                                                                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800">Special Delivery Approved</p>
+                                                                        <p className="text-[9px] font-bold text-emerald-600 uppercase">Extra Logistics Fee: ₹{activeRequest.negotiatedFee}</p>
+                                                                    </div>
+                                                                </div>
+                                                                <Badge className="bg-emerald-600 text-white border-0 text-[8px] font-black uppercase">READY</Badge>
+                                                            </div>
+                                                        )}
+
+                                                        {isPendingReq && (
+                                                            <div className="mb-4 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between gap-3 animate-pulse">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm"><Clock className="h-4 w-4 text-indigo-600" /></div>
+                                                                    <div>
+                                                                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-800">Mediation in Progress</p>
+                                                                        <p className="text-[9px] font-bold text-indigo-500 uppercase">Admin reviewing your distance request...</p>
+                                                                    </div>
+                                                                </div>
+                                                                <Badge className="bg-indigo-600 text-white border-0 text-[8px] font-black uppercase">PENDING</Badge>
+                                                            </div>
+                                                        )}
+
+                                                        {isUnserviceable && !activeRequest && (
+                                                            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 shadow-sm">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm"><ShieldAlert className="h-4 w-4 text-amber-600" /></div>
+                                                                    <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest leading-tight">Out of Delivery Range</p>
+                                                                </div>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    disabled={isPending}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleRequestForSingleItem(item);
+                                                                    }}
+                                                                    className="h-9 rounded-xl bg-amber-600 border-amber-600 text-white hover:bg-amber-700 font-black text-[9px] uppercase gap-2 px-4 shadow-lg shadow-amber-600/20"
+                                                                >
+                                                                    <MessageSquare className="h-3.5 w-3.5" /> Request Mediation
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex items-center gap-6">
+                                                            <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedItemIds.includes(item.id)}
+                                                                    onChange={() => toggleSelect(item.id)}
+                                                                    className={`w-6 h-6 rounded-lg accent-emerald-600 cursor-pointer`}
+                                                                />
+                                                            </div>
+
+                                                            <div className="relative w-28 h-28 rounded-2xl overflow-hidden bg-slate-50 border border-slate-100 shadow-inner group">
+                                                                {item.product?.images?.[0] ? (
+                                                                    <Image src={item.product.images[0]} alt={item.product.productName} fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50"><Package className="h-10 w-10" /></div>
+                                                                )}
+                                                            </div>
+
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div>
+                                                                        <h3 className="text-xl font-black text-slate-900 truncate uppercase tracking-tight leading-none mb-1">{item.product?.productName || "Product"}</h3>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 font-black text-[9px] uppercase tracking-tighter">
+                                                                                {item.product?.sellerType === 'farmer' ? '👨‍🌾 Farmer' : '🏢 Agent'}
+                                                                            </span>
+                                                                            <span className="text-slate-300 font-bold">•</span>
+                                                                            <span className="text-slate-400 text-[10px] font-bold uppercase">{item.product?.category || "Category"}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={(e) => { e.stopPropagation(); handleRemove(item.id); }}
+                                                                        className="text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
+                                                                    >
+                                                                        <Trash2 className="h-5 w-5" />
+                                                                    </Button>
+                                                                </div>
+
+                                                                <div className="flex items-end justify-between mt-6">
+                                                                    <div className="flex flex-col gap-1.5">
+                                                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Quantity ({item.product?.unit || 'Units'})</p>
+                                                                        <div className="flex items-center bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none hover:bg-slate-50 border-r border-slate-50" onClick={() => handleUpdateQty(item, -1)}><Minus className="h-3 w-3" /></Button>
+                                                                            <span className="w-10 text-center font-black text-slate-900 text-sm">{item.quantity}</span>
+                                                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none hover:bg-slate-50 border-l border-slate-50 text-emerald-600" onClick={() => handleUpdateQty(item, 1)}><Plus className="h-3 w-3" /></Button>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <p className="text-xl font-black text-slate-900 tracking-tighter">₹{(item.quantity * (item.product?.pricePerUnit || 0)).toLocaleString()}</p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </motion.div>
+                                                );
+                                            })}
+                                        </AnimatePresence>
+                                    </div>
+
+                                    {/* --- REJECTED / BLOCKED ITEMS --- */}
+                                    {hasRejectedInCart && (
+                                        <div className="space-y-6 pt-10 border-t-2 border-slate-100 border-dashed">
+                                            <div className="flex items-center justify-between px-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-600 shadow-sm"><Ban className="h-5 w-5" /></div>
+                                                    <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Rejected Logistics</h3>
+                                                </div>
+                                                <Badge variant="outline" className="border-rose-200 text-rose-600 font-black text-[9px] uppercase animate-pulse bg-rose-50 px-3 py-1">Auto-Removal Active</Badge>
+                                            </div>
+
                                             <AnimatePresence mode="popLayout">
-                                                {cartItems.map((item) => {
-                                                    const isUnserviceable = unserviceableIds.includes(item.id);
-                                                    const activeRequest = specialRequests.find(r => r.productId === item.productId);
-                                                    const isRejected = activeRequest?.status === 'REJECTED';
-                                                    const isApproved = activeRequest?.status === 'APPROVED';
-                                                    const isPendingReq = activeRequest?.status === 'PENDING';
-
-                                                    if (isRejected) return null;
-
-                                                    const isDisabled = isUnserviceable && !isApproved;
+                                                {cartItems.filter(it => specialRequests.some(r => r.productId === it.productId && r.status === 'REJECTED')).map((item) => {
+                                                    const request = specialRequests.find(r => r.productId === item.productId);
+                                                    const rejectedAt = new Date(request?.rejectedAt || Date.now());
+                                                    const removalTime = new Date(rejectedAt.getTime() + 60 * 60 * 1000);
 
                                                     return (
                                                         <motion.div
                                                             key={item.id}
-                                                            layout
-                                                            initial={{ opacity: 0, y: 10 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            exit={{ opacity: 0, scale: 0.95 }}
-                                                            onClick={() => !isDisabled && toggleSelect(item.id)}
-                                                            className={`p-6 bg-white border rounded-[2rem] shadow-sm transition-all duration-300 relative overflow-hidden ${isDisabled ? 'grayscale-[0.8] opacity-70 border-amber-100 bg-amber-50/10 cursor-not-allowed' : selectedItemIds.includes(item.id) ? 'border-emerald-500 ring-4 ring-emerald-500/10 bg-emerald-50/30 shadow-xl scale-[1.01]' : 'border-slate-100 hover:border-slate-200 hover:shadow-md cursor-pointer'}`}
+                                                            initial={{ opacity: 0, x: -20 }}
+                                                            animate={{ opacity: 1, x: 0 }}
+                                                            className="p-6 bg-white border-2 border-rose-100 rounded-[2rem] shadow-sm relative overflow-hidden group"
                                                         >
-                                                            {selectedItemIds.includes(item.id) && (
-                                                                <div className="absolute top-0 right-0 w-12 h-12 flex items-center justify-center">
-                                                                    <div className="bg-emerald-500 text-white p-1 rounded-bl-2xl shadow-lg">
-                                                                        <CheckCircle2 className="h-4 w-4" />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {isApproved && (
-                                                                <div className="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between gap-3 shadow-inner">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm"><Truck className="h-4 w-4 text-emerald-600" /></div>
-                                                                        <div>
-                                                                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800">Special Delivery Approved</p>
-                                                                            <p className="text-[9px] font-bold text-emerald-600 uppercase">Extra Logistics Fee: ₹{activeRequest.negotiatedFee}</p>
+                                                            <div className="mb-4 p-4 bg-rose-50 border border-rose-100 rounded-2xl">
+                                                                <div className="flex items-start justify-between gap-4">
+                                                                    <div className="flex items-start gap-3">
+                                                                        <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0"><ShieldAlert className="h-4 w-4 text-rose-600" /></div>
+                                                                        <div className="space-y-1">
+                                                                            <p className="text-[10px] font-black uppercase tracking-widest text-rose-800">Admin Declined Logistics Request</p>
+                                                                            <p className="text-[11px] font-medium text-rose-600 leading-tight italic">"{request?.adminNotes || 'Request does not meet delivery criteria.'}"</p>
                                                                         </div>
                                                                     </div>
-                                                                    <Badge className="bg-emerald-600 text-white border-0 text-[8px] font-black uppercase">READY</Badge>
-                                                                </div>
-                                                            )}
-
-                                                            {isPendingReq && (
-                                                                <div className="mb-4 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between gap-3 animate-pulse">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm"><Clock className="h-4 w-4 text-indigo-600" /></div>
-                                                                        <div>
-                                                                            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-800">Mediation in Progress</p>
-                                                                            <p className="text-[9px] font-bold text-indigo-500 uppercase">Admin reviewing your distance request...</p>
+                                                                    <div className="text-right shrink-0">
+                                                                        <p className="text-[8px] font-black text-rose-400 uppercase tracking-widest mb-1">Clearing In</p>
+                                                                        <div className="px-3 py-1 bg-white rounded-lg border border-rose-100 font-black text-[10px] text-rose-700 shadow-sm">
+                                                                            <CountdownTimer expiryDate={removalTime} onExpire={() => router.refresh()} />
                                                                         </div>
                                                                     </div>
-                                                                    <Badge className="bg-indigo-600 text-white border-0 text-[8px] font-black uppercase">PENDING</Badge>
                                                                 </div>
-                                                            )}
 
-                                                            {isUnserviceable && !activeRequest && (
-                                                                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 shadow-sm">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm"><ShieldAlert className="h-4 w-4 text-amber-600" /></div>
-                                                                        <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest leading-tight">Out of Delivery Range</p>
-                                                                    </div>
-                                                                    <Button 
-                                                                        variant="outline" 
-                                                                        size="sm" 
-                                                                        disabled={isPending}
-                                                                        onClick={(e) => { 
-                                                                            e.stopPropagation(); 
-                                                                            handleRequestForSingleItem(item);
-                                                                        }}
-                                                                        className="h-9 rounded-xl bg-amber-600 border-amber-600 text-white hover:bg-amber-700 font-black text-[9px] uppercase gap-2 px-4 shadow-lg shadow-amber-600/20"
+                                                                <div className="mt-4 pt-4 border-t border-rose-100 flex items-center justify-between">
+                                                                    <p className="text-[9px] font-bold text-rose-500 uppercase">You can re-request mediation with a better offer.</p>
+                                                                    <Button
+                                                                        variant="link"
+                                                                        className="h-auto p-0 text-rose-700 font-black uppercase text-[9px] hover:text-rose-900"
+                                                                        onClick={() => handleRequestForSingleItem(item)}
                                                                     >
-                                                                        <MessageSquare className="h-3.5 w-3.5" /> Request Mediation
+                                                                        <RotateCcw className="h-3 w-3 mr-1" /> Re-Request Mediation
                                                                     </Button>
                                                                 </div>
-                                                            )}
-                                                            <div className="flex items-center gap-6">
-                                                                <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={selectedItemIds.includes(item.id)}
-                                                                        onChange={() => !isDisabled && toggleSelect(item.id)}
-                                                                        disabled={isDisabled}
-                                                                        className={`w-6 h-6 rounded-lg accent-emerald-600 cursor-pointer`}
-                                                                    />
-                                                                </div>
+                                                            </div>
 
-                                                                <div className="relative w-28 h-28 rounded-2xl overflow-hidden bg-slate-50 border border-slate-100 shadow-inner group">
+                                                            <div className="flex items-center gap-6 opacity-60">
+                                                                <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-slate-50 border border-slate-100 shadow-inner">
                                                                     {item.product?.images?.[0] ? (
-                                                                        <Image src={item.product.images[0]} alt={item.product.productName} fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                                        <Image src={item.product.images[0]} alt={item.product.productName} fill className="object-cover" />
                                                                     ) : (
-                                                                        <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50"><Package className="h-10 w-10" /></div>
+                                                                        <div className="w-full h-full flex items-center justify-center text-slate-300"><Package className="h-8 w-8" /></div>
                                                                     )}
                                                                 </div>
-
                                                                 <div className="flex-1 min-w-0">
-                                                                    <div className="flex justify-between items-start">
-                                                                        <div>
-                                                                            <h3 className="text-xl font-black text-slate-900 truncate uppercase tracking-tight leading-none mb-1">{item.product?.productName || "Product"}</h3>
-                                                                            <div className="flex items-center gap-2">
-                                                                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 font-black text-[9px] uppercase tracking-tighter">
-                                                                                    {item.product?.sellerType === 'farmer' ? '👨‍🌾 Farmer' : '🏢 Agent'}
-                                                                                </span>
-                                                                                <span className="text-slate-300 font-bold">•</span>
-                                                                                <span className="text-slate-400 text-[10px] font-bold uppercase">{item.product?.category || "Category"}</span>
-                                                                            </div>
-                                                                        </div>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            onClick={(e) => { e.stopPropagation(); handleRemove(item.id); }}
-                                                                            className="text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
-                                                                        >
-                                                                            <Trash2 className="h-5 w-5" />
-                                                                        </Button>
-                                                                    </div>
-
-                                                                    <div className="flex items-end justify-between mt-6">
-                                                                        <div className="flex flex-col gap-1.5">
-                                                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Quantity ({item.product?.unit || 'Units'})</p>
-                                                                            <div className="flex items-center bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                                                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none hover:bg-slate-50 border-r border-slate-50" onClick={() => handleUpdateQty(item, -1)}><Minus className="h-3 w-3" /></Button>
-                                                                                <span className="w-10 text-center font-black text-slate-900 text-sm">{item.quantity}</span>
-                                                                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none hover:bg-slate-50 border-l border-slate-50 text-emerald-600" onClick={() => handleUpdateQty(item, 1)}><Plus className="h-3 w-3" /></Button>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="text-right">
-                                                                            <p className="text-xl font-black text-slate-900 tracking-tighter">₹{(item.quantity * (item.product?.pricePerUnit || 0)).toLocaleString()}</p>
-                                                                        </div>
-                                                                    </div>
+                                                                    <h3 className="text-lg font-black text-slate-900 truncate uppercase tracking-tight">{item.product?.productName}</h3>
+                                                                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">₹{(item.product?.pricePerUnit || 0).toLocaleString()} / {item.product?.unit}</p>
                                                                 </div>
                                                             </div>
                                                         </motion.div>
@@ -1011,79 +1056,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                 })}
                                             </AnimatePresence>
                                         </div>
-
-                                        {/* --- REJECTED / BLOCKED ITEMS --- */}
-                                        {hasRejectedInCart && (
-                                            <div className="space-y-6 pt-10 border-t-2 border-slate-100 border-dashed">
-                                                <div className="flex items-center justify-between px-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-600 shadow-sm"><Ban className="h-5 w-5" /></div>
-                                                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Rejected Logistics</h3>
-                                                    </div>
-                                                    <Badge variant="outline" className="border-rose-200 text-rose-600 font-black text-[9px] uppercase animate-pulse bg-rose-50 px-3 py-1">Auto-Removal Active</Badge>
-                                                </div>
-                                                
-                                                <AnimatePresence mode="popLayout">
-                                                    {cartItems.filter(it => specialRequests.some(r => r.productId === it.productId && r.status === 'REJECTED')).map((item) => {
-                                                        const request = specialRequests.find(r => r.productId === item.productId);
-                                                        const rejectedAt = new Date(request?.rejectedAt || Date.now());
-                                                        const removalTime = new Date(rejectedAt.getTime() + 60 * 60 * 1000);
-                                                        
-                                                        return (
-                                                            <motion.div
-                                                                key={item.id}
-                                                                initial={{ opacity: 0, x: -20 }}
-                                                                animate={{ opacity: 1, x: 0 }}
-                                                                className="p-6 bg-white border-2 border-rose-100 rounded-[2rem] shadow-sm relative overflow-hidden group"
-                                                            >
-                                                                <div className="mb-4 p-4 bg-rose-50 border border-rose-100 rounded-2xl">
-                                                                    <div className="flex items-start justify-between gap-4">
-                                                                        <div className="flex items-start gap-3">
-                                                                            <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0"><ShieldAlert className="h-4 w-4 text-rose-600" /></div>
-                                                                            <div className="space-y-1">
-                                                                                <p className="text-[10px] font-black uppercase tracking-widest text-rose-800">Admin Declined Logistics Request</p>
-                                                                                <p className="text-[11px] font-medium text-rose-600 leading-tight italic">"{request?.adminNotes || 'Request does not meet delivery criteria.'}"</p>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="text-right shrink-0">
-                                                                            <p className="text-[8px] font-black text-rose-400 uppercase tracking-widest mb-1">Clearing In</p>
-                                                                            <div className="px-3 py-1 bg-white rounded-lg border border-rose-100 font-black text-[10px] text-rose-700 shadow-sm">
-                                                                                <CountdownTimer expiryDate={removalTime} onExpire={() => router.refresh()} />
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    
-                                                                    <div className="mt-4 pt-4 border-t border-rose-100 flex items-center justify-between">
-                                                                        <p className="text-[9px] font-bold text-rose-500 uppercase">You can re-request mediation with a better offer.</p>
-                                                                        <Button 
-                                                                            variant="link" 
-                                                                            className="h-auto p-0 text-rose-700 font-black uppercase text-[9px] hover:text-rose-900"
-                                                                            onClick={() => handleRequestForSingleItem(item)}
-                                                                        >
-                                                                            <RotateCcw className="h-3 w-3 mr-1" /> Re-Request Mediation
-                                                                        </Button>
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="flex items-center gap-6 opacity-60">
-                                                                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-slate-50 border border-slate-100 shadow-inner">
-                                                                        {item.product?.images?.[0] ? (
-                                                                            <Image src={item.product.images[0]} alt={item.product.productName} fill className="object-cover" />
-                                                                        ) : (
-                                                                            <div className="w-full h-full flex items-center justify-center text-slate-300"><Package className="h-8 w-8" /></div>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <h3 className="text-lg font-black text-slate-900 truncate uppercase tracking-tight">{item.product?.productName}</h3>
-                                                                        <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">₹{(item.product?.pricePerUnit || 0).toLocaleString()} / {item.product?.unit}</p>
-                                                                    </div>
-                                                                </div>
-                                                            </motion.div>
-                                                        );
-                                                    })}
-                                                </AnimatePresence>
-                                            </div>
-                                        )}
+                                    )}
 
                                 </div>
 
@@ -1274,7 +1247,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                         </Button>
 
                                         {effectiveIsOutOfRange && (
-                                            <motion.p 
+                                            <motion.p
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 className="text-center text-[10px] font-black text-amber-600 uppercase tracking-widest px-8 leading-relaxed"

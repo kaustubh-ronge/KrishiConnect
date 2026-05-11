@@ -226,11 +226,11 @@ export async function initiateCheckout(params) {
     // --- SELECTIVE CHECKOUT LOGIC ---
     let checkoutItems = cart.items;
     if (selectedItemIds && selectedItemIds.length > 0) {
-        checkoutItems = cart.items.filter(it => selectedItemIds.includes(it.id));
+      checkoutItems = cart.items.filter(it => selectedItemIds.includes(it.id));
     }
 
     if (checkoutItems.length === 0) {
-        return { success: false, error: "No items selected for checkout" };
+      return { success: false, error: "No items selected for checkout" };
     }
 
     for (const it of checkoutItems) {
@@ -263,7 +263,7 @@ export async function initiateCheckout(params) {
     // --- DYNAMIC DISTANCE-BASED DELIVERY CALCULATION ---
     // Instead of flat fees per product, we calculate based on Road Distance * Seller's rate
     // This protects the seller from "forced losses" when hiring dynamic partners.
-    
+
     // Group items by seller to handle multi-seller carts
     const sellerMap = new Map();
     for (const it of checkoutItems) {
@@ -298,51 +298,51 @@ export async function initiateCheckout(params) {
       if (sellerProfile && sellerProfile.lat && sellerProfile.lng && addressData.lat && addressData.lng) {
         const dist = await getOSRMDistance(sellerProfile.lat, sellerProfile.lng, addressData.lat, addressData.lng);
         console.log(`[Checkout Security] Dist to seller ${seller.id}: ${dist}km`);
-        
+
         // 1. CHECK FOR APPROVED SPECIAL DELIVERY REQUESTS
         const sellerItems = seller.items;
         const sellerApprovedReq = approvedRequests.find(r => sellerItems.some(it => it.productId === r.productId));
 
         if (sellerApprovedReq && sellerApprovedReq.negotiatedFee !== null) {
-            console.log(`[Checkout Security] Using Approved Negotiated Fee: ₹${sellerApprovedReq.negotiatedFee}`);
-            deliveryTotal += sellerApprovedReq.negotiatedFee;
-            continue; // Standard check bypassed for approved negotiation
+          console.log(`[Checkout Security] Using Approved Negotiated Fee: ₹${sellerApprovedReq.negotiatedFee}`);
+          deliveryTotal += sellerApprovedReq.negotiatedFee;
+          continue; // Standard check bypassed for approved negotiation
         }
 
         // 2. ENFORCE SERVICEABILITY LIMITS
         for (const it of sellerItems) {
-            const productRange = it.product.maxDeliveryRange;
-            const profileRange = sellerProfile.maxDeliveryRange;
-            const effectiveMaxRange = Number(productRange ?? profileRange ?? 100);
+          const productRange = it.product.maxDeliveryRange;
+          const profileRange = sellerProfile.maxDeliveryRange;
+          const effectiveMaxRange = Number(productRange ?? profileRange ?? 100);
 
-            if (dist > effectiveMaxRange) {
-                return { 
-                    success: false, 
-                    error: `UNSERVICEABLE: Product "${it.product.productName}" is beyond delivery range (${dist.toFixed(1)}km > ${effectiveMaxRange}km). Please request special delivery approval first.` 
-                };
-            }
+          if (dist > effectiveMaxRange) {
+            return {
+              success: false,
+              error: `UNSERVICEABLE: Product "${it.product.productName}" is beyond delivery range (${dist.toFixed(1)}km > ${effectiveMaxRange}km). Please request special delivery approval first.`
+            };
+          }
         }
 
         // 3. STANDARD CALCULATION (Only if in range)
         const partnersRes = await getAvailableDeliveryBoys(sellerProfile.lat, sellerProfile.lng);
         let marketRate = sellerProfile.deliveryPricePerKm || 10;
-        
+
         if (partnersRes.success && partnersRes.data.length > 0) {
-            const localPartners = partnersRes.data.filter(p => p.isOnline && p.distance <= 100);
-            if (localPartners.length > 0) {
-                const nearestPartner = localPartners[0]; 
-                marketRate = Math.max(marketRate, nearestPartner.pricePerKm);
-            }
+          const localPartners = partnersRes.data.filter(p => p.isOnline && p.distance <= 100);
+          if (localPartners.length > 0) {
+            const nearestPartner = localPartners[0];
+            marketRate = Math.max(marketRate, nearestPartner.pricePerKm);
+          }
         }
 
         deliveryTotal += Math.round(dist * marketRate);
       } else {
         // --- CRITICAL: If seller has a range limit, we MUST have a location to verify ---
         if (sellerProfile.maxDeliveryRange) {
-            return { 
-                success: false, 
-                error: `Location Required: ${sellerProfile.name || sellerProfile.companyName} has a delivery range limit. Please pin your location on the cart page to proceed.` 
-            };
+          return {
+            success: false,
+            error: `Location Required: ${sellerProfile.name || sellerProfile.companyName} has a delivery range limit. Please pin your location on the cart page to proceed.`
+          };
         }
 
         // Fallback to product-defined flat fees if location is missing and no range limit
@@ -382,11 +382,28 @@ export async function initiateCheckout(params) {
       if (existing.paymentStatus === 'PAID') {
         throw new Error("You've already purchased these items recently. Please check your orders or refresh your cart.");
       }
-      
+
+      // CRITICAL FIX: If the user switched payment methods (e.g. Online -> COD), 
+      // we MUST update the existing order record to reflect the NEW choice.
+      // Also clear stale Razorpay metadata if switching to COD.
+      if (existing.paymentMethod !== addressData.paymentMethod) {
+        await db.order.update({
+          where: { id: existing.id },
+          data: {
+            paymentMethod: addressData.paymentMethod,
+            // Clear any stale Razorpay metadata if switching to COD
+            ...(addressData.paymentMethod === 'COD' ? { 
+                razorpayOrderId: null,
+                razorpayPaymentId: null 
+            } : {})
+          }
+        });
+      }
+
       if (forceResumeId === existing.id) {
-          // Fall through to the Razorpay flow below
+        // Fall through to the Razorpay flow below
       } else {
-          return { success: true, data: { ...existing, isCollision: true } };
+        return { success: true, data: { ...existing, isCollision: true, paymentMethod: addressData.paymentMethod } };
       }
     }
 
@@ -400,7 +417,7 @@ export async function initiateCheckout(params) {
           if (generated && typeof generated === 'string') {
             const crypto = await import('crypto');
             const entropy = crypto.randomBytes(2).toString('hex').toUpperCase();
-            invNum = `${generated}-${entropy}`; 
+            invNum = `${generated}-${entropy}`;
           }
         } catch (e) {
           console.error("Generator error:", e);
@@ -430,6 +447,8 @@ export async function initiateCheckout(params) {
           buyerPhone: addressData.phone,
           buyerName: addressData.name,
           expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+          razorpayOrderId: null,
+          razorpayPaymentId: null,
           ...(invNum && { invoiceNumber: invNum }),
         }
       });
@@ -483,7 +502,20 @@ export async function initiateCheckout(params) {
 
     // Handle COD Success Flow
     if (addressData.paymentMethod === 'COD') {
-        // Cart deletion removed to keep items in both tabs per user request.
+      // CRITICAL FIX: Re-enable cart deletion for COD orders.
+      // We only delete the items that were actually checked out.
+      try {
+        const itemIdsToDelete = checkoutItems.map(it => it.id);
+        await db.cartItem.deleteMany({
+          where: {
+            id: { in: itemIdsToDelete }
+          }
+        });
+        // revalidatePath("/cart") or update client store via return
+      } catch (cartErr) {
+        console.error("Failed to clear cart for COD order:", cartErr);
+        // We don't fail the whole order if cart deletion fails, but we log it.
+      }
 
       const { createNotification } = await import('./notifications');
       const orderWithItems = await db.order.findUnique({
@@ -531,45 +563,45 @@ export async function initiateCheckout(params) {
     let finalRazorpayOrderId = created.razorpayOrderId;
 
     if (!finalRazorpayOrderId) {
-        const auth = Buffer.from(`${razorpayKey}:${razorpaySecret}`).toString("base64");
-        const response = await fetch("https://api.razorpay.com/v1/orders", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
-          body: JSON.stringify({
-            amount: amountInPaise,
-            currency: "INR",
-            receipt: created.id,
-            payment_capture: 1,
-          })
-        });
+      const auth = Buffer.from(`${razorpayKey}:${razorpaySecret}`).toString("base64");
+      const response = await fetch("https://api.razorpay.com/v1/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
+        body: JSON.stringify({
+          amount: amountInPaise,
+          currency: "INR",
+          receipt: created.id,
+          payment_capture: 1,
+        })
+      });
 
-        const razorpayData = await response.json();
-        
-        if (!response.ok) {
-          console.error("Razorpay Order Creation Failed:", razorpayData);
-          return { 
-            success: false, 
-            error: `Razorpay Error: ${razorpayData.error?.description || "Failed to create order"}` 
-          };
-        }
-        finalRazorpayOrderId = razorpayData.id;
+      const razorpayData = await response.json();
 
-        await db.order.update({
-          where: { id: created.id },
-          data: { razorpayOrderId: finalRazorpayOrderId }
-        });
+      if (!response.ok) {
+        console.error("Razorpay Order Creation Failed:", razorpayData);
+        return {
+          success: false,
+          error: `Razorpay Error: ${razorpayData.error?.description || "Failed to create order"}`
+        };
+      }
+      finalRazorpayOrderId = razorpayData.id;
+
+      await db.order.update({
+        where: { id: created.id },
+        data: { razorpayOrderId: finalRazorpayOrderId }
+      });
     } else {
     }
 
     return {
       success: true,
-      data: { 
-          id: created.id, 
-          orderId: created.id, 
-          razorpayOrderId: finalRazorpayOrderId, 
-          amount: amountInPaise, 
-          resumed: !!created.isResumed, 
-          isCollision: !!created.isCollision 
+      data: {
+        id: created.id,
+        orderId: created.id,
+        razorpayOrderId: finalRazorpayOrderId,
+        amount: amountInPaise,
+        resumed: !!created.isResumed,
+        isCollision: !!created.isCollision
       }
     };
 
@@ -629,7 +661,7 @@ export async function confirmOrderPayment({ orderId, razorpayPaymentId, razorpay
           const generated = await generateInvoiceNumber(orderId);
           if (generated && typeof generated === 'string') {
             const entropy = crypto.randomBytes(2).toString('hex').toUpperCase();
-            invoiceNumber = `${generated}-${entropy}`; 
+            invoiceNumber = `${generated}-${entropy}`;
           }
         } catch (e) {
           console.error("Custom generator error:", e);
@@ -718,133 +750,133 @@ export async function confirmOrderPayment({ orderId, razorpayPaymentId, razorpay
  * Dynamic delivery fee calculation for frontend preview
  */
 export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, targetLng, productId = null) {
-    try {
-        if (!targetLat || !targetLng) return { success: true, fee: 0 };
+  try {
+    if (!targetLat || !targetLng) return { success: true, fee: 0 };
 
-        let items = [];
-        if (productId) {
-            // Single product preview (Product Detail Page)
-            const product = await db.productListing.findUnique({
-                where: { id: productId }
-            });
-            if (product) items = [{ product }];
-        } else if (cartItemIds.length > 0) {
-            // Standard Cart calculation
-            items = await db.cartItem.findMany({
-                where: { id: { in: cartItemIds } },
-                include: { product: true }
-            });
-        }
-
-        if (items.length === 0) return { success: true, fee: 0 };
-
-        // Group by seller
-        const unserviceableIds = [];
-        const sellerMap = new Map();
-        for (const it of items) {
-            const sellerId = it.product.farmerId || it.product.agentId;
-            if (!sellerId) continue;
-            if (!sellerMap.has(sellerId)) {
-                sellerMap.set(sellerId, {
-                    id: sellerId,
-                    type: it.product.farmerId ? 'farmer' : 'agent'
-                });
-            }
-        }
-
-        const user = await currentUser();
-        const approvedRequests = user ? await db.specialDeliveryRequest.findMany({
-            where: { 
-                userId: user.id, 
-                status: 'APPROVED',
-                productId: productId ? productId : { in: items.map(it => it.product.id) }
-            },
-            orderBy: { updatedAt: 'desc' }
-        }) : [];
-
-        let totalFee = 0;
-        let isLongDistance = false;
-        const { getOSRMDistance } = await import('@/lib/utils');
-        const { getAvailableDeliveryBoys } = await import('./delivery-job');
-
-        for (const seller of sellerMap.values()) {
-            const sellerItems = items.filter(it => (it.product.farmerId || it.product.agentId) === seller.id);
-            
-            // Check if ANY item from this seller has an approved special delivery request
-            const sellerApprovedReq = approvedRequests.find(r => sellerItems.some(it => it.product.id === r.productId));
-
-            if (sellerApprovedReq && sellerApprovedReq.negotiatedFee !== null) {
-                console.log(`[Logistics] Using Negotiated Fee for Seller ${seller.id}: ₹${sellerApprovedReq.negotiatedFee}`);
-                totalFee += sellerApprovedReq.negotiatedFee;
-                continue; // Skip standard calculation for this seller
-            }
-
-            let profile;
-            if (seller.type === 'farmer') {
-                profile = await db.farmerProfile.findUnique({ where: { id: seller.id } });
-            } else {
-                profile = await db.agentProfile.findUnique({ where: { id: seller.id } });
-            }
-
-            if (profile?.lat && profile?.lng) {
-                const dist = await getOSRMDistance(profile.lat, profile.lng, targetLat, targetLng);
-                console.log(`[Logistics] Seller ${seller.id} Dist: ${dist}km, Buyer: ${targetLat},${targetLng}`);
-                
-                // --- SERVICEABILITY CHECK (Per-Product Override) ---
-                let isSellerOutOfRange = false;
-
-                for (const it of sellerItems) {
-                    const productRange = it.product.maxDeliveryRange;
-                    const profileRange = profile.maxDeliveryRange;
-                    const effectiveMaxRange = Number(productRange ?? profileRange ?? 100);
-                    
-                    if (dist > effectiveMaxRange) {
-                        console.warn(`[Logistics] Out of Range: Dist ${dist}km > Max ${effectiveMaxRange}km (Product: ${productRange}, Profile: ${profileRange})`);
-                        isSellerOutOfRange = true;
-                        break;
-                    }
-                }
-
-                if (isSellerOutOfRange) {
-                    // Use it.id if it's a CartItem, otherwise use it.product.id for single product preview
-                    unserviceableIds.push(...sellerItems.map(it => it.id || it.product.id));
-                    isLongDistance = true; // Mark as problematic
-                } else {
-                    // If distance is beyond 100km, we will FLAG it to hide the price in UI
-                    if (dist > 100) isLongDistance = true;
-
-                    // Real-time market scan for partners within 100km of the seller
-                    const partnersRes = await getAvailableDeliveryBoys(profile.lat, profile.lng);
-                    let marketRate = profile.deliveryPricePerKm || 10;
-                    
-                    if (partnersRes.success && partnersRes.data.length > 0) {
-                        // Filter: Online partners within 100km
-                        const localPartners = partnersRes.data.filter(p => p.isOnline && p.distance <= 100);
-                        
-                        if (localPartners.length > 0) {
-                            // Use the rate of the NEAREST available partner
-                            const nearestPartner = localPartners[0]; // Already sorted by distance in getAvailableDeliveryBoys
-                            const nearestPartnerRate = nearestPartner.pricePerKm;
-                            
-                            // Charge the buyer the HIGHER of seller's rate or the NEAREST partner's rate
-                            marketRate = Math.max(marketRate, nearestPartnerRate);
-                        }
-                    }
-
-                    totalFee += Math.round(dist * marketRate);
-                }
-            }
-        }
-
-        return { 
-            success: true, 
-            fee: totalFee, 
-            isLongDistance, 
-            isOutOfRange: unserviceableIds.length > 0,
-            unserviceableIds 
-        };
-    } catch (err) {
-        console.error("Calculate Fee Error:", err);
-        return { success: false, error: err.message };
+    let items = [];
+    if (productId) {
+      // Single product preview (Product Detail Page)
+      const product = await db.productListing.findUnique({
+        where: { id: productId }
+      });
+      if (product) items = [{ product }];
+    } else if (cartItemIds.length > 0) {
+      // Standard Cart calculation
+      items = await db.cartItem.findMany({
+        where: { id: { in: cartItemIds } },
+        include: { product: true }
+      });
     }
+
+    if (items.length === 0) return { success: true, fee: 0 };
+
+    // Group by seller
+    const unserviceableIds = [];
+    const sellerMap = new Map();
+    for (const it of items) {
+      const sellerId = it.product.farmerId || it.product.agentId;
+      if (!sellerId) continue;
+      if (!sellerMap.has(sellerId)) {
+        sellerMap.set(sellerId, {
+          id: sellerId,
+          type: it.product.farmerId ? 'farmer' : 'agent'
+        });
+      }
+    }
+
+    const user = await currentUser();
+    const approvedRequests = user ? await db.specialDeliveryRequest.findMany({
+      where: {
+        userId: user.id,
+        status: 'APPROVED',
+        productId: productId ? productId : { in: items.map(it => it.product.id) }
+      },
+      orderBy: { updatedAt: 'desc' }
+    }) : [];
+
+    let totalFee = 0;
+    let isLongDistance = false;
+    const { getOSRMDistance } = await import('@/lib/utils');
+    const { getAvailableDeliveryBoys } = await import('./delivery-job');
+
+    for (const seller of sellerMap.values()) {
+      const sellerItems = items.filter(it => (it.product.farmerId || it.product.agentId) === seller.id);
+
+      // Check if ANY item from this seller has an approved special delivery request
+      const sellerApprovedReq = approvedRequests.find(r => sellerItems.some(it => it.product.id === r.productId));
+
+      if (sellerApprovedReq && sellerApprovedReq.negotiatedFee !== null) {
+        console.log(`[Logistics] Using Negotiated Fee for Seller ${seller.id}: ₹${sellerApprovedReq.negotiatedFee}`);
+        totalFee += sellerApprovedReq.negotiatedFee;
+        continue; // Skip standard calculation for this seller
+      }
+
+      let profile;
+      if (seller.type === 'farmer') {
+        profile = await db.farmerProfile.findUnique({ where: { id: seller.id } });
+      } else {
+        profile = await db.agentProfile.findUnique({ where: { id: seller.id } });
+      }
+
+      if (profile?.lat && profile?.lng) {
+        const dist = await getOSRMDistance(profile.lat, profile.lng, targetLat, targetLng);
+        console.log(`[Logistics] Seller ${seller.id} Dist: ${dist}km, Buyer: ${targetLat},${targetLng}`);
+
+        // --- SERVICEABILITY CHECK (Per-Product Override) ---
+        let isSellerOutOfRange = false;
+
+        for (const it of sellerItems) {
+          const productRange = it.product.maxDeliveryRange;
+          const profileRange = profile.maxDeliveryRange;
+          const effectiveMaxRange = Number(productRange ?? profileRange ?? 100);
+
+          if (dist > effectiveMaxRange) {
+            console.warn(`[Logistics] Out of Range: Dist ${dist}km > Max ${effectiveMaxRange}km (Product: ${productRange}, Profile: ${profileRange})`);
+            isSellerOutOfRange = true;
+            break;
+          }
+        }
+
+        if (isSellerOutOfRange) {
+          // Use it.id if it's a CartItem, otherwise use it.product.id for single product preview
+          unserviceableIds.push(...sellerItems.map(it => it.id || it.product.id));
+          isLongDistance = true; // Mark as problematic
+        } else {
+          // If distance is beyond 100km, we will FLAG it to hide the price in UI
+          if (dist > 100) isLongDistance = true;
+
+          // Real-time market scan for partners within 100km of the seller
+          const partnersRes = await getAvailableDeliveryBoys(profile.lat, profile.lng);
+          let marketRate = profile.deliveryPricePerKm || 10;
+
+          if (partnersRes.success && partnersRes.data.length > 0) {
+            // Filter: Online partners within 100km
+            const localPartners = partnersRes.data.filter(p => p.isOnline && p.distance <= 100);
+
+            if (localPartners.length > 0) {
+              // Use the rate of the NEAREST available partner
+              const nearestPartner = localPartners[0]; // Already sorted by distance in getAvailableDeliveryBoys
+              const nearestPartnerRate = nearestPartner.pricePerKm;
+
+              // Charge the buyer the HIGHER of seller's rate or the NEAREST partner's rate
+              marketRate = Math.max(marketRate, nearestPartnerRate);
+            }
+          }
+
+          totalFee += Math.round(dist * marketRate);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      fee: totalFee,
+      isLongDistance,
+      isOutOfRange: unserviceableIds.length > 0,
+      unserviceableIds
+    };
+  } catch (err) {
+    console.error("Calculate Fee Error:", err);
+    return { success: false, error: err.message };
+  }
 }
