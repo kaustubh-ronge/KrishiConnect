@@ -101,6 +101,14 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     const [isInquiryOpen, setIsInquiryOpen] = useState(false);
     const [inquiryProduct, setInquiryProduct] = useState(null);
     const [selectedPendingOrder, setSelectedPendingOrder] = useState(null);
+    const [initialGraceLoading, setInitialGraceLoading] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setInitialGraceLoading(false);
+        }, 2500);
+        return () => clearTimeout(timer);
+    }, []);
     const [currentPage, setCurrentPage] = useState(1);
     const [specialRequests, setSpecialRequests] = useState(initialSpecialRequests);
     const ordersPerPage = 3;
@@ -307,8 +315,35 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
         }
     };
 
-    // Prevent hydration errors by not rendering until mounted
-    if (!isMounted) return <div className="min-h-screen bg-gray-50/50" />;
+    // Prevent hydration errors and "flash" of enabled items
+    if (!isMounted || initialGraceLoading) {
+        return (
+            <div className="min-h-screen bg-slate-50/50 flex flex-col items-center justify-center p-6 text-center">
+                <div className="relative mb-8">
+                    <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        className="w-24 h-24 rounded-[2.5rem] border-4 border-emerald-100 border-t-emerald-600 shadow-2xl"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center text-emerald-600">
+                        <ShoppingBag className="h-8 w-8 animate-bounce" />
+                    </div>
+                </div>
+                <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-2">Analyzing Marketplace Logistics</h2>
+                <p className="text-slate-500 font-bold max-w-xs leading-relaxed">Please wait while we verify delivery ranges for all items in your cart...</p>
+                <div className="mt-8 flex gap-2">
+                    {[1, 2, 3].map(i => (
+                        <motion.div
+                            key={i}
+                            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 1, 0.3] }}
+                            transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                            className="w-2 h-2 rounded-full bg-emerald-500"
+                        />
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
     // --- Handlers ---
     const handleRemove = async (itemId) => {
@@ -421,34 +456,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
         }
 
         if (isOutOfRange) {
-            // SPECIAL DELIVERY REQUEST FLOW (NO ORDER CREATED YET)
-            setIsPending(true);
-            try {
-                // For now, we process only one out-of-range item at a time for simplicity, 
-                // or all selected ones that are unserviceable.
-                const itemsToRequest = selectedActiveItems.filter(it => unserviceableIds.includes(it.productId));
-
-                if (itemsToRequest.length === 0) {
-                    toast.error("No unserviceable items found in selection.");
-                    return;
-                }
-
-                let successCount = 0;
-                for (const item of itemsToRequest) {
-                    const sellerId = item.product.farmerId || item.product.agentId;
-                    const res = await createSpecialDeliveryRequest(item.productId, item.quantity, sellerId);
-                    if (res.success) successCount++;
-                }
-
-                if (successCount > 0) {
-                    toast.success(`${successCount} Special Delivery requests sent! Check back after admin approval.`);
-                    fetchPending();
-                }
-            } catch (err) {
-                toast.error("Failed to send requests.");
-            } finally {
-                setIsPending(false);
-            }
+            toast.error("Please deselect out-of-range items to proceed.");
             return;
         }
 
@@ -1202,7 +1210,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                         <h5 className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Special Delivery Mode</h5>
                                                     </div>
                                                     <p className="text-[10px] text-amber-600 font-bold leading-relaxed">
-                                                        Some items are out of standard delivery range. Clicking the button below will send an approval request to our logistics team. **No payment is required now.**
+                                                        Some items are out of standard delivery range. Please deselect them to proceed with the rest of your order.
                                                     </p>
                                                 </div>
                                             )}
@@ -1250,9 +1258,9 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                             <motion.p
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
-                                                className="text-center text-[10px] font-black text-amber-600 uppercase tracking-widest px-8 leading-relaxed"
+                                                className="text-center text-[11px] font-black text-amber-600 uppercase tracking-widest px-8 leading-relaxed"
                                             >
-                                                You have selected items that are out of range. Please deselect them or wait for admin approval to proceed.
+                                                Please deselect the out of range orders to initiate checkout
                                             </motion.p>
                                         )}
                                     </CardFooter>
