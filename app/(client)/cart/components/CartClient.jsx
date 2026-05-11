@@ -216,7 +216,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
 
     // Items that are out of range but NOT approved
     const unserviceableWaitlist = cartItems.filter(it =>
-        unserviceableIds.includes(it.productId) &&
+        unserviceableIds.includes(it.id) &&
         !specialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED')
     );
 
@@ -224,7 +224,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     // We only care about selected items that are unserviceable AND not approved
     const selectedUnserviceableItems = cartItems.filter(it =>
         selectedItemIds.includes(it.id) &&
-        unserviceableIds.includes(it.productId) &&
+        unserviceableIds.includes(it.id) &&
         !specialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED')
     );
 
@@ -301,7 +301,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     const toggleSelectAll = () => {
         const selectableItems = cartItems.filter(it => {
             const isRejected = specialRequests.some(r => r.productId === it.product.id && r.status === 'REJECTED');
-            const isUnserviceable = unserviceableIds.includes(it.productId);
+            const isUnserviceable = unserviceableIds.includes(it.id);
             const isApproved = specialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED');
 
             // Allow selecting if NOT rejected (unserviceable items can be selected for mediation requests)
