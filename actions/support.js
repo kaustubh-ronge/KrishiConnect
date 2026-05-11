@@ -40,6 +40,7 @@ export async function sendSupportMessage(message, type = "GENERAL") {
       }
     });
 
+    revalidatePath("/admin-dashboard");
     return apiResponse.success(supportMsg, "Message sent to support. We will get back to you soon.");
   } catch (error) {
     return apiResponse.error(error.message);

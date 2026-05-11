@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { sendSupportMessage } from "@/actions/support";
 
-export default function InquiryModal({ isOpen, onClose, product }) {
+export default function InquiryModal({ isOpen, onClose, product, onSuccess }) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [message, setMessage] = useState("");
@@ -53,6 +53,7 @@ export default function InquiryModal({ isOpen, onClose, product }) {
           setName("");
           setQuantity("");
           setMessage("");
+          if (onSuccess) onSuccess();
           onClose();
        } else {
           toast.error(res.error || "Failed to send request.");

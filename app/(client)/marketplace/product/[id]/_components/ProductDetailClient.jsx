@@ -41,6 +41,7 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
   const [isLongDistance, setIsLongDistance] = useState(false);
   const [isOutOfRange, setIsOutOfRange] = useState(false);
   const [isBypassed, setIsBypassed] = useState(false);
+  const [hasRequested, setHasRequested] = useState(false);
 
   // Track product view & Fetch dynamic fee
   useEffect(() => {
@@ -49,13 +50,28 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
 
     const fetchFee = async (targetLat, targetLng) => {
       const { calculateDynamicDeliveryFee } = await import("@/actions/orders");
+      const { getUserSpecialDeliveryRequests } = await import("@/actions/special-delivery");
+      
       setIsFeeLoading(true);
       const res = await calculateDynamicDeliveryFee([], targetLat, targetLng, product.id);
       if (res.success) {
-        console.log(`[ProductDetail] Serviceability Check:`, res);
         setDynamicFee(res.fee);
         setIsLongDistance(res.isLongDistance);
         setIsOutOfRange(res.isOutOfRange);
+      }
+
+      // Check for approved/pending requests
+      const reqRes = await getUserSpecialDeliveryRequests();
+      if (reqRes.success) {
+        const approved = reqRes.data.find(r => r.productId === product.id && r.status === 'APPROVED');
+        if (approved) {
+           setIsBypassed(true);
+           setDynamicFee(approved.negotiatedFee);
+        }
+        const pending = reqRes.data.find(r => r.productId === product.id && r.status === 'PENDING');
+        if (pending) {
+           setHasRequested(true);
+        }
       }
       setIsFeeLoading(false);
     };
@@ -85,6 +101,23 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
   const themeLightText = isFarmer ? "text-emerald-700" : "text-blue-700";
   const themeBorder = isFarmer ? "border-emerald-200" : "border-blue-200";
 
+  const handleRequestSpecialDelivery = async () => {
+    const { createSpecialDeliveryRequest } = await import("@/actions/special-delivery");
+    setIsAdding(true);
+    const sellerId = product.farmerId || product.agentId;
+    const res = await createSpecialDeliveryRequest(product.id, parseFloat(qty), sellerId);
+    setIsAdding(false);
+    
+    if (res.success) {
+      toast.info("Request Initiated", {
+        description: "Now please send a support message to confirm your delivery details and enable Add to Cart."
+      });
+      setShowInquiry(true);
+    } else {
+      toast.error(res.error || "Failed to send request.");
+    }
+  };
+
   // Handle Add to Cart
   const handleAddToCart = async () => {
     if (qty > product.availableStock) {
@@ -98,14 +131,15 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
       return;
     }
 
-    if (isOutOfRange && !isBypassed) {
-      toast.error("Delivery Unavailable", {
-        description: "This seller is out of range. Please request special delivery first.",
+    if (isOutOfRange && !isBypassed && !hasRequested) {
+      toast.error("Special Delivery Required", {
+        description: "Please click 'Request Special Delivery Approval' first to enable purchasing.",
         icon: <Truck className="h-5 w-5 text-rose-500" />
       });
       return;
     }
 
+    // Standard Add to Cart Flow (allows out-of-range, handled in cart)
     setIsAdding(true);
     const success = await addItem(product.id, parseFloat(qty));
     setIsAdding(false);
@@ -497,42 +531,61 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
 
                   {/* Action Buttons */}
                   <div className="space-y-3 pt-2">
-                    {isOutOfRange && (
+                    {isOutOfRange && !isBypassed && !hasRequested && (
                       <div className="p-5 bg-amber-50 border border-amber-200 rounded-3xl space-y-3 animate-in fade-in slide-in-from-top-4 duration-500 shadow-sm">
                         <div className="flex items-start gap-3">
                           <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                           <div>
-                            <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Limited Delivery Range</p>
-                            <p className="text-[10px] text-amber-600 font-bold leading-relaxed mt-1">This seller is outside our standard 50KM radius. However, special delivery can be negotiated through our admin team.</p>
+                            <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Extended Delivery</p>
+                            <p className="text-[10px] text-amber-600 font-bold leading-relaxed mt-1">This seller is outside our standard radius. <strong>Send a support message</strong> to confirm logistics and enable the "Add to Cart" button.</p>
                           </div>
                         </div>
-                        {!isBypassed ? (
-                          <Button
-                            variant="secondary"
-                            className="w-full h-10 rounded-xl bg-amber-600 text-white hover:bg-amber-700 font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-amber-600/20"
-                            onClick={() => setShowInquiry(true)}
-                          >
-                            <MessageCircle className="h-4 w-4 mr-2" /> Request Special Delivery
-                          </Button>
-                        ) : (
-                          <div className="flex items-center gap-2 py-1 px-3 bg-white/50 rounded-xl border border-amber-200/50">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="text-[9px] font-black text-emerald-700 uppercase">Special Request Acknowledged</span>
-                            <Button variant="link" className="text-[9px] h-auto p-0 font-black text-rose-500 ml-auto" onClick={() => setIsBypassed(false)}>Undo</Button>
+                        <Button
+                          variant="secondary"
+                          disabled={isAdding}
+                          className="w-full h-10 rounded-xl bg-amber-600 text-white hover:bg-amber-700 font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-amber-600/20"
+                          onClick={handleRequestSpecialDelivery}
+                        >
+                          <Truck className="h-4 w-4 mr-2" /> Request Special Delivery Approval
+                        </Button>
+                      </div>
+                    )}
+                    {hasRequested && !isBypassed && (
+                      <div className="p-5 bg-indigo-50 border border-indigo-200 rounded-3xl space-y-3 shadow-sm">
+                        <div className="flex items-start gap-3">
+                          <div className="w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center animate-pulse">
+                             <Clock className="h-3 w-3 text-white" />
                           </div>
-                        )}
+                          <div>
+                            <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">Request Pending</p>
+                            <p className="text-[10px] text-indigo-600 font-bold leading-relaxed mt-1">Your request is sent. You can now add this to your cart while the admin reviews the logistics cost.</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {isBypassed && (
+                      <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-3xl space-y-3 shadow-sm">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Logistics Approved</p>
+                            <p className="text-[10px] text-emerald-600 font-bold leading-relaxed mt-1">Special delivery has been approved at a negotiated fee of ₹{dynamicFee}.</p>
+                          </div>
+                        </div>
                       </div>
                     )}
                     {!isAdmin && (
                       <Button
                         onClick={handleAddToCart}
-                        disabled={product.availableStock <= 0 || isAdding}
-                        className={`w-full h-14 text-lg font-black shadow-2xl transition-all duration-500 rounded-2xl ${product.availableStock > 0
-                          ? (isOutOfRange && !isBypassed)
-                            ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-50"
-                            : `bg-gradient-to-r ${themeGradient} hover:shadow-${themeColor}-500/50 text-white hover:scale-[1.02]`
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
+                        disabled={product.availableStock <= 0 || isAdding || isFeeLoading}
+                         className={`w-full h-14 text-lg font-black shadow-2xl transition-all duration-500 rounded-2xl ${product.availableStock > 0
+                             ? (isOutOfRange && !isBypassed && !hasRequested)
+                               ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-50"
+                               : (isAdding || isFeeLoading)
+                                 ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                                 : `bg-gradient-to-r ${themeGradient} hover:shadow-${themeColor}-500/50 text-white hover:scale-[1.02]`
+                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                           }`}
                       >
                         {isAdding ? (
                           <motion.div
@@ -543,11 +596,16 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
                             <RotateCcw className="h-5 w-5" />
                             Adding to Cart...
                           </motion.div>
+                        ) : isFeeLoading ? (
+                           <div className="flex items-center gap-2">
+                             <Loader2 className="h-6 w-6 animate-spin" />
+                             Calculating Logistics...
+                           </div>
                         ) : (
                           <span className="flex items-center gap-2">
                             <ShoppingCart className="h-6 w-6" />
-                            {product.availableStock > 0
-                              ? (isOutOfRange && !isBypassed) ? "Delivery Unavailable" : "Add to Cart"
+                            {product.availableStock > 0 
+                              ? (isOutOfRange && !isBypassed && !hasRequested) ? "Awaiting Request" : "Add to Cart" 
                               : "Out of Stock"}
                             <ChevronRight className="h-5 w-5 ml-auto" />
                           </span>
@@ -605,15 +663,12 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
 
       <InquiryModal
         isOpen={showInquiry}
-        onClose={() => {
-          setShowInquiry(false);
-          if (isOutOfRange) {
-            setIsBypassed(true);
-            toast.success("Logistics request initiated. You can now add the product to your cart while we coordinate.", {
-              duration: 8000,
-              icon: <Truck className="h-5 w-5 text-emerald-600" />
-            });
-          }
+        onClose={() => setShowInquiry(false)}
+        onSuccess={() => {
+          setHasRequested(true);
+          toast.success("Message Sent!", {
+            description: "Purchasing enabled. You can now add this item to your cart."
+          });
         }}
         product={product}
       />

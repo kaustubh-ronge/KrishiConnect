@@ -57,6 +57,8 @@ model User {
   // Recently viewed products (stored as IDs)
   recentlyViewedProducts String[] @default([])
 
+  specialDeliveryRequests SpecialDeliveryRequest[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -213,6 +215,8 @@ model ProductListing {
   averageRating Float?   @default(0)
   totalReviews  Int      @default(0)
 
+  specialDeliveryRequests SpecialDeliveryRequest[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -325,10 +329,6 @@ model Order {
   disputeReason     String?
   disputeCreatedAt  DateTime?
   disputeResolvedAt DateTime?
-
-  // Mediation & Special Delivery (New)
-  isSpecialDelivery   Boolean @default(false)
-  adminApprovalStatus String  @default("NONE") // NONE, PENDING, APPROVED, REJECTED
 
   items         OrderItem[]
   tracking      OrderTracking[]
@@ -560,4 +560,29 @@ model SupportMessage {
   createdAt DateTime @default(now())
 
   @@map("support_messages")
+}
+
+model SpecialDeliveryRequest {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  productId     String
+  product       ProductListing @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  quantity      Float
+  sellerId      String   
+  
+  negotiatedFee Float?   
+  
+  status        String   @default("PENDING") 
+  adminNotes    String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([productId])
+  @@index([status])
+  @@map("special_delivery_requests")
 }

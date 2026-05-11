@@ -279,7 +279,6 @@ export async function initiateCheckout(params) {
     }
 
     let deliveryTotal = 0;
-    let isSpecialDelivery = false;
     const { getOSRMDistance } = await import('@/lib/utils');
     const { getAvailableDeliveryBoys } = await import('./delivery-job');
 
@@ -294,16 +293,6 @@ export async function initiateCheckout(params) {
       if (sellerProfile && sellerProfile.lat && sellerProfile.lng && addressData.lat && addressData.lng) {
         const dist = await getOSRMDistance(sellerProfile.lat, sellerProfile.lng, addressData.lat, addressData.lng);
         console.log(`[Checkout] Dist to seller ${seller.id}: ${dist}km`);
-        
-        // --- SERVICEABILITY CHECK (Per-Product Override) ---
-        for (const it of seller.items) {
-          const effectiveMaxRange = it.product.maxDeliveryRange || sellerProfile.maxDeliveryRange || 100;
-          if (dist > effectiveMaxRange) {
-             console.warn(`[Checkout] Out of Range: Dist ${dist} > Max ${effectiveMaxRange} for ${it.product.productName}`);
-             isSpecialDelivery = true;
-             break;
-          }
-        }
         
         // Real-time market scan for partners within 100km of the seller
         const partnersRes = await getAvailableDeliveryBoys(sellerProfile.lat, sellerProfile.lng);
@@ -412,8 +401,6 @@ export async function initiateCheckout(params) {
           buyerPhone: addressData.phone,
           buyerName: addressData.name,
           expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-          isSpecialDelivery: isSpecialDelivery,
-          adminApprovalStatus: isSpecialDelivery ? "PENDING" : "NONE",
           ...(invNum && { invoiceNumber: invNum }),
         }
       });
@@ -509,20 +496,6 @@ export async function initiateCheckout(params) {
 
     if (!razorpayKey || !razorpaySecret) {
       return { success: false, error: "Razorpay keys not configured" };
-    }
-
-    // Handle Special Delivery Flow
-    if (isSpecialDelivery || created.isSpecialDelivery) {
-        // We no longer delete the cart items here, as per user requirement to keep them in the cart tab.
-        return {
-            success: true,
-            data: {
-                id: created.id,
-                orderId: created.id,
-                isSpecialDelivery: true,
-                adminApprovalStatus: created.adminApprovalStatus || "PENDING"
-            }
-        };
     }
 
     // Check if we already have a razorpayOrderId for this order
@@ -750,12 +723,33 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
             }
         }
 
+        const user = await currentUser();
+        const approvedRequests = user ? await db.specialDeliveryRequest.findMany({
+            where: { 
+                userId: user.id, 
+                status: 'APPROVED',
+                productId: productId ? productId : { in: items.map(it => it.product.id) }
+            },
+            orderBy: { updatedAt: 'desc' }
+        }) : [];
+
         let totalFee = 0;
         let isLongDistance = false;
         const { getOSRMDistance } = await import('@/lib/utils');
         const { getAvailableDeliveryBoys } = await import('./delivery-job');
 
         for (const seller of sellerMap.values()) {
+            const sellerItems = items.filter(it => (it.product.farmerId || it.product.agentId) === seller.id);
+            
+            // Check if ANY item from this seller has an approved special delivery request
+            const sellerApprovedReq = approvedRequests.find(r => sellerItems.some(it => it.product.id === r.productId));
+
+            if (sellerApprovedReq && sellerApprovedReq.negotiatedFee !== null) {
+                console.log(`[Logistics] Using Negotiated Fee for Seller ${seller.id}: ₹${sellerApprovedReq.negotiatedFee}`);
+                totalFee += sellerApprovedReq.negotiatedFee;
+                continue; // Skip standard calculation for this seller
+            }
+
             let profile;
             if (seller.type === 'farmer') {
                 profile = await db.farmerProfile.findUnique({ where: { id: seller.id } });
@@ -768,7 +762,6 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
                 console.log(`[Logistics] Seller ${seller.id} Dist: ${dist}km, Buyer: ${targetLat},${targetLng}`);
                 
                 // --- SERVICEABILITY CHECK (Per-Product Override) ---
-                const sellerItems = items.filter(it => (it.product.farmerId || it.product.agentId) === seller.id);
                 let isSellerOutOfRange = false;
 
                 for (const it of sellerItems) {
@@ -823,39 +816,6 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
         };
     } catch (err) {
         console.error("Calculate Fee Error:", err);
-        return { success: false, error: err.message };
-    }
-}
-export async function updateOrderApprovalStatus(orderId, status, finalDeliveryFee = null) {
-    try {
-        const user = await currentUser();
-        if (!user) throw new Error('Unauthorized');
-
-        const order = await db.order.findUnique({
-            where: { id: orderId }
-        });
-        if (!order) throw new Error('Order not found');
-
-        const updateData = { adminApprovalStatus: status };
-
-        if (status === 'APPROVED' && finalDeliveryFee !== null) {
-            updateData.deliveryFee = finalDeliveryFee;
-            updateData.totalAmount = (order.totalAmount - order.deliveryFee) + finalDeliveryFee;
-            updateData.sellerAmount = (order.sellerAmount - order.deliveryFee) + finalDeliveryFee;
-        }
-
-        const updated = await db.order.update({
-            where: { id: orderId },
-            data: updateData
-        });
-
-        revalidatePath('/admin-dashboard');
-        revalidatePath('/cart');
-        revalidatePath('/my-orders');
-
-        return { success: true, data: JSON.parse(JSON.stringify(updated)) };
-    } catch (err) {
-        console.error('Update Order Approval Error:', err);
         return { success: false, error: err.message };
     }
 }

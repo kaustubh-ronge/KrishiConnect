@@ -69,15 +69,16 @@ export async function getAvailableDeliveryBoys(lat = null, lng = null, orderId =
         const activeJobs = boy.jobs.filter(j => j.orderId !== orderId);
 
         if (activeJobs.length > 0) {
-          // If they are already in transit, they will be free soon
           if (activeJobs.some(j => j.status === "IN_TRANSIT")) {
             availability = "AVAILABLE_SOON";
           } else {
-            // If they just accepted or are picking up, they will take longer
             availability = "AVAILABLE_LATER";
           }
         }
       }
+
+      // Check if pickup is within service radius (if radius is set)
+      const isWithinRadius = !boy.radius || distToPickup <= boy.radius;
 
       return {
         ...boy,
@@ -86,10 +87,15 @@ export async function getAvailableDeliveryBoys(lat = null, lng = null, orderId =
         deliveryDistance: parseFloat(distSellerToBuyer.toFixed(2)),
         boyToBuyerDistance: parseFloat(distBoyToBuyer.toFixed(2)),
         availability,
+        isWithinRadius,
         hiringStatus: myRequestForThisOrder ? myRequestForThisOrder.status : null,
         hiringJobId: myRequestForThisOrder ? myRequestForThisOrder.id : null,
         jobs: undefined // Clean up
       };
+    }).filter(boy => {
+        // Keep them if they are within radius, OR if they already have an active request/hiring status
+        // (to avoid them disappearing if they were already hired)
+        return boy.isWithinRadius || (boy.hiringStatus && boy.hiringStatus !== 'REJECTED' && boy.hiringStatus !== 'CANCELLED');
     });
 
     // Sort: 

@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { MapPin, Navigation } from "lucide-react";
+import { MapPin, Navigation, Search, Loader2 } from "lucide-react";
 
 // Leaflet must be imported client-side only (no SSR)
 const MapComponent = dynamic(() => import("./LeafletMap"), { ssr: false });
@@ -26,6 +26,7 @@ export default function LocationPicker({ value = {}, onChange }) {
   const [lat, setLat] = useState(value.lat || 20.5937);
   const [lng, setLng] = useState(value.lng || 78.9629);
   const [address, setAddress] = useState(value.address || "");
+  const [isGeocoding, setIsGeocoding] = useState(false);
 
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -103,6 +104,29 @@ export default function LocationPicker({ value = {}, onChange }) {
     notify({ address: e.target.value });
   };
 
+  const handleFindAddress = async () => {
+    if (!address && !city) return;
+    
+    setIsGeocoding(true);
+    const query = `${address}, ${city}, ${stateCode}, ${country}`;
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        const newLat = parseFloat(data[0].lat);
+        const newLng = parseFloat(data[0].lon);
+        setLat(newLat);
+        setLng(newLng);
+        notify({ lat: newLat, lng: newLng });
+      }
+    } catch (err) {
+      console.error("[Geocoding] Failed:", err);
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
   // Try to use browser geolocation to centre the map
   const handleGeolocate = () => {
     if (!navigator.geolocation) return;
@@ -114,7 +138,7 @@ export default function LocationPicker({ value = {}, onChange }) {
         setLng(newLng);
         notify({ lat: newLat, lng: newLng });
       },
-      () => {}
+      () => { }
     );
   };
 
@@ -191,12 +215,30 @@ export default function LocationPicker({ value = {}, onChange }) {
           <Label className="text-sm font-semibold text-gray-700">
             Full Address <span className="text-red-500">*</span>
           </Label>
-          <Input
-            value={address}
-            onChange={handleAddressChange}
-            placeholder="House/Plot, Street, Village, Taluka..."
-            className="h-12 bg-gray-50 border-2 border-gray-200 hover:border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 rounded-xl transition-all"
-          />
+          <div className="flex gap-2">
+            <Input
+              value={address}
+              onChange={handleAddressChange}
+              placeholder="House/Plot, Street, Village, Taluka..."
+              className="h-12 bg-gray-50 border-2 border-gray-200 hover:border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 rounded-xl transition-all"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleFindAddress}
+              disabled={isGeocoding}
+              className="h-12 px-4 border-red-200 text-red-600 hover:bg-red-50 rounded-xl"
+              title="Find precise coordinates from address"
+            >
+              {isGeocoding ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4 mr-1" />
+              )}
+              {isGeocoding ? "Finding..." : "Find"}
+            </Button>
+          </div>
         </div>
       </div>
 

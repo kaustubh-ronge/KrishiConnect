@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/useCartStore";
 import { initiateCheckout, confirmOrderPayment, getUserPendingOrders, cancelPendingOrder, calculateDynamicDeliveryFee } from '@/actions/orders';
+import { createSpecialDeliveryRequest, getUserSpecialDeliveryRequests } from '@/actions/special-delivery';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -65,6 +66,7 @@ export default function CartClient({ initialCart, user }) {
     const [inquiryProduct, setInquiryProduct] = useState(null);
     const [selectedPendingOrder, setSelectedPendingOrder] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [specialRequests, setSpecialRequests] = useState([]);
     const ordersPerPage = 3;
 
 
@@ -84,6 +86,10 @@ export default function CartClient({ initialCart, user }) {
         const res = await getUserPendingOrders();
         if (res.success) {
             setPendingOrders(res.data);
+        }
+        const reqRes = await getUserSpecialDeliveryRequests();
+        if (reqRes.success) {
+            setSpecialRequests(reqRes.data);
         }
     };
 
@@ -138,7 +144,8 @@ export default function CartClient({ initialCart, user }) {
                 if (res.success) {
                     setDynamicDeliveryFee(res.fee || 0);
                     setIsOutOfRange(!!res.isOutOfRange);
-                    setUnserviceableIds(res.unserviceableIds || []);
+                    const unserviceable = res.unserviceableIds || [];
+                    setUnserviceableIds(unserviceable);
                 }
                 setIsCalculatingFee(false);
             }
@@ -170,6 +177,13 @@ export default function CartClient({ initialCart, user }) {
     const toggleSelect = (id) => {
         setSelectedItemIds(prev => {
             const isCurrentlySelected = prev.includes(id);
+            if (!isCurrentlySelected && unserviceableIds.includes(id)) {
+                toast.error("This item is out of delivery range. Please request approval first.", {
+                    icon: <ShieldAlert className="h-4 w-4 text-rose-500" />
+                });
+                return prev;
+            }
+
             let newSelection = isCurrentlySelected 
                 ? prev.filter(prevId => prevId !== id) 
                 : [...prev, id];
@@ -253,6 +267,28 @@ export default function CartClient({ initialCart, user }) {
         });
     };
 
+    const handleRequestForSingleItem = async (item) => {
+        const { createSpecialDeliveryRequest } = await import("@/actions/special-delivery");
+        setIsPending(true);
+        try {
+            const sellerId = item.product.farmerId || item.product.agentId;
+            const res = await createSpecialDeliveryRequest(item.productId, item.quantity, sellerId);
+            if (res.success) {
+                toast.success("Special Delivery request sent for " + item.product.productName);
+                fetchPending();
+                // Open inquiry modal to allow user to provide more details/chat
+                setInquiryProduct(item.product);
+                setIsInquiryOpen(true);
+            } else {
+                toast.error(res.error || "Failed to send request");
+            }
+        } catch (err) {
+            toast.error("Failed to send request.");
+        } finally {
+            setIsPending(false);
+        }
+    };
+
     const openPendingDetails = (order) => {
         setSelectedPendingOrder(order);
         setIsDetailsModalOpen(true);
@@ -309,10 +345,43 @@ export default function CartClient({ initialCart, user }) {
         }
 
         if (!shippingName || !shippingPhone || !shippingAddress) {
-            toast.error("Please fill all shipping details");
+            toast.error("Please fill in all shipping details.");
             return;
         }
 
+        if (isOutOfRange) {
+            // SPECIAL DELIVERY REQUEST FLOW (NO ORDER CREATED YET)
+            setIsPending(true);
+            try {
+                // For now, we process only one out-of-range item at a time for simplicity, 
+                // or all selected ones that are unserviceable.
+                const itemsToRequest = selectedActiveItems.filter(it => unserviceableIds.includes(it.id));
+                
+                if (itemsToRequest.length === 0) {
+                    toast.error("No unserviceable items found in selection.");
+                    return;
+                }
+
+                let successCount = 0;
+                for (const item of itemsToRequest) {
+                    const sellerId = item.product.farmerId || item.product.agentId;
+                    const res = await createSpecialDeliveryRequest(item.productId, item.quantity, sellerId);
+                    if (res.success) successCount++;
+                }
+
+                if (successCount > 0) {
+                    toast.success(`${successCount} Special Delivery requests sent! Check back after admin approval.`);
+                    fetchPending();
+                }
+            } catch (err) {
+                toast.error("Failed to send requests.");
+            } finally {
+                setIsPending(false);
+            }
+            return;
+        }
+
+        // Standard Order Flow
         setIsPending(true);
         const checkoutId = toast.loading(isFresh ? "Creating fresh order..." : "Processing your order...");
 
@@ -710,52 +779,68 @@ export default function CartClient({ initialCart, user }) {
                                             <AnimatePresence mode="popLayout">
                                                 {cartItems.map((item) => {
                                                     const isUnserviceable = unserviceableIds.includes(item.id);
+                                                    const activeRequest = specialRequests.find(r => r.productId === item.productId);
+                                                    
                                                     return (
                                                         <motion.div
                                                             key={item.id}
                                                             initial={{ opacity: 0, y: 10 }}
                                                             animate={{ opacity: 1, y: 0 }}
                                                             exit={{ opacity: 0, scale: 0.95 }}
-                                                            onClick={() => !isUnserviceable && toggleSelect(item.id)}
-                                                            className={`p-6 bg-white border rounded-3xl shadow-sm transition-all duration-300 cursor-pointer relative overflow-hidden ${isUnserviceable ? 'grayscale opacity-60 border-amber-200 bg-amber-50/20' : selectedItemIds.includes(item.id) ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/30 shadow-md scale-[1.02]' : 'border-slate-100 hover:shadow-md opacity-40 grayscale-[0.5] scale-[0.98] border-dashed bg-slate-50/50'}`}
+                                                            onClick={() => toggleSelect(item.id)}
+                                                            className={`p-6 bg-white border rounded-3xl shadow-sm transition-all duration-300 cursor-pointer relative overflow-hidden ${isUnserviceable && (!activeRequest || activeRequest.status !== 'APPROVED') ? 'grayscale opacity-60 border-amber-200 bg-amber-50/20' : selectedItemIds.includes(item.id) ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/30 shadow-md scale-[1.02]' : 'border-slate-100 hover:shadow-md opacity-40 grayscale-[0.5] scale-[0.98] border-dashed bg-slate-50/50'}`}
                                                         >
-                                                            {selectedItemIds.includes(item.id) && !isUnserviceable && (
+                                                            {selectedItemIds.includes(item.id) && (
                                                                 <div className="absolute top-0 right-0 w-12 h-12 flex items-center justify-center">
                                                                     <div className="bg-emerald-500 text-white p-1 rounded-bl-2xl shadow-lg">
                                                                         <CheckCircle2 className="h-4 w-4" />
                                                                     </div>
                                                                 </div>
                                                             )}
-                                                            {isUnserviceable && (
+                                                            
+                                                            {activeRequest && (
+                                                                <div className={`mb-4 p-3 border rounded-xl flex items-center justify-between gap-3 ${activeRequest.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-100' : 'bg-indigo-50 border-indigo-100 animate-pulse'}`}>
+                                                                    <div className="flex items-center gap-3">
+                                                                        {activeRequest.status === 'APPROVED' ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Clock className="h-4 w-4 text-indigo-600" />}
+                                                                        <p className={`text-[10px] font-black uppercase tracking-widest leading-tight ${activeRequest.status === 'APPROVED' ? 'text-emerald-700' : 'text-indigo-700'}`}>
+                                                                            {activeRequest.status === 'APPROVED' ? `Logistics Approved! Negotiated Fee: ₹${activeRequest.negotiatedFee}` : 'Special Delivery Request Pending Admin Approval...'}
+                                                                        </p>
+                                                                    </div>
+                                                                    {activeRequest.status === 'PENDING' && (
+                                                                        <Badge className="bg-indigo-600 text-white border-0 text-[8px] font-black uppercase px-2 py-0.5">AWAITING</Badge>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            {isUnserviceable && !activeRequest && (
                                                                 <div className="mb-4 p-3 bg-amber-100 border border-amber-200 rounded-xl flex items-center justify-between gap-3">
                                                                     <div className="flex items-center gap-3">
                                                                         <ShieldAlert className="h-4 w-4 text-amber-600" />
                                                                         <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest leading-tight">
-                                                                            This product can only be bought after admin approves because it is out of delivery range.
+                                                                            Out of delivery range. 
                                                                         </p>
                                                                     </div>
                                                                     <Button 
                                                                         variant="outline" 
                                                                         size="sm" 
+                                                                        disabled={isPending}
                                                                         onClick={(e) => { 
                                                                             e.stopPropagation(); 
-                                                                            setInquiryProduct(item.product); 
-                                                                            setIsInquiryOpen(true); 
+                                                                            handleRequestForSingleItem(item);
                                                                         }}
-                                                                        className="h-8 rounded-lg bg-amber-200 border-amber-300 text-amber-800 hover:bg-amber-300 font-bold text-[10px] uppercase gap-2 px-3 shrink-0"
+                                                                        className="h-8 rounded-lg bg-amber-600 border-amber-600 text-white hover:bg-amber-700 font-bold text-[10px] uppercase gap-2 px-3 shrink-0"
                                                                     >
-                                                                        <MessageCircle className="h-3.5 w-3.5" /> Chat with Admin
+                                                                        <Truck className="h-3.5 w-3.5" /> Request Approval
                                                                     </Button>
                                                                 </div>
                                                             )}
                                                             <div className="flex items-center gap-6">
-                                                                <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                        <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                                                     <input
                                                                         type="checkbox"
-                                                                        disabled={isUnserviceable}
-                                                                        checked={selectedItemIds.includes(item.id) && !isUnserviceable}
+                                                                        checked={selectedItemIds.includes(item.id)}
                                                                         onChange={() => toggleSelect(item.id)}
-                                                                        className={`w-6 h-6 rounded-lg accent-emerald-600 ${isUnserviceable ? 'opacity-40' : 'cursor-pointer'}`}
+                                                                        className={`w-6 h-6 rounded-lg accent-emerald-600 cursor-pointer`}
                                                                     />
                                                                 </div>
 
@@ -963,6 +1048,18 @@ export default function CartClient({ initialCart, user }) {
                                                 <span className="text-slate-900 font-black">₹{platformFee.toLocaleString()}</span>
                                             </div>
 
+                                            {isOutOfRange && (
+                                                <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-[1.5rem] space-y-2 animate-pulse shadow-sm">
+                                                    <div className="flex items-center gap-3">
+                                                        <ShieldAlert className="h-5 w-5 text-amber-600" />
+                                                        <h5 className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Special Delivery Mode</h5>
+                                                    </div>
+                                                    <p className="text-[10px] text-amber-600 font-bold leading-relaxed">
+                                                        Some items are out of standard delivery range. Clicking the button below will send an approval request to our logistics team. **No payment is required now.**
+                                                    </p>
+                                                </div>
+                                            )}
+
                                             <div className="pt-6 border-t-2 border-dashed border-slate-100">
                                                 <div className="flex justify-between items-center">
                                                     <div>
@@ -986,12 +1083,22 @@ export default function CartClient({ initialCart, user }) {
                                         >
                                             {isPending ? (
                                                 <span className="flex items-center justify-center gap-3 relative z-10 text-white">
-                                                    <Loader2 className="h-6 w-6 animate-spin" />
-                                                    Processing...
+                                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                                    {isOutOfRange ? "Sending Request..." : "Processing..."}
                                                 </span>
                                             ) : (
                                                 <span className="flex items-center justify-center gap-3 relative z-10 text-white">
-                                                    {paymentMethod === 'COD' ? 'Confirm Order' : 'Initialize Payment'}
+                                                    {isOutOfRange ? (
+                                                        <>
+                                                            <ShieldAlert className="h-6 w-6 group-hover:scale-110 transition-transform" />
+                                                            Request Special Delivery Approval
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            {paymentMethod === 'ONLINE' ? <CreditCard className="h-6 w-6 group-hover:rotate-12 transition-transform" /> : <ShieldCheck className="h-6 w-6" />}
+                                                            {paymentMethod === 'ONLINE' ? 'Initialize Secure Payment' : 'Confirm Order (COD)'}
+                                                        </>
+                                                    )}
                                                     <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform" />
                                                 </span>
                                             )}
