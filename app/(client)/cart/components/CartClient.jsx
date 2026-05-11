@@ -79,7 +79,15 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     const { cartItems: storeCartItems, removeItem, updateQuantity, fetchCart } = useCartStore();
     const [isMounted, setIsMounted] = useState(false);
     const [isPending, setIsPending] = useState(false);
-    const [selectedItemIds, setSelectedItemIds] = useState((initialCart?.items || []).map(it => it.id));
+    const [selectedItemIds, setSelectedItemIds] = useState(
+        (initialCart?.items || [])
+            .filter(it => {
+                const isUnserviceable = initialUnserviceableIds.includes(it.id);
+                const isApproved = initialSpecialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED');
+                return !(isUnserviceable && !isApproved);
+            })
+            .map(it => it.id)
+    );
 
     useEffect(() => {
         // Sync server-side cart data to store on mount
@@ -206,6 +214,19 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
         updateUnserviceableList();
     }, [cartItems.length, lat, lng]);
 
+    // 2.1 Auto-deselect unserviceable items that are not approved
+    useEffect(() => {
+        if (unserviceableIds.length > 0) {
+            setSelectedItemIds(prev => prev.filter(id => {
+                const item = cartItems.find(it => it.id === id);
+                if (!item) return true;
+                const isUnserviceable = unserviceableIds.includes(item.id);
+                const isApproved = specialRequests.some(r => r.productId === item.product.id && r.status === 'APPROVED');
+                return !(isUnserviceable && !isApproved);
+            }));
+        }
+    }, [unserviceableIds, specialRequests]);
+
     // Derived state: Categorize items for UI
     const rejectedItems = cartItems.filter(it =>
         specialRequests.some(r => r.productId === it.product.id && r.status === 'REJECTED')
@@ -272,6 +293,14 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                     });
                     return prev;
                 }
+
+                const isUnserviceable = unserviceableIds.includes(id);
+                if (isUnserviceable && !isApproved) {
+                    toast.error("This item is out of range. Request mediation or deselect it.", {
+                        icon: <ShieldAlert className="h-4 w-4 text-amber-500" />
+                    });
+                    return prev;
+                }
             }
 
             let newSelection = isCurrentlySelected
@@ -304,8 +333,8 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
             const isUnserviceable = unserviceableIds.includes(it.id);
             const isApproved = specialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED');
 
-            // Allow selecting if NOT rejected (unserviceable items can be selected for mediation requests)
-            return !isRejected;
+            // Allow selecting if NOT rejected AND NOT unserviceable (unless approved)
+            return !isRejected && !(isUnserviceable && !isApproved);
         });
 
         if (selectedItemIds.length === selectableItems.length) {
