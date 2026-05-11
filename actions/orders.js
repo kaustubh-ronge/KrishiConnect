@@ -281,6 +281,11 @@ export async function initiateCheckout(params) {
     let deliveryTotal = 0;
     const { getOSRMDistance } = await import('@/lib/utils');
     const { getAvailableDeliveryBoys } = await import('./delivery-job');
+    const { getUserSpecialDeliveryRequests } = await import('./special-delivery');
+
+    // Fetch approved requests for this user once
+    const { data: allRequests } = await getUserSpecialDeliveryRequests();
+    const approvedRequests = allRequests?.filter(r => r.status === 'APPROVED') || [];
 
     for (const seller of sellerMap.values()) {
       let sellerProfile;
@@ -292,16 +297,40 @@ export async function initiateCheckout(params) {
 
       if (sellerProfile && sellerProfile.lat && sellerProfile.lng && addressData.lat && addressData.lng) {
         const dist = await getOSRMDistance(sellerProfile.lat, sellerProfile.lng, addressData.lat, addressData.lng);
-        console.log(`[Checkout] Dist to seller ${seller.id}: ${dist}km`);
+        console.log(`[Checkout Security] Dist to seller ${seller.id}: ${dist}km`);
         
-        // Real-time market scan for partners within 100km of the seller
+        // 1. CHECK FOR APPROVED SPECIAL DELIVERY REQUESTS
+        const sellerItems = seller.items;
+        const sellerApprovedReq = approvedRequests.find(r => sellerItems.some(it => it.productId === r.productId));
+
+        if (sellerApprovedReq && sellerApprovedReq.negotiatedFee !== null) {
+            console.log(`[Checkout Security] Using Approved Negotiated Fee: ₹${sellerApprovedReq.negotiatedFee}`);
+            deliveryTotal += sellerApprovedReq.negotiatedFee;
+            continue; // Standard check bypassed for approved negotiation
+        }
+
+        // 2. ENFORCE SERVICEABILITY LIMITS
+        for (const it of sellerItems) {
+            const productRange = it.product.maxDeliveryRange;
+            const profileRange = sellerProfile.maxDeliveryRange;
+            const effectiveMaxRange = Number(productRange ?? profileRange ?? 100);
+
+            if (dist > effectiveMaxRange) {
+                return { 
+                    success: false, 
+                    error: `UNSERVICEABLE: Product "${it.product.productName}" is beyond delivery range (${dist.toFixed(1)}km > ${effectiveMaxRange}km). Please request special delivery approval first.` 
+                };
+            }
+        }
+
+        // 3. STANDARD CALCULATION (Only if in range)
         const partnersRes = await getAvailableDeliveryBoys(sellerProfile.lat, sellerProfile.lng);
         let marketRate = sellerProfile.deliveryPricePerKm || 10;
         
         if (partnersRes.success && partnersRes.data.length > 0) {
             const localPartners = partnersRes.data.filter(p => p.isOnline && p.distance <= 100);
             if (localPartners.length > 0) {
-                const nearestPartner = localPartners[0]; // Nearest online partner
+                const nearestPartner = localPartners[0]; 
                 marketRate = Math.max(marketRate, nearestPartner.pricePerKm);
             }
         }

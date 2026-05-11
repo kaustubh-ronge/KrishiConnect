@@ -577,6 +577,8 @@ model SpecialDeliveryRequest {
   
   status        String   @default("PENDING") 
   adminNotes    String?
+  rejectedAt    DateTime?
+  inquirySent   Boolean  @default(false)
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

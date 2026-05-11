@@ -13,28 +13,58 @@ export async function createSpecialDeliveryRequest(productId, quantity, sellerId
         const user = await currentUser();
         if (!user) throw new Error("Unauthorized");
 
-        // Duplicate check removed per user request for now
-        /*
+        // Check for existing request
         const existing = await db.specialDeliveryRequest.findFirst({
             where: {
                 userId: user.id,
-                productId: productId,
-                status: "PENDING"
+                productId: productId
             }
         });
 
-        if (existing) {
-            return apiResponse.error("You already have a pending request for this product.");
-        }
-        */
+        const COOLDOWN_MINUTES = 15;
 
+        if (existing) {
+            // Logic for existing requests
+            if (existing.status === 'PENDING') {
+                return apiResponse.error("You already have a pending request for this product.");
+            }
+
+            if (existing.status === 'REJECTED' && existing.rejectedAt) {
+                const now = new Date();
+                const cooldownEnd = new Date(existing.rejectedAt.getTime() + COOLDOWN_MINUTES * 60 * 1000);
+                
+                if (now < cooldownEnd) {
+                    const remaining = Math.ceil((cooldownEnd - now) / 1000 / 60);
+                    return apiResponse.error(`This request was recently rejected. Please wait ${remaining} minutes before re-requesting.`);
+                }
+            }
+
+            // Update existing record (Re-request)
+            const updated = await db.specialDeliveryRequest.update({
+                where: { id: existing.id },
+                data: {
+                    quantity: parseFloat(quantity),
+                    status: "PENDING",
+                    inquirySent: false, // Reset inquiry status on re-request
+                    rejectedAt: null, // Reset rejection timestamp
+                    adminNotes: null, // Clear old notes
+                    negotiatedFee: null // Clear old fee
+                }
+            });
+            
+            revalidatePath("/cart");
+            return apiResponse.success(updated, "Request re-submitted for approval.");
+        }
+
+        // Create new if none exists
         const request = await db.specialDeliveryRequest.create({
             data: {
                 userId: user.id,
                 productId: productId,
                 quantity: parseFloat(quantity),
                 sellerId: sellerId,
-                status: "PENDING"
+                status: "PENDING",
+                inquirySent: false
             }
         });
 
@@ -90,7 +120,8 @@ export async function updateSpecialDeliveryStatus(requestId, status, negotiatedF
             data: {
                 status: status,
                 negotiatedFee: negotiatedFee ? parseFloat(negotiatedFee) : null,
-                adminNotes: notes
+                adminNotes: notes,
+                rejectedAt: status === 'REJECTED' ? new Date() : null
             }
         });
 
@@ -108,16 +139,71 @@ export async function updateSpecialDeliveryStatus(requestId, status, negotiatedF
 export async function getUserSpecialDeliveryRequests() {
     try {
         const user = await currentUser();
-        if (!user) return apiResponse.success([]);
+        if (!user) return apiResponse.error("Unauthorized");
+
+        // CLEANUP STEP: Remove rejected requests (and cart items) older than 1 hour
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        
+        const staleRequests = await db.specialDeliveryRequest.findMany({
+            where: {
+                userId: user.id,
+                status: 'REJECTED',
+                rejectedAt: { lt: oneHourAgo }
+            }
+        });
+
+        if (staleRequests.length > 0) {
+            const productIdsToRemove = staleRequests.map(r => r.productId);
+            
+            // 1. Remove from Cart
+            await db.cartItem.deleteMany({
+                where: {
+                    cart: { userId: user.id },
+                    productId: { in: productIdsToRemove }
+                }
+            });
+
+            // 2. Delete the stale requests (or mark them as ARCHIVED if we had that status)
+            await db.specialDeliveryRequest.deleteMany({
+                where: { id: { in: staleRequests.map(r => r.id) } }
+            });
+        }
 
         const requests = await db.specialDeliveryRequest.findMany({
             where: {
                 userId: user.id,
-                status: { in: ["PENDING", "APPROVED"] }
+                status: { in: ["PENDING", "APPROVED", "REJECTED"] }
             }
         });
 
         return apiResponse.success(requests);
+    } catch (error) {
+        return apiResponse.error(error.message);
+    }
+}
+
+/**
+ * Mark an inquiry as sent for a specific product.
+ */
+export async function markInquiryAsSent(productId) {
+    try {
+        const user = await currentUser();
+        if (!user) throw new Error("Unauthorized");
+
+        const updated = await db.specialDeliveryRequest.updateMany({
+            where: {
+                userId: user.id,
+                productId: productId,
+                status: "PENDING"
+            },
+            data: {
+                inquirySent: true
+            }
+        });
+
+        revalidatePath("/marketplace");
+        revalidatePath("/cart");
+        return apiResponse.success(updated, "Inquiry marked as sent.");
     } catch (error) {
         return apiResponse.error(error.message);
     }

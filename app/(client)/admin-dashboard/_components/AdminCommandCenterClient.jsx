@@ -10,7 +10,7 @@ import {
    ArrowDownRight, Scale, ShieldAlert, Check, Ban, ExternalLink,
    MapPin, Phone, Mail, Building2, UserCircle2, Wallet,
    History as LucideHistory, PieChart, Activity, Globe, Landmark, Fingerprint,
-   ChevronLeft, ImageIcon, Trash2,
+   ChevronLeft, ImageIcon, Trash2, ArrowRight,
    UserX, UserCheck2, RefreshCw, ShoppingBag,
    ListChecks, ClipboardEdit, StickyNote, Map as LucideMap,
    Zap,
@@ -747,7 +747,8 @@ export default function AdminCommandCenterClient({
                                           {activeView === 'orders' || activeView === 'disputes' ? 'ORDER ID & BUYER' :
                                              activeView === 'logistics' ? 'DELIVERY BOY & ORDER' :
                                                 activeView === 'reviews' ? 'REVIEWER & PRODUCT' :
-                                                   activeView === 'support' ? 'SUPPORT USER' : 'IDENTITY & NAME'}
+                                                   activeView === 'support' ? 'SUPPORT USER' :
+                                                      activeView === 'mediation' ? 'PRODUCT & USER' : 'IDENTITY & NAME'}
                                        </TableHead>
                                        <TableHead>
                                           {activeView === 'orders' || activeView === 'disputes' ? 'PAYMENT' :
@@ -759,13 +760,13 @@ export default function AdminCommandCenterClient({
                                           {activeView === 'orders' || activeView === 'disputes' ? 'ORDER STATUS' :
                                              activeView === 'logistics' ? 'DISTANCE/PRICE' :
                                                 activeView === 'reviews' ? 'COMMENT' :
-                                                   'JOIN DATE'}
+                                                   activeView === 'mediation' ? 'FEE/PRICE' : 'JOIN DATE'}
                                        </TableHead>
                                        <TableHead>
                                           {activeView === 'orders' || activeView === 'disputes' ? 'METHOD' :
                                              activeView === 'logistics' ? 'TIME ESTIMATE' :
                                                 activeView === 'reviews' ? 'DATE' :
-                                                   'ACCOUNT STATE'}
+                                                   activeView === 'mediation' ? 'STATUS' : 'ACCOUNT STATE'}
                                        </TableHead>
                                        <TableHead className="text-right pr-8">AUDIT ACTION</TableHead>
                                     </TableRow>
@@ -789,13 +790,14 @@ export default function AdminCommandCenterClient({
                                                          activeView === 'support' ? 'bg-rose-50 text-rose-600 border-rose-100' : item.role === 'farmer' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                                             'bg-indigo-50 text-indigo-600 border-indigo-100'
                                                  }`}>
-                                                   {(item.productName || item.name || item.displayName || item.buyerName || item.userName)?.[0] || 'O'}
+                                                   {(item.productName || item.name || item.displayName || item.buyerName || item.userName || item.product?.productName)?.[0] || 'O'}
                                                 </div>
                                                 <div className="flex flex-col">
                                                    <span className="font-black text-slate-900 text-sm leading-tight">
                                                       {activeView === 'logistics' ? item.deliveryBoy?.name :
                                                          activeView === 'reviews' ? item.user?.name :
-                                                            s(item.productName || item.name || item.displayName || item.buyerName || item.userName)}
+                                                            activeView === 'mediation' ? item.product?.productName :
+                                                               s(item.productName || item.name || item.displayName || item.buyerName || item.userName)}
                                                    </span>
                                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                                                       {activeView === 'orders' ? <>Bill: ₹{item.totalAmount}</> :
@@ -832,8 +834,16 @@ export default function AdminCommandCenterClient({
                                                       </div>
                                                    ) : (
                                                       <>
-                                                         <span className="text-[10px] font-black text-slate-900 leading-none">{activeView === 'support' ? (item.type?.replace('_', ' ') || 'SUPPORT REQUEST') : activeView === 'mediation' ? `Qty: ${item.quantity}` : s(item.city || item.category || item.vehicleType)}</span>
-                                                         <span className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">{activeView === 'support' ? (item.isRead ? 'READ' : 'NEW MESSAGE') : activeView === 'mediation' ? item.status : s(item.district)}</span>
+                                                         <span className="text-[10px] font-black text-slate-900 leading-none">
+                                                            {activeView === 'support' ? (item.type?.replace('_', ' ') || 'SUPPORT REQUEST') : 
+                                                             activeView === 'mediation' ? `₹${item.negotiatedFee || 0} Fee` : 
+                                                             s(item.city || item.category || item.vehicleType)}
+                                                         </span>
+                                                         <span className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">
+                                                            {activeView === 'support' ? (item.isRead ? 'READ' : 'NEW MESSAGE') : 
+                                                             activeView === 'mediation' ? `Price: ₹${item.product?.pricePerUnit}` : 
+                                                             s(item.district)}
+                                                         </span>
                                                       </>
                                                    )}
                                                 </div>
@@ -843,15 +853,33 @@ export default function AdminCommandCenterClient({
                                              <Badge variant="outline" className="text-[8px] font-black uppercase border-0 bg-indigo-50 text-indigo-600 px-2 py-0.5">
                                                 {getFriendlyStatus(item.orderStatus)}
                                              </Badge>
-                                          ) : activeView === 'catalog' ? (
+                                                                                     ) : activeView === 'logistics' ? (
+                                              <div className="flex flex-col">
+                                                 <span className="text-[10px] font-black text-slate-900 leading-none">{item.distance} KM</span>
+                                                 <span className="text-[9px] font-bold text-indigo-600 uppercase mt-0.5">₹{item.totalPrice}</span>
+                                              </div>
+                                           ) : activeView === 'catalog' ? (
+
                                              <span className="text-[10px] font-black text-slate-600">{s(item.category)}</span>
                                           ) : (
                                              item.createdAt && mounted ? new Date(item.createdAt).toLocaleDateString() : '—'
                                           )}</TableCell>
                                           <TableCell>{activeView === 'orders' || activeView === 'disputes' ? (
                                              <span className="text-[10px] font-black text-slate-600 uppercase">{item.paymentMethod}</span>
-                                          ) : activeView === 'farmers' || activeView === 'agents' ? (
+                                                                                     ) : activeView === 'logistics' ? (
+                                              <span className="text-[10px] font-black text-slate-600 uppercase">{item.estimatedTime || 'ASAP'}</span>
+                                           ) : activeView === 'farmers' || activeView === 'agents' ? (
+
                                              <Badge className={`text-[8px] font-black uppercase px-3 py-1 border-0 rounded-lg ${item.usagePurpose === 'buy_and_sell' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{item.usagePurpose === 'buy_and_sell' ? 'BUY & SELL' : 'BUY ONLY'}</Badge>
+                                          ) : activeView === 'mediation' ? (
+                                             <div className="flex flex-col gap-1.5 items-center">
+                                                <Badge className={`text-[8px] font-black uppercase px-3 py-1 border-0 rounded-lg ${item.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700' : item.status === 'REJECTED' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-700'}`}>
+                                                   {item.status}
+                                                </Badge>
+                                                <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md ${item.inquirySent ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                   {item.inquirySent ? 'Message Sent' : 'No Message'}
+                                                </Badge>
+                                             </div>
                                           ) : (
                                              <Badge variant="outline" className={`text-[8px] font-black uppercase px-3 py-1 border-0 rounded-lg ${item.user?.isDisabled ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'}`}>{activeView === 'support' ? (item.userRole || 'USER') : (item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE')}</Badge>
                                           )}</TableCell>
@@ -1239,61 +1267,99 @@ export default function AdminCommandCenterClient({
                  <div className="bg-amber-500 p-8 text-white relative">
                     <div className="flex items-center justify-between mb-4">
                        <Badge className="bg-white/10 text-white border-0 text-[8px] font-black uppercase px-4 py-1 rounded-full tracking-widest">LOGISTICS MEDIATION</Badge>
-                       <Badge className={`text-[8px] font-black uppercase px-4 py-1 border-0 rounded-full ${selectedRequest?.status === 'APPROVED' ? 'bg-emerald-400' : 'bg-white text-amber-600 animate-pulse'}`}>
-                          {selectedRequest?.status}
-                       </Badge>
-                    </div>
+                        <div className="flex gap-2">
+                           <Badge className={`text-[8px] font-black uppercase px-4 py-1 border-0 rounded-full ${selectedRequest?.status === 'APPROVED' ? 'bg-emerald-400' : 'bg-white text-amber-600 animate-pulse'}`}>
+                              {selectedRequest?.status}
+                           </Badge>
+                           <Badge className={`text-[8px] font-black uppercase px-4 py-1 border-0 rounded-full ${selectedRequest?.inquirySent ? 'bg-blue-400' : 'bg-slate-800/40 text-slate-300'}`}>
+                              {selectedRequest?.inquirySent ? 'INQUIRY RECEIVED' : 'AWAITING MESSAGE'}
+                           </Badge>
+                        </div>
                     <DialogTitle className="text-3xl font-black tracking-tighter leading-tight flex items-center gap-3">
                        <ShieldAlert className="h-8 w-8" /> Product Approval
                     </DialogTitle>
                     <p className="text-amber-100 font-bold mt-2 text-sm uppercase tracking-widest">Product: {selectedRequest?.product?.productName}</p>
                  </div>
-                 <div className="p-8 space-y-8 bg-slate-50/50">
+                     </div>
+                 <div className="p-8 space-y-8 bg-slate-50/50 flex-grow overflow-y-auto custom-scrollbar">
                     <div className="grid grid-cols-2 gap-6">
-                       <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm">
-                          <p className="text-[9px] font-black text-slate-400 uppercase mb-1">User / Buyer</p>
-                          <p className="text-sm font-black text-slate-900">{selectedRequest?.user?.name}</p>
-                          <p className="text-[9px] text-slate-400">{selectedRequest?.user?.email}</p>
+                       <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm space-y-1">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Buyer / Requestor</p>
+                          <p className="text-sm font-black text-slate-900 leading-tight">{selectedRequest?.user?.name || "Member"}</p>
+                          <p className="text-[9px] text-indigo-500 font-bold">{selectedRequest?.user?.email}</p>
                        </div>
-                       <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm">
-                          <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Quantity Requested</p>
-                          <p className="text-sm font-black text-slate-900">{selectedRequest?.quantity} {selectedRequest?.product?.unit}</p>
+                       <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm space-y-1">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Target Product</p>
+                          <p className="text-sm font-black text-slate-900 leading-tight">{selectedRequest?.product?.productName}</p>
+                          <p className="text-[9px] text-emerald-500 font-bold">{selectedRequest?.quantity} {selectedRequest?.product?.unit} Requested</p>
                        </div>
                     </div>
 
-                    <div className="p-8 bg-amber-50 border-2 border-dashed border-amber-200 rounded-[2rem] space-y-4">
-                       <h5 className="text-[11px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-2"><IndianRupee className="h-4 w-4" /> Negotiated Delivery Fee</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm space-y-3">
+                            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Building2 className="h-4 w-4" /> Seller Hub</h5>
+                            <div className="space-y-1">
+                                <p className="font-black text-slate-900">{selectedRequest?.product?.farmer?.name || selectedRequest?.product?.agent?.companyName || "Verified Seller"}</p>
+                                <p className="text-[9px] text-slate-500 font-bold uppercase">{selectedRequest?.product?.farmer?.address || selectedRequest?.product?.agent?.region || "Logistics Region"}</p>
+                            </div>
+                        </div>
+                        <div className="p-6 bg-indigo-50 rounded-3xl border border-indigo-100 shadow-sm space-y-3 flex flex-col justify-center">
+                            <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2"><Globe className="h-4 w-4" /> Logistics Gap</h5>
+                            <p className="text-xl font-black text-indigo-900 uppercase">Out of Range</p>
+                            <p className="text-[9px] text-indigo-500 font-bold uppercase">Manual Quote Required</p>
+                        </div>
+
+                    {!selectedRequest?.inquirySent && (
+                       <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 animate-pulse">
+                          <AlertCircle className="h-5 w-5 text-rose-600" />
+                          <p className="text-[10px] font-black text-rose-700 uppercase tracking-widest">Buyer has not sent the required support message for this request yet.</p>
+                       </div>
+                    )}
+                    </div>
+
+                    <div className="p-8 bg-amber-50 border-2 border-amber-200 rounded-[2.5rem] space-y-6 shadow-inner">
+                       <div className="flex items-center justify-between">
+                          <h5 className="text-[11px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-2"><IndianRupee className="h-5 w-5" /> Negotiated Delivery Fee</h5>
+                          <Badge className="bg-amber-500 text-white border-0 text-[8px] px-3 py-1 uppercase font-black rounded-lg shadow-lg shadow-amber-500/20">Action: SET FEE</Badge>
+                       </div>
                        <div className="relative">
-                          <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-amber-600" />
+                          <IndianRupee className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-amber-600" />
                           <Input 
                              type="number"
-                             placeholder="Enter final delivery fee (₹)"
+                             placeholder="0.00"
                              value={negotiatedFee}
                              onChange={(e) => setNegotiatedFee(e.target.value)}
-                             className="pl-12 h-14 bg-white border-2 border-amber-200 focus:border-amber-500 rounded-2xl text-lg font-black"
+                             className="pl-16 h-20 bg-white border-4 border-amber-200 focus:border-amber-500 rounded-3xl text-3xl font-black tracking-tighter shadow-sm transition-all"
                           />
                        </div>
+                       <p className="text-[9px] text-amber-600/60 font-black text-center uppercase">This fee will be added to the buyer's checkout total.</p>
                     </div>
                  </div>
-                 <DialogFooter className="p-6 bg-white border-t border-slate-200 flex gap-4 shrink-0">
-                    <Button variant="ghost" className="flex-1 font-black text-[11px] text-slate-400 h-12 rounded-2xl uppercase tracking-widest" onClick={() => setIsMediationModalOpen(false)}>Close</Button>
+                 <DialogFooter className="p-8 bg-white border-t border-slate-200 flex gap-6 shrink-0">
+                    <Button variant="ghost" className="flex-1 font-black text-[11px] text-slate-400 h-14 rounded-2xl uppercase tracking-widest hover:bg-slate-50" onClick={() => setIsMediationModalOpen(false)}>Back to Directory</Button>
                     <div className="flex-[2] flex gap-4">
-                       <Button variant="outline" className="flex-1 h-12 border-rose-200 text-rose-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-rose-50" onClick={async () => {
+                       <Button variant="outline" className="flex-1 h-14 border-rose-200 text-rose-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-rose-50 transition-all active:scale-95" onClick={async () => {
                           const { updateSpecialDeliveryStatus } = await import('@/actions/special-delivery');
+                          const id = toast.loading("Rejecting request...");
                           await updateSpecialDeliveryStatus(selectedRequest.id, 'REJECTED');
+                          toast.success("Request Rejected", { id });
                           setIsMediationModalOpen(false);
                           fetchDirectoryData('mediation');
-                       }}>Reject</Button>
-                       <Button className="flex-1 h-12 bg-amber-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-amber-500/20" onClick={async () => {
+                       }}>Reject Request</Button>
+                       <Button className="flex-1 h-14 bg-amber-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-amber-500/30 hover:bg-amber-600 transition-all active:scale-95 group" onClick={async () => {
                           const { updateSpecialDeliveryStatus } = await import('@/actions/special-delivery');
+                          const id = toast.loading("Approving & Locking Fee...");
                           await updateSpecialDeliveryStatus(selectedRequest.id, 'APPROVED', negotiatedFee);
+                          toast.success("Logistics Approved!", { id });
                           setIsMediationModalOpen(false);
                           fetchDirectoryData('mediation');
-                       }}>Approve Request</Button>
+                       }}>
+                          Approve & Set Fee <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                       </Button>
                     </div>
                  </DialogFooter>
-              </DialogContent>
-           </Dialog>
+             </DialogContent>
+          </Dialog>
        </div>
     );
 }

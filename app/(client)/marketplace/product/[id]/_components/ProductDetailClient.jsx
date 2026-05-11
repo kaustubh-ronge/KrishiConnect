@@ -41,7 +41,8 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
   const [isLongDistance, setIsLongDistance] = useState(false);
   const [isOutOfRange, setIsOutOfRange] = useState(false);
   const [isBypassed, setIsBypassed] = useState(false);
-  const [hasRequested, setHasRequested] = useState(false);
+  const [hasRequested, setHasRequested] = useState(false); // This means inquiry sent
+  const [requestRecordExists, setRequestRecordExists] = useState(false);
 
   // Track product view & Fetch dynamic fee
   useEffect(() => {
@@ -68,9 +69,11 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
            setIsBypassed(true);
            setDynamicFee(approved.negotiatedFee);
         }
-        const pending = reqRes.data.find(r => r.productId === product.id && r.status === 'PENDING');
-        if (pending) {
-           setHasRequested(true);
+        
+        const existingReq = reqRes.data.find(r => r.productId === product.id && r.status === 'PENDING');
+        if (existingReq) {
+           setRequestRecordExists(true);
+           setHasRequested(existingReq.inquirySent);
         }
       }
       setIsFeeLoading(false);
@@ -112,6 +115,7 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
       toast.info("Request Initiated", {
         description: "Now please send a support message to confirm your delivery details and enable Add to Cart."
       });
+      setRequestRecordExists(true);
       setShowInquiry(true);
     } else {
       toast.error(res.error || "Failed to send request.");
@@ -544,9 +548,16 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
                           variant="secondary"
                           disabled={isAdding}
                           className="w-full h-10 rounded-xl bg-amber-600 text-white hover:bg-amber-700 font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-amber-600/20"
-                          onClick={handleRequestSpecialDelivery}
+                          onClick={() => {
+                             if (requestRecordExists) {
+                               setShowInquiry(true);
+                             } else {
+                               handleRequestSpecialDelivery();
+                             }
+                          }}
                         >
-                          <Truck className="h-4 w-4 mr-2" /> Request Special Delivery Approval
+                          <Truck className="h-4 w-4 mr-2" /> 
+                          {requestRecordExists ? "Send Support Message" : "Request Special Delivery Approval"}
                         </Button>
                       </div>
                     )}
@@ -557,8 +568,8 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
                              <Clock className="h-3 w-3 text-white" />
                           </div>
                           <div>
-                            <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">Request Pending</p>
-                            <p className="text-[10px] text-indigo-600 font-bold leading-relaxed mt-1">Your request is sent. You can now add this to your cart while the admin reviews the logistics cost.</p>
+                            <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">Inquiry Received</p>
+                            <p className="text-[10px] text-indigo-600 font-bold leading-relaxed mt-1">Your message is with the admin. You can now add this to your cart while the logistics cost is finalized.</p>
                           </div>
                         </div>
                       </div>

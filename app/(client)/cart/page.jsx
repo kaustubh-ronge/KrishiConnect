@@ -36,9 +36,33 @@ export default async function CartPage() {
       lng: dbUser?.farmerProfile?.lng || dbUser?.agentProfile?.lng || null
   };
 
+  const { calculateDynamicDeliveryFee } = await import("@/actions/orders");
+  const { getUserSpecialDeliveryRequests } = await import("@/actions/special-delivery");
+
+  let initialUnserviceableIds = [];
+  let initialSpecialRequests = [];
+
+  if (cart && cart.items.length > 0) {
+      const { data: requests } = await getUserSpecialDeliveryRequests();
+      initialSpecialRequests = requests || [];
+
+      if (userData.lat && userData.lng) {
+          const allItemIds = cart.items.map(it => it.id);
+          const res = await calculateDynamicDeliveryFee(allItemIds, userData.lat, userData.lng);
+          if (res.success) {
+              initialUnserviceableIds = res.unserviceableIds || [];
+          }
+      }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50/50">
-       <CartClient initialCart={cart} user={userData} />
+       <CartClient 
+          initialCart={cart} 
+          user={userData} 
+          initialUnserviceableIds={initialUnserviceableIds}
+          initialSpecialRequests={initialSpecialRequests}
+       />
     </div>
   );
 }

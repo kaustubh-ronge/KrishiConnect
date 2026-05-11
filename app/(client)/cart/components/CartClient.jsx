@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
 import { initiateCheckout, confirmOrderPayment, getUserPendingOrders, cancelPendingOrder, calculateDynamicDeliveryFee } from '@/actions/orders';
 import { createSpecialDeliveryRequest, getUserSpecialDeliveryRequests } from '@/actions/special-delivery';
@@ -27,7 +28,7 @@ import {
     MapPin, RotateCcw, AlertCircle, X, CreditCard, Eye,
     Receipt, Package, Calendar, Clock,
     Sparkles, Navigation, Loader2,
-    ShieldAlert, MessageCircle
+    ShieldAlert, MessageCircle, MessageSquare, Ban
 } from "lucide-react";
 
 
@@ -49,12 +50,49 @@ const loadRazorpay = () => {
     });
 };
 
-export default function CartClient({ initialCart, user }) {
+const CountdownTimer = ({ expiryDate, onExpire }) => {
+    const [timeLeft, setTimeLeft] = useState("");
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const now = new Date();
+            const diff = expiryDate.getTime() - now.getTime();
+
+            if (diff <= 0) {
+                clearInterval(interval);
+                setTimeLeft("Expired");
+                if (onExpire) onExpire();
+                return;
+            }
+
+            const mins = Math.floor(diff / 1000 / 60);
+            const secs = Math.floor((diff / 1000) % 60);
+            setTimeLeft(`${mins}:${secs.toString().padStart(2, '0')}`);
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [expiryDate, onExpire]);
+
+    return <span>{timeLeft}</span>;
+};
+
+export default function CartClient({ initialCart, user, initialUnserviceableIds = [], initialSpecialRequests = [] }) {
     const router = useRouter();
     const { cartItems: storeCartItems, removeItem, updateQuantity, fetchCart } = useCartStore();
     const [isMounted, setIsMounted] = useState(false);
     const [isPending, setIsPending] = useState(false);
     const [selectedItemIds, setSelectedItemIds] = useState((initialCart?.items || []).map(it => it.id));
+    
+    useEffect(() => {
+        // Sync server-side cart data to store on mount
+        if (initialCart?.items) {
+           useCartStore.setState({ 
+             cartItems: initialCart.items,
+             cartCount: initialCart.items.reduce((sum, it) => sum + (it.quantity || 0), 0)
+           });
+        }
+        fetchCart();
+    }, []);
 
     const [pendingOrders, setPendingOrders] = useState([]);
     const [collisionOrder, setCollisionOrder] = useState(null);
@@ -66,7 +104,7 @@ export default function CartClient({ initialCart, user }) {
     const [inquiryProduct, setInquiryProduct] = useState(null);
     const [selectedPendingOrder, setSelectedPendingOrder] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
-    const [specialRequests, setSpecialRequests] = useState([]);
+    const [specialRequests, setSpecialRequests] = useState(initialSpecialRequests);
     const ordersPerPage = 3;
 
 
@@ -128,39 +166,70 @@ export default function CartClient({ initialCart, user }) {
 
     const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState(0);
     const [isCalculatingFee, setIsCalculatingFee] = useState(false);
-    const [unserviceableIds, setUnserviceableIds] = useState([]);
+    const [unserviceableIds, setUnserviceableIds] = useState(initialUnserviceableIds);
 
-    // Fetch dynamic fee when selection or location changes
+    // 1. Fetch dynamic fee for SELECTED items ONLY
     useEffect(() => {
-        const updateFee = async () => {
-            if (lat && lng) {
-                // 1. Calculate fee for SELECTED items
-                if (selectedItemIds.length > 0) {
-                    setIsCalculatingFee(true);
-                    const res = await calculateDynamicDeliveryFee(selectedItemIds, lat, lng);
-                    if (res.success) {
-                        setDynamicDeliveryFee(res.fee || 0);
-                    }
-                    setIsCalculatingFee(false);
-                } else {
-                    setDynamicDeliveryFee(0);
+        const updateSelectionFee = async () => {
+            if (lat && lng && selectedItemIds.length > 0) {
+                setIsCalculatingFee(true);
+                const res = await calculateDynamicDeliveryFee(selectedItemIds, lat, lng);
+                if (res.success) {
+                    setDynamicDeliveryFee(res.fee || 0);
                 }
+                setIsCalculatingFee(false);
+            } else {
+                setDynamicDeliveryFee(0);
+            }
+        };
+        updateSelectionFee();
+    }, [selectedItemIds, lat, lng]);
 
-                // 2. Identify ALL unserviceable items in the cart for grayscaling
+    // 2. Identify ALL unserviceable items in the cart for grayscaling
+    // This ONLY runs when the cart items or location change
+    useEffect(() => {
+        const updateUnserviceableList = async () => {
+            if (lat && lng && cartItems.length > 0) {
                 const allItemIds = cartItems.map(it => it.id);
-                if (allItemIds.length > 0) {
-                    const resAll = await calculateDynamicDeliveryFee(allItemIds, lat, lng);
-                    if (resAll.success) {
-                        setUnserviceableIds(resAll.unserviceableIds || []);
-                    }
+                const resAll = await calculateDynamicDeliveryFee(allItemIds, lat, lng);
+                if (resAll.success) {
+                    setUnserviceableIds(resAll.unserviceableIds || []);
                 }
             }
         };
-        updateFee();
-    }, [selectedItemIds, lat, lng, cartItems.length]);
+        updateUnserviceableList();
+    }, [cartItems.length, lat, lng]);
 
-    // Derived state: Is any SELECTED item unserviceable?
-    const isOutOfRange = selectedItemIds.some(id => unserviceableIds.includes(id));
+    // Derived state: Categorize items for UI
+    const rejectedItems = cartItems.filter(it => 
+        specialRequests.some(r => r.productId === it.product.id && r.status === 'REJECTED')
+    );
+    const approvedItems = cartItems.filter(it => 
+        specialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED')
+    );
+    
+    // Items that are out of range but NOT approved
+    const unserviceableWaitlist = cartItems.filter(it => 
+        unserviceableIds.includes(it.productId) && 
+        !specialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED')
+    );
+
+    // Derived state: Is any SELECTED item currently blocking checkout?
+    // We only care about selected items that are unserviceable AND not approved
+    const selectedUnserviceableItems = cartItems.filter(it => 
+        selectedItemIds.includes(it.id) && 
+        unserviceableIds.includes(it.productId) &&
+        !specialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED')
+    );
+
+    const isOutOfRange = selectedUnserviceableItems.length > 0;
+    
+    // We don't want hasRejectedRequest to refer to SELECTED items, but ANY items in cart
+    // to show the "Rejected" warning section
+    const hasRejectedInCart = rejectedItems.length > 0;
+
+    // effectiveIsOutOfRange means "Checkout is blocked because of selection"
+    const effectiveIsOutOfRange = isOutOfRange;
 
     // Final calculations
     const activeDeliveryTotal = selectedActiveItems.reduce((acc, item) => {
@@ -186,11 +255,23 @@ export default function CartClient({ initialCart, user }) {
     const toggleSelect = (id) => {
         setSelectedItemIds(prev => {
             const isCurrentlySelected = prev.includes(id);
-            if (!isCurrentlySelected && unserviceableIds.includes(id)) {
-                toast.error("This item is out of delivery range. Please request approval first.", {
-                    icon: <ShieldAlert className="h-4 w-4 text-rose-500" />
-                });
-                return prev;
+            const item = cartItems.find(it => it.id === id);
+            const isRejected = specialRequests.some(r => r.productId === item?.product?.id && r.status === 'REJECTED');
+            const isApproved = specialRequests.some(r => r.productId === item?.product?.id && r.status === 'APPROVED');
+
+            if (!isCurrentlySelected) {
+                if (isRejected) {
+                    toast.error("This item was rejected by admin. It will be removed soon.", {
+                        icon: <Ban className="h-4 w-4 text-rose-500" />
+                    });
+                    return prev;
+                }
+                if (unserviceableIds.includes(id) && !isApproved) {
+                    toast.error("This item is out of range. Request approval to purchase.", {
+                        icon: <ShieldAlert className="h-4 w-4 text-amber-500" />
+                    });
+                    return prev;
+                }
             }
 
             let newSelection = isCurrentlySelected 
@@ -218,10 +299,19 @@ export default function CartClient({ initialCart, user }) {
     };
 
     const toggleSelectAll = () => {
-        if (selectedItemIds.length === cartItems.length) {
+        const selectableItems = cartItems.filter(it => {
+            const isRejected = specialRequests.some(r => r.productId === it.product.id && r.status === 'REJECTED');
+            const isUnserviceable = unserviceableIds.includes(it.productId);
+            const isApproved = specialRequests.some(r => r.productId === it.product.id && r.status === 'APPROVED');
+            
+            // Only allow selecting if NOT rejected AND (NOT unserviceable OR isApproved)
+            return !isRejected && (!isUnserviceable || isApproved);
+        });
+
+        if (selectedItemIds.length === selectableItems.length) {
             setSelectedItemIds([]);
         } else {
-            setSelectedItemIds(cartItems.map(it => it.id));
+            setSelectedItemIds(selectableItems.map(it => it.id));
         }
     };
 
@@ -364,7 +454,7 @@ export default function CartClient({ initialCart, user }) {
             try {
                 // For now, we process only one out-of-range item at a time for simplicity, 
                 // or all selected ones that are unserviceable.
-                const itemsToRequest = selectedActiveItems.filter(it => unserviceableIds.includes(it.id));
+                const itemsToRequest = selectedActiveItems.filter(it => unserviceableIds.includes(it.productId));
                 
                 if (itemsToRequest.length === 0) {
                     toast.error("No unserviceable items found in selection.");
@@ -778,26 +868,33 @@ export default function CartClient({ initialCart, user }) {
                             <div className="grid grid-cols-1 xl:grid-cols-3 gap-10 items-start">
                                 {/* Left: Cart Items */}
                                 <div className="xl:col-span-2 space-y-10">
-                                    {/* --- ACTIVE CART ITEMS --- */}
-                                    {cartItems.length > 0 && (
-                                        <div className="space-y-6">
-                                            <div className="flex items-center gap-3 px-4">
-                                                <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm"><ShoppingBag className="h-5 w-5" /></div>
-                                                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Active Cart</h3>
-                                            </div>
+                                    {/* --- ACTIVE & SERVICEABLE ITEMS --- */}
+                                    <div className="space-y-6">
+                                        <div className="flex items-center gap-3 px-4">
+                                            <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm"><ShoppingBag className="h-5 w-5" /></div>
+                                            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Your Items</h3>
+                                        </div>
                                             <AnimatePresence mode="popLayout">
                                                 {cartItems.map((item) => {
                                                     const isUnserviceable = unserviceableIds.includes(item.id);
                                                     const activeRequest = specialRequests.find(r => r.productId === item.productId);
-                                                    
+                                                    const isRejected = activeRequest?.status === 'REJECTED';
+                                                    const isApproved = activeRequest?.status === 'APPROVED';
+                                                    const isPendingReq = activeRequest?.status === 'PENDING';
+
+                                                    if (isRejected) return null;
+
+                                                    const isDisabled = isUnserviceable && !isApproved;
+
                                                     return (
                                                         <motion.div
                                                             key={item.id}
+                                                            layout
                                                             initial={{ opacity: 0, y: 10 }}
                                                             animate={{ opacity: 1, y: 0 }}
                                                             exit={{ opacity: 0, scale: 0.95 }}
-                                                            onClick={() => toggleSelect(item.id)}
-                                                            className={`p-6 bg-white border rounded-3xl shadow-sm transition-all duration-300 cursor-pointer relative overflow-hidden ${isUnserviceable && (!activeRequest || activeRequest.status !== 'APPROVED') ? 'grayscale opacity-60 border-amber-200 bg-amber-50/20' : selectedItemIds.includes(item.id) ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/30 shadow-md scale-[1.02]' : 'border-slate-100 hover:shadow-md opacity-40 grayscale-[0.5] scale-[0.98] border-dashed bg-slate-50/50'}`}
+                                                            onClick={() => !isDisabled && toggleSelect(item.id)}
+                                                            className={`p-6 bg-white border rounded-[2rem] shadow-sm transition-all duration-300 relative overflow-hidden ${isDisabled ? 'grayscale-[0.8] opacity-70 border-amber-100 bg-amber-50/10 cursor-not-allowed' : selectedItemIds.includes(item.id) ? 'border-emerald-500 ring-4 ring-emerald-500/10 bg-emerald-50/30 shadow-xl scale-[1.01]' : 'border-slate-100 hover:border-slate-200 hover:shadow-md cursor-pointer'}`}
                                                         >
                                                             {selectedItemIds.includes(item.id) && (
                                                                 <div className="absolute top-0 right-0 w-12 h-12 flex items-center justify-center">
@@ -807,27 +904,37 @@ export default function CartClient({ initialCart, user }) {
                                                                 </div>
                                                             )}
                                                             
-                                                            {activeRequest && (
-                                                                <div className={`mb-4 p-3 border rounded-xl flex items-center justify-between gap-3 ${activeRequest.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-100' : 'bg-indigo-50 border-indigo-100 animate-pulse'}`}>
+                                                            {isApproved && (
+                                                                <div className="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between gap-3 shadow-inner">
                                                                     <div className="flex items-center gap-3">
-                                                                        {activeRequest.status === 'APPROVED' ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Clock className="h-4 w-4 text-indigo-600" />}
-                                                                        <p className={`text-[10px] font-black uppercase tracking-widest leading-tight ${activeRequest.status === 'APPROVED' ? 'text-emerald-700' : 'text-indigo-700'}`}>
-                                                                            {activeRequest.status === 'APPROVED' ? `Logistics Approved! Negotiated Fee: ₹${activeRequest.negotiatedFee}` : 'Special Delivery Request Pending Admin Approval...'}
-                                                                        </p>
+                                                                        <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm"><Truck className="h-4 w-4 text-emerald-600" /></div>
+                                                                        <div>
+                                                                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800">Special Delivery Approved</p>
+                                                                            <p className="text-[9px] font-bold text-emerald-600 uppercase">Extra Logistics Fee: ₹{activeRequest.negotiatedFee}</p>
+                                                                        </div>
                                                                     </div>
-                                                                    {activeRequest.status === 'PENDING' && (
-                                                                        <Badge className="bg-indigo-600 text-white border-0 text-[8px] font-black uppercase px-2 py-0.5">AWAITING</Badge>
-                                                                    )}
+                                                                    <Badge className="bg-emerald-600 text-white border-0 text-[8px] font-black uppercase">READY</Badge>
+                                                                </div>
+                                                            )}
+
+                                                            {isPendingReq && (
+                                                                <div className="mb-4 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between gap-3 animate-pulse">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm"><Clock className="h-4 w-4 text-indigo-600" /></div>
+                                                                        <div>
+                                                                            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-800">Mediation in Progress</p>
+                                                                            <p className="text-[9px] font-bold text-indigo-500 uppercase">Admin reviewing your distance request...</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <Badge className="bg-indigo-600 text-white border-0 text-[8px] font-black uppercase">PENDING</Badge>
                                                                 </div>
                                                             )}
 
                                                             {isUnserviceable && !activeRequest && (
-                                                                <div className="mb-4 p-3 bg-amber-100 border border-amber-200 rounded-xl flex items-center justify-between gap-3">
+                                                                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 shadow-sm">
                                                                     <div className="flex items-center gap-3">
-                                                                        <ShieldAlert className="h-4 w-4 text-amber-600" />
-                                                                        <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest leading-tight">
-                                                                            Out of delivery range. 
-                                                                        </p>
+                                                                        <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm"><ShieldAlert className="h-4 w-4 text-amber-600" /></div>
+                                                                        <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest leading-tight">Out of Delivery Range</p>
                                                                     </div>
                                                                     <Button 
                                                                         variant="outline" 
@@ -837,78 +944,64 @@ export default function CartClient({ initialCart, user }) {
                                                                             e.stopPropagation(); 
                                                                             handleRequestForSingleItem(item);
                                                                         }}
-                                                                        className="h-8 rounded-lg bg-amber-600 border-amber-600 text-white hover:bg-amber-700 font-bold text-[10px] uppercase gap-2 px-3 shrink-0"
+                                                                        className="h-9 rounded-xl bg-amber-600 border-amber-600 text-white hover:bg-amber-700 font-black text-[9px] uppercase gap-2 px-4 shadow-lg shadow-amber-600/20"
                                                                     >
-                                                                        <Truck className="h-3.5 w-3.5" /> Request Approval
+                                                                        <MessageSquare className="h-3.5 w-3.5" /> Request Mediation
                                                                     </Button>
                                                                 </div>
                                                             )}
                                                             <div className="flex items-center gap-6">
-                                                        <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                                <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                                                     <input
                                                                         type="checkbox"
                                                                         checked={selectedItemIds.includes(item.id)}
-                                                                        onChange={() => toggleSelect(item.id)}
+                                                                        onChange={() => !isDisabled && toggleSelect(item.id)}
+                                                                        disabled={isDisabled}
                                                                         className={`w-6 h-6 rounded-lg accent-emerald-600 cursor-pointer`}
                                                                     />
                                                                 </div>
 
-                                                                <div className="relative w-32 h-32 rounded-2xl overflow-hidden bg-slate-50 border border-slate-100">
+                                                                <div className="relative w-28 h-28 rounded-2xl overflow-hidden bg-slate-50 border border-slate-100 shadow-inner group">
                                                                     {item.product?.images?.[0] ? (
-                                                                        <Image src={item.product.images[0]} alt={item.product.productName} fill className="object-cover" />
+                                                                        <Image src={item.product.images[0]} alt={item.product.productName} fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
                                                                     ) : (
-                                                                        <div className="w-full h-full flex items-center justify-center text-slate-300"><ShoppingBag className="h-10 w-10" /></div>
+                                                                        <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50"><Package className="h-10 w-10" /></div>
                                                                     )}
                                                                 </div>
 
                                                                 <div className="flex-1 min-w-0">
-                                                                    <div className="flex justify-between items-start mb-2">
+                                                                    <div className="flex justify-between items-start">
                                                                         <div>
-                                                                            <h3 className="text-xl font-black text-slate-900 truncate uppercase tracking-tight">{item.product?.productName || "Product"}</h3>
-                                                                            <div className="flex items-center gap-2 mt-1">
-                                                                                <Badge variant="outline" className="bg-slate-50 border-slate-200 text-slate-500 font-bold text-[10px] uppercase">
-                                                                                    {item.product?.sellerType === 'farmer' ? item.product?.farmer?.name : (item.product?.agent?.companyName || item.product?.agent?.name)}
-                                                                                </Badge>
-                                                                                <span className="text-slate-300">•</span>
-                                                                                <span className="text-slate-500 text-xs font-bold uppercase">{item.product?.category || "Category"}</span>
+                                                                            <h3 className="text-xl font-black text-slate-900 truncate uppercase tracking-tight leading-none mb-1">{item.product?.productName || "Product"}</h3>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 font-black text-[9px] uppercase tracking-tighter">
+                                                                                    {item.product?.sellerType === 'farmer' ? '👨‍🌾 Farmer' : '🏢 Agent'}
+                                                                                </span>
+                                                                                <span className="text-slate-300 font-bold">•</span>
+                                                                                <span className="text-slate-400 text-[10px] font-bold uppercase">{item.product?.category || "Category"}</span>
                                                                             </div>
                                                                         </div>
                                                                         <Button
                                                                             variant="ghost"
                                                                             size="icon"
-                                                                            onClick={() => handleRemove(item.id)}
-                                                                            className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl"
+                                                                            onClick={(e) => { e.stopPropagation(); handleRemove(item.id); }}
+                                                                            className="text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
                                                                         >
                                                                             <Trash2 className="h-5 w-5" />
                                                                         </Button>
                                                                     </div>
 
                                                                     <div className="flex items-end justify-between mt-6">
-                                                                        <div className="flex flex-col gap-1">
-                                                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity ({item.product?.unit || 'Units'})</p>
-                                                                            <div className="flex items-center bg-slate-50 rounded-2xl p-1 border border-slate-100 shadow-inner">
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    size="icon"
-                                                                                    className="h-10 w-10 rounded-xl hover:bg-white hover:shadow-sm"
-                                                                                    onClick={() => handleUpdateQty(item, -1)}
-                                                                                >
-                                                                                    <Minus className="h-4 w-4" />
-                                                                                </Button>
-                                                                                <span className="w-12 text-center font-black text-slate-900">{item.quantity}</span>
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    size="icon"
-                                                                                    className="h-10 w-10 rounded-xl hover:bg-white hover:shadow-sm text-emerald-600"
-                                                                                    onClick={() => handleUpdateQty(item, 1)}
-                                                                                >
-                                                                                    <Plus className="h-4 w-4" />
-                                                                                </Button>
+                                                                        <div className="flex flex-col gap-1.5">
+                                                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Quantity ({item.product?.unit || 'Units'})</p>
+                                                                            <div className="flex items-center bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                                                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none hover:bg-slate-50 border-r border-slate-50" onClick={() => handleUpdateQty(item, -1)}><Minus className="h-3 w-3" /></Button>
+                                                                                <span className="w-10 text-center font-black text-slate-900 text-sm">{item.quantity}</span>
+                                                                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none hover:bg-slate-50 border-l border-slate-50 text-emerald-600" onClick={() => handleUpdateQty(item, 1)}><Plus className="h-3 w-3" /></Button>
                                                                             </div>
                                                                         </div>
                                                                         <div className="text-right">
-                                                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Subtotal</p>
-                                                                            <p className="text-2xl font-black text-slate-900">₹{(item.quantity * (item.product?.pricePerUnit || 0)).toLocaleString()}</p>
+                                                                            <p className="text-xl font-black text-slate-900 tracking-tighter">₹{(item.quantity * (item.product?.pricePerUnit || 0)).toLocaleString()}</p>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -918,7 +1011,79 @@ export default function CartClient({ initialCart, user }) {
                                                 })}
                                             </AnimatePresence>
                                         </div>
-                                    )}
+
+                                        {/* --- REJECTED / BLOCKED ITEMS --- */}
+                                        {hasRejectedInCart && (
+                                            <div className="space-y-6 pt-10 border-t-2 border-slate-100 border-dashed">
+                                                <div className="flex items-center justify-between px-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-600 shadow-sm"><Ban className="h-5 w-5" /></div>
+                                                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Rejected Logistics</h3>
+                                                    </div>
+                                                    <Badge variant="outline" className="border-rose-200 text-rose-600 font-black text-[9px] uppercase animate-pulse bg-rose-50 px-3 py-1">Auto-Removal Active</Badge>
+                                                </div>
+                                                
+                                                <AnimatePresence mode="popLayout">
+                                                    {cartItems.filter(it => specialRequests.some(r => r.productId === it.productId && r.status === 'REJECTED')).map((item) => {
+                                                        const request = specialRequests.find(r => r.productId === item.productId);
+                                                        const rejectedAt = new Date(request?.rejectedAt || Date.now());
+                                                        const removalTime = new Date(rejectedAt.getTime() + 60 * 60 * 1000);
+                                                        
+                                                        return (
+                                                            <motion.div
+                                                                key={item.id}
+                                                                initial={{ opacity: 0, x: -20 }}
+                                                                animate={{ opacity: 1, x: 0 }}
+                                                                className="p-6 bg-white border-2 border-rose-100 rounded-[2rem] shadow-sm relative overflow-hidden group"
+                                                            >
+                                                                <div className="mb-4 p-4 bg-rose-50 border border-rose-100 rounded-2xl">
+                                                                    <div className="flex items-start justify-between gap-4">
+                                                                        <div className="flex items-start gap-3">
+                                                                            <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0"><ShieldAlert className="h-4 w-4 text-rose-600" /></div>
+                                                                            <div className="space-y-1">
+                                                                                <p className="text-[10px] font-black uppercase tracking-widest text-rose-800">Admin Declined Logistics Request</p>
+                                                                                <p className="text-[11px] font-medium text-rose-600 leading-tight italic">"{request?.adminNotes || 'Request does not meet delivery criteria.'}"</p>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-right shrink-0">
+                                                                            <p className="text-[8px] font-black text-rose-400 uppercase tracking-widest mb-1">Clearing In</p>
+                                                                            <div className="px-3 py-1 bg-white rounded-lg border border-rose-100 font-black text-[10px] text-rose-700 shadow-sm">
+                                                                                <CountdownTimer expiryDate={removalTime} onExpire={() => router.refresh()} />
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div className="mt-4 pt-4 border-t border-rose-100 flex items-center justify-between">
+                                                                        <p className="text-[9px] font-bold text-rose-500 uppercase">You can re-request mediation with a better offer.</p>
+                                                                        <Button 
+                                                                            variant="link" 
+                                                                            className="h-auto p-0 text-rose-700 font-black uppercase text-[9px] hover:text-rose-900"
+                                                                            onClick={() => handleRequestForSingleItem(item)}
+                                                                        >
+                                                                            <RotateCcw className="h-3 w-3 mr-1" /> Re-Request Mediation
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="flex items-center gap-6 opacity-60">
+                                                                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-slate-50 border border-slate-100 shadow-inner">
+                                                                        {item.product?.images?.[0] ? (
+                                                                            <Image src={item.product.images[0]} alt={item.product.productName} fill className="object-cover" />
+                                                                        ) : (
+                                                                            <div className="w-full h-full flex items-center justify-center text-slate-300"><Package className="h-8 w-8" /></div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <h3 className="text-lg font-black text-slate-900 truncate uppercase tracking-tight">{item.product?.productName}</h3>
+                                                                        <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">₹{(item.product?.pricePerUnit || 0).toLocaleString()} / {item.product?.unit}</p>
+                                                                    </div>
+                                                                </div>
+                                                            </motion.div>
+                                                        );
+                                                    })}
+                                                </AnimatePresence>
+                                            </div>
+                                        )}
 
                                 </div>
 
@@ -1084,43 +1249,48 @@ export default function CartClient({ initialCart, user }) {
                                             </div>
                                         </div>
                                     </CardContent>
-                                    <CardFooter className="p-10 pt-0">
+                                    <CardFooter className="p-10 pt-0 flex flex-col gap-4">
                                         <Button
+                                            disabled={isPending || selectedItemIds.length === 0 || effectiveIsOutOfRange}
                                             onClick={() => handleCheckout()}
-                                            disabled={isPending || selectedItemIds.length === 0}
-                                            className={`w-full rounded-[2rem] h-20 text-lg font-black uppercase tracking-widest transition-all shadow-2xl group relative overflow-hidden ${paymentMethod === 'COD' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'}`}
+                                            className={`w-full rounded-[2rem] h-20 font-black transition-all relative overflow-hidden group shadow-2xl ${effectiveIsOutOfRange ? 'bg-amber-100 text-amber-600 cursor-not-allowed border-2 border-amber-200 shadow-amber-900/5' : 'bg-slate-900 text-white hover:scale-[1.02] active:scale-95 shadow-slate-900/20'}`}
                                         >
-                                            {isPending ? (
-                                                <span className="flex items-center justify-center gap-3 relative z-10 text-white">
-                                                    <Loader2 className="h-5 w-5 animate-spin" />
-                                                    {isOutOfRange ? "Sending Request..." : "Processing..."}
-                                                </span>
-                                            ) : (
-                                                <span className="flex items-center justify-center gap-3 relative z-10 text-white">
-                                                    {isOutOfRange ? (
-                                                        <>
-                                                            <ShieldAlert className="h-6 w-6 group-hover:scale-110 transition-transform" />
-                                                            Request Special Delivery Approval
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            {paymentMethod === 'ONLINE' ? <CreditCard className="h-6 w-6 group-hover:rotate-12 transition-transform" /> : <ShieldCheck className="h-6 w-6" />}
-                                                            {paymentMethod === 'ONLINE' ? 'Initialize Secure Payment' : 'Confirm Order (COD)'}
-                                                        </>
-                                                    )}
-                                                    <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform" />
-                                                </span>
-                                            )}
-                                            <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/0 via-emerald-400/10 to-emerald-600/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                                            <span className="relative flex items-center justify-center gap-4 text-sm uppercase tracking-[0.2em]">
+                                                {isPending ? (
+                                                    <Loader2 className="h-6 w-6 animate-spin" />
+                                                ) : effectiveIsOutOfRange ? (
+                                                    <>
+                                                        <ShieldAlert className="h-6 w-6" />
+                                                        Selection Unserviceable
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <CreditCard className="h-6 w-6" />
+                                                        Initiate Checkout
+                                                    </>
+                                                )}
+                                            </span>
                                         </Button>
+
+                                        {effectiveIsOutOfRange && (
+                                            <motion.p 
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="text-center text-[10px] font-black text-amber-600 uppercase tracking-widest px-8 leading-relaxed"
+                                            >
+                                                You have selected items that are out of range. Please deselect them or wait for admin approval to proceed.
+                                            </motion.p>
+                                        )}
                                     </CardFooter>
                                 </Card>
                             </div>
                         )}
                     </TabsContent>
-
                 </Tabs>
+
             </div>
+
 
             {/* Pending Order Details Modal */}
             <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>

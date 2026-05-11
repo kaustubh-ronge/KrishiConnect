@@ -12,11 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import {
   MessageCircle, Send, User, Box, Phone, Package,
   IndianRupee, Sparkles, ArrowRight, Leaf, Star,
-  MapPin, Shield, Clock, CheckCircle2, AlertCircle, RotateCcw
+  MapPin, Shield, Clock, CheckCircle2, AlertCircle, RotateCcw,
+  Truck, ShieldCheck, Scale
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { sendSupportMessage } from "@/actions/support";
+import { markInquiryAsSent } from "@/actions/special-delivery";
 
 export default function InquiryModal({ isOpen, onClose, product, onSuccess }) {
   const [name, setName] = useState("");
@@ -46,6 +48,9 @@ export default function InquiryModal({ isOpen, onClose, product, onSuccess }) {
     try {
        const res = await sendSupportMessage(fullMessage, "PRODUCT_INQUIRY");
        if (res.success) {
+          // Flag the request as "inquiry sent"
+          await markInquiryAsSent(product.id);
+
           toast.success("Request Sent!", {
             icon: <CheckCircle2 className="h-5 w-5 text-green-500" />,
             description: "Admin will contact the seller and get back to you."
@@ -70,27 +75,26 @@ export default function InquiryModal({ isOpen, onClose, product, onSuccess }) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-white rounded-3xl border-0 shadow-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-emerald-500 to-green-600 p-6 text-white">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgMjAgMTAgTSAxMCAwIEwgMTAgMjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjEiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-30" />
-
+        <div className="relative bg-slate-900 p-8 text-white">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 to-transparent pointer-events-none" />
+          
           <DialogHeader className="relative">
-            <div className="flex items-center gap-3 mb-3">
-              <motion.div
-                animate={{ rotate: [0, 15, -15, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="bg-white/20 backdrop-blur-sm p-3 rounded-2xl"
-              >
-                <MessageCircle className="h-6 w-6" />
-              </motion.div>
+            <div className="flex items-center gap-4 mb-2">
+              <div className="bg-amber-500 p-3 rounded-2xl shadow-lg shadow-amber-500/20">
+                <Truck className="h-6 w-6 text-white" />
+              </div>
               <div>
-                <DialogTitle className="text-2xl font-bold text-white">
-                  Contact Support
+                <Badge className="bg-amber-500/20 text-amber-400 border-0 text-[9px] font-black uppercase px-3 py-1 rounded-full mb-1 tracking-widest">
+                  Logistics Mediation
+                </Badge>
+                <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none">
+                  Special Delivery
                 </DialogTitle>
-                <DialogDescription className="text-green-100 mt-1">
-                  Request product info through platform admin
-                </DialogDescription>
               </div>
             </div>
+            <DialogDescription className="text-slate-400 font-bold text-sm">
+              Requesting a custom logistics quote for out-of-range delivery.
+            </DialogDescription>
           </DialogHeader>
         </div>
 
@@ -165,26 +169,22 @@ export default function InquiryModal({ isOpen, onClose, product, onSuccess }) {
             </div>
           </div>
 
-          {/* Seller Info */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100 flex items-center gap-4">
-            <div className="relative">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                {sellerName?.charAt(0)?.toUpperCase()}
-              </div>
-              <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-0.5">
-                <Shield className="h-3 w-3 text-white" />
-              </div>
-            </div>
-            <div>
-              <p className="font-bold text-gray-900">{sellerName}</p>
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                <span>Verified Seller</span>
-                <span>•</span>
-                <Clock className="h-3 w-3" />
-                <span>Usually responds in 2hrs</span>
-              </div>
-            </div>
+          {/* TRUST INDICATORS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
+                <ShieldCheck className="h-5 w-5 text-indigo-600" />
+                <div>
+                   <p className="text-[10px] font-black text-slate-900 uppercase">Secure Mediation</p>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase">Escrow Protected</p>
+                </div>
+             </div>
+             <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
+                <Scale className="h-5 w-5 text-amber-600" />
+                <div>
+                   <p className="text-[10px] font-black text-slate-900 uppercase">Fair Pricing</p>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase">Market Rates Only</p>
+                </div>
+             </div>
           </div>
         </div>
 
