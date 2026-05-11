@@ -116,3 +116,17 @@ export async function getUnreadSupportCount() {
         return apiResponse.error(error.message);
     }
 }
+/**
+ * Delete a support message (Close Ticket permanently).
+ */
+export async function deleteSupportMessage(id) {
+    try {
+        await db.supportMessage.delete({
+            where: { id }
+        });
+        revalidatePath("/admin-dashboard");
+        return apiResponse.success(null, "Ticket closed and removed successfully.");
+    } catch (error) {
+        return apiResponse.error(error.message);
+    }
+}

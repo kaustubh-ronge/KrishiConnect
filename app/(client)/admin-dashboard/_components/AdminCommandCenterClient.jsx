@@ -473,15 +473,28 @@ export default function AdminCommandCenterClient({
       setIsProductModalOpen(true);
  };
 
-   const openSupportAudit = async (message) => {
-      setSelectedMessage(message);
-      setIsSupportModalOpen(true);
-      if (!message.isRead) {
-          const { markSupportMessageAsRead } = await import('@/actions/support');
-          await markSupportMessageAsRead(message.id);
-          refreshData();
-    }
- };
+    const openSupportAudit = async (message) => {
+       setSelectedMessage(message);
+       setIsSupportModalOpen(true);
+       if (!message.isRead) {
+           const { markSupportMessageAsRead } = await import('@/actions/support');
+           await markSupportMessageAsRead(message.id);
+           refreshData();
+     }
+  };
+
+   const handleCloseSupportTicket = async (id) => {
+      const { deleteSupportMessage } = await import('@/actions/support');
+      const toastId = toast.loading("Closing and archiving ticket...");
+      const res = await deleteSupportMessage(id);
+      if (res.success) {
+         toast.success(res.message, { id: toastId });
+         setIsSupportModalOpen(false);
+         refreshData();
+      } else {
+         toast.error(res.error, { id: toastId });
+      }
+   };
 
    const disputes = useMemo(() => orders.filter(o => o.disputeStatus === 'OPEN'), [orders]);
 
@@ -1217,8 +1230,8 @@ export default function AdminCommandCenterClient({
                </Dialog>
           {/* SUPPORT MESSAGE MODAL */}
           <Dialog open={isSupportModalOpen} onOpenChange={setIsSupportModalOpen}>
-             <DialogContent className="sm:max-w-2xl p-0 border-0 bg-white shadow-2xl rounded-[2.5rem] overflow-hidden">
-                <div className="bg-rose-600 p-8 text-white relative">
+             <DialogContent className="sm:max-w-2xl p-0 border-0 bg-white shadow-2xl rounded-[2.5rem] overflow-hidden max-h-[90vh] flex flex-col">
+                <div className="bg-rose-600 p-8 text-white relative shrink-0">
                    <div className="flex items-center justify-between mb-4">
                       <Badge className="bg-white/10 text-white border-0 text-[8px] font-black uppercase px-4 py-1 rounded-full tracking-widest">SUPPORT TICKET</Badge>
                       <Badge className={`text-[8px] font-black uppercase px-4 py-1 border-0 rounded-full ${selectedMessage?.isRead ? 'bg-white/20' : 'bg-white animate-bounce text-rose-600'}`}>
@@ -1230,30 +1243,46 @@ export default function AdminCommandCenterClient({
                    </DialogTitle>
                    <p className="text-rose-100 font-bold mt-2 text-sm uppercase tracking-widest">From: {selectedMessage?.userName} ({selectedMessage?.userRole})</p>
                 </div>
-                <div className="p-8 space-y-8 bg-slate-50/50">
+                <div className="p-8 space-y-8 bg-slate-50/50 flex-grow overflow-y-auto custom-scrollbar">
                    <div className="space-y-4">
                       <div className="flex items-center justify-between">
                          <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Mail className="h-4 w-4" /> Message Content</h5>
                          <span className="text-[10px] font-bold text-slate-400">{selectedMessage?.createdAt && new Date(selectedMessage.createdAt).toLocaleString()}</span>
                       </div>
-                      <Card className="p-8 rounded-[2rem] border-0 bg-white shadow-sm italic text-slate-700 leading-relaxed text-base">
-                         "{selectedMessage?.message}"
-                      </Card>
+                      
+                      {/* BEAUTIFIED MESSAGE BUBBLE */}
+                      <div className="relative group">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-rose-100 to-indigo-100 rounded-[2.5rem] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                        <Card className="relative p-10 rounded-[2.5rem] border-0 bg-white shadow-sm overflow-hidden">
+                           <div className="absolute top-0 right-0 p-4 opacity-5"><HelpCircle className="h-24 w-24 text-rose-600" /></div>
+                           <p className="text-slate-700 leading-relaxed text-lg font-medium italic relative z-10">
+                              "{selectedMessage?.message}"
+                           </p>
+                        </Card>
+                      </div>
                    </div>
 
                    <div className="grid grid-cols-2 gap-6">
-                      <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm">
-                         <p className="text-[9px] font-black text-slate-400 uppercase mb-1">User Email</p>
-                         <p className="text-sm font-black text-slate-900">{selectedMessage?.userEmail}</p>
+                      <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-1">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">User Email</p>
+                         <p className="text-sm font-black text-slate-900 truncate">{selectedMessage?.userEmail}</p>
                       </div>
-                      <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm">
-                         <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Inquiry Type</p>
-                         <Badge className="bg-indigo-50 text-indigo-700 border-0 text-[10px] font-black uppercase px-3 py-1 rounded-lg">{selectedMessage?.type}</Badge>
+                      <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-1">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Inquiry Type</p>
+                         <div>
+                            <Badge className="bg-indigo-50 text-indigo-700 border-0 text-[10px] font-black uppercase px-3 py-1 rounded-lg">{selectedMessage?.type}</Badge>
+                         </div>
                       </div>
                    </div>
                 </div>
                 <DialogFooter className="p-6 bg-white border-t border-slate-200 flex gap-6 shrink-0">
-                   <Button variant="ghost" className="flex-1 font-black text-[11px] text-slate-400 h-12 rounded-2xl uppercase tracking-widest" onClick={() => setIsSupportModalOpen(false)}>Close Ticket</Button>
+                   <Button 
+                      variant="ghost" 
+                      className="flex-1 font-black text-[11px] text-rose-600 hover:bg-rose-50 h-12 rounded-2xl uppercase tracking-widest" 
+                      onClick={() => handleCloseSupportTicket(selectedMessage.id)}
+                   >
+                      <Trash2 className="h-4 w-4 mr-2" /> Close & Archive
+                   </Button>
                    <Button className="flex-[2] h-12 bg-rose-600 text-white rounded-2xl font-black text-sm shadow-2xl shadow-rose-600/30 uppercase tracking-widest hover:bg-rose-700 transition-all" onClick={() => window.open(`mailto:${selectedMessage?.userEmail}?subject=Re: KrishiConnect Support Ticket`)}>
                       Reply via Email <ExternalLink className="ml-2 h-4 w-4" />
                    </Button>
@@ -1263,8 +1292,8 @@ export default function AdminCommandCenterClient({
 
           {/* SPECIAL DELIVERY MEDIATION MODAL */}
            <Dialog open={isMediationModalOpen} onOpenChange={setIsMediationModalOpen}>
-              <DialogContent className="sm:max-w-2xl p-0 border-0 bg-white shadow-2xl rounded-[2.5rem] overflow-hidden">
-                 <div className="bg-amber-500 p-8 text-white relative">
+              <DialogContent className="sm:max-w-2xl p-0 border-0 bg-white shadow-2xl rounded-[2.5rem] overflow-hidden max-h-[90vh] flex flex-col">
+                 <div className="bg-amber-500 p-8 text-white relative shrink-0">
                     <div className="flex items-center justify-between mb-4">
                        <Badge className="bg-white/10 text-white border-0 text-[8px] font-black uppercase px-4 py-1 rounded-full tracking-widest">LOGISTICS MEDIATION</Badge>
                         <div className="flex gap-2">

@@ -27,18 +27,16 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 export default function MarketplaceClient({ initialListings, metadata, userRole, recentlyViewed }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [viewMode, setViewMode] = useState("grid"); // grid or list
 
-  // --- Filter States ---
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [activeTab, setActiveTab] = useState("all");
+  // --- Filter States (Synced with URL) ---
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get("category") || "All");
+  const [activeTab, setActiveTab] = useState(searchParams.get("sellerType") || "all");
   const [priceRange, setPriceRange] = useState({ min: "", max: "" });
-  const [showOutOfStock, setShowOutOfStock] = useState(
-    initialListings?.some(item => item.availableStock > 0) ? false : true
-  );
-  const [sortBy, setSortBy] = useState("newest");
-  const [locationFilter, setLocationFilter] = useState("");
+  const [showOutOfStock, setShowOutOfStock] = useState(true);
+  const [sortBy, setSortBy] = useState(searchParams.get("sortBy") || "newest");
+  const [locationFilter, setLocationFilter] = useState(searchParams.get("region") || "");
   const [freshnessFilter, setFreshnessFilter] = useState("all");
 
   const [mounted, setMounted] = useState(false);
@@ -99,6 +97,34 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
     });
   }, [initialListings, searchQuery, selectedCategory, activeTab, priceRange, showOutOfStock, locationFilter, freshnessFilter, sortBy]);
 
+  const updateParams = (newParams) => {
+    const params = new URLSearchParams(searchParams);
+    Object.entries(newParams).forEach(([key, value]) => {
+      if (value === null || value === "" || value === "All" || value === "all") {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    });
+    // Reset to page 1 on filter change unless it's a page change
+    if (!newParams.page) params.delete("page");
+    router.push(`/marketplace?${params.toString()}`, { scroll: false });
+  };
+
+  // Sync state to URL with debounce for search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery !== (searchParams.get("search") || "")) {
+        updateParams({ search: searchQuery });
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handlePageChange = (newPage) => {
+    updateParams({ page: newPage });
+  };
+
   const resetFilters = () => {
     setSearchQuery("");
     setSelectedCategory("All");
@@ -106,12 +132,7 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
     setSortBy("newest");
     setLocationFilter("");
     setFreshnessFilter("all");
-  };
-
-  const handlePageChange = (newPage) => {
-    const params = new URLSearchParams(searchParams);
-    params.set("page", newPage);
-    router.push(`/marketplace?${params.toString()}`);
+    router.push("/marketplace");
   };
 
   const PaginationUI = () => {
@@ -310,7 +331,7 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
         >
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             {/* Tabs */}
-            <Tabs defaultValue="all" onValueChange={setActiveTab} className="w-full md:w-auto">
+            <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); updateParams({ sellerType: val }); }} className="w-full md:w-auto">
               <TabsList className="h-12 p-1 bg-gray-100/80 rounded-full">
                 <TabsTrigger
                   value="all"
@@ -338,7 +359,7 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
 
             {/* Sort & Filter Controls */}
             <div className="flex items-center gap-3 w-full md:w-auto">
-              <Select value={sortBy} onValueChange={setSortBy}>
+              <Select value={sortBy} onValueChange={(val) => { setSortBy(val); updateParams({ sortBy: val }); }}>
                 <SelectTrigger className="h-12 bg-white border-2 border-gray-200 hover:border-emerald-300 rounded-xl font-medium min-w-[180px] transition-all">
                   <ArrowUpDown className="h-4 w-4 mr-2 text-gray-500" />
                   <SelectValue placeholder="Sort by" />
@@ -609,7 +630,7 @@ function FilterSidebar({
             placeholder="Search region/district..."
             className="pl-10 h-11 bg-gray-50 border-2 border-gray-200 hover:border-purple-300 focus:border-purple-500 rounded-xl transition-all"
             value={locationFilter}
-            onChange={(e) => setLocationFilter(e.target.value)}
+            onChange={(e) => { setLocationFilter(e.target.value); updateParams({ region: e.target.value }); }}
           />
         </div>
         <p className="text-xs text-gray-400">Find sellers near your location</p>
@@ -719,7 +740,7 @@ function FilterSidebar({
               transition={{ delay: idx * 0.02 }}
               whileHover={{ x: 4 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => setSelectedCategory(cat)}
+              onClick={() => { setSelectedCategory(cat); updateParams({ category: cat }); }}
               className={`block text-sm w-full text-left px-4 py-3 rounded-xl transition-all ${selectedCategory === cat
                 ? "bg-gradient-to-r from-emerald-50 to-green-50 text-emerald-700 font-semibold border-l-4 border-emerald-500 shadow-md"
                 : "text-gray-600 hover:bg-gray-50 hover:border-l-4 hover:border-gray-200"

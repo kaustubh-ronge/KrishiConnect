@@ -26,7 +26,16 @@ export default async function MarketplacePage({ searchParams }) {
   }
 
   // 3. Fetch Data
-  const { data: listings, success, pagination } = await getMarketplaceListings({ page, limit });
+  const { data: listings, success, pagination } = await getMarketplaceListings({ 
+    page, 
+    limit,
+    search: params.search || "",
+    category: params.category || "All",
+    sortBy: params.sortBy || "newest",
+    sellerType: params.sellerType || "all",
+    region: params.region || "",
+    district: params.district || ""
+  });
   const { data: recentlyViewed } = await getRecentlyViewedProducts();
 
   return (
