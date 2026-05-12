@@ -388,11 +388,12 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     };
 
     const handleUpdateQty = async (item, change) => {
-        // --- QUANTITY LOCK FOR SPECIAL DELIVERY ---
+        // --- QUANTITY CAP FOR REUSABLE SPECIAL DELIVERY ---
         const activeApproval = specialRequests?.find(r => r.productId === item.productId && r.status === 'APPROVED' && !r.isConsumed);
-        if (activeApproval) {
-            toast.error("Quantity is locked for approved special delivery.", {
-                description: `This product is locked at ${activeApproval.quantity} ${activeApproval.unit || item.product.unit} as per mediation.`
+        
+        if (activeApproval && change > 0 && item.quantity >= activeApproval.quantity) {
+            toast.error(`Mediation limit reached.`, {
+                description: `Admin approved up to ${activeApproval.quantity} ${activeApproval.unit || item.product.unit}. For more, please submit a new request.`
             });
             return;
         }
@@ -920,27 +921,46 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                         )}
 
                                                         {isApproved && (
-                                                            <div className="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between gap-3 shadow-inner">
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm"><Truck className="h-4 w-4 text-emerald-600" /></div>
-                                                                    <div>
-                                                                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800">Special Delivery Approved</p>
-                                                                        <p className="text-[9px] font-bold text-emerald-600 uppercase">Extra Logistics Fee: ₹{activeRequest.negotiatedFee}</p>
+                                                            <div className="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex flex-col gap-3 shadow-inner">
+                                                                <div className="flex items-center justify-between gap-3">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm"><Truck className="h-4 w-4 text-emerald-600" /></div>
+                                                                        <div>
+                                                                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-800">Special Delivery Approved</p>
+                                                                            <p className="text-[9px] font-bold text-emerald-600 uppercase">Terms verified by Admin</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex flex-col items-end gap-2">
+                                                                        <Badge className="bg-emerald-600 text-white border-0 text-[8px] font-black uppercase">READY</Badge>
+                                                                        <button
+                                                                            onClick={async (e) => {
+                                                                                e.stopPropagation();
+                                                                                const { deleteSpecialDeliveryRequest } = await import('@/actions/special-delivery');
+                                                                                const res = await deleteSpecialDeliveryRequest(activeRequest.id);
+                                                                                if (res.success) toast.success("Mediation cleared. Quantity unlocked.");
+                                                                            }}
+                                                                            className="text-[8px] font-black text-rose-500 uppercase hover:underline"
+                                                                        >
+                                                                            Cancel & Re-request
+                                                                        </button>
                                                                     </div>
                                                                 </div>
-                                                                <div className="flex flex-col items-end gap-2">
-                                                                    <Badge className="bg-emerald-600 text-white border-0 text-[8px] font-black uppercase">READY</Badge>
-                                                                    <button 
-                                                                        onClick={async (e) => {
-                                                                            e.stopPropagation();
-                                                                            const { deleteSpecialDeliveryRequest } = await import('@/actions/special-delivery');
-                                                                            const res = await deleteSpecialDeliveryRequest(activeRequest.id);
-                                                                            if (res.success) toast.success("Mediation cleared. Quantity unlocked.");
-                                                                        }}
-                                                                        className="text-[8px] font-black text-rose-500 uppercase hover:underline"
-                                                                    >
-                                                                        Cancel & Re-request
-                                                                    </button>
+
+                                                                {/* HIGHLIGHTED TERMS NOTE */}
+                                                                <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50 space-y-1">
+                                                                    <p className="text-[10px] font-black text-emerald-900 uppercase tracking-tight flex items-center gap-1.5">
+                                                                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Mediation Terms Secured
+                                                                    </p>
+                                                                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                                                        <div className="flex items-center gap-1">
+                                                                            <span className="text-[9px] font-bold text-emerald-600/70 uppercase">Approved Limit:</span>
+                                                                            <span className="text-[10px] font-black text-emerald-700">{activeRequest.quantity} {activeRequest.unit || item.product.unit}</span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1">
+                                                                            <span className="text-[9px] font-bold text-emerald-600/70 uppercase">Delivery Fee:</span>
+                                                                            <span className="text-[10px] font-black text-emerald-700">₹{activeRequest.negotiatedFee}</span>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         )}
@@ -956,7 +976,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                                 </div>
                                                                 <div className="flex flex-col items-end gap-2">
                                                                     <Badge className="bg-indigo-600 text-white border-0 text-[8px] font-black uppercase">PENDING</Badge>
-                                                                    <button 
+                                                                    <button
                                                                         onClick={async (e) => {
                                                                             e.stopPropagation();
                                                                             const { deleteSpecialDeliveryRequest } = await import('@/actions/special-delivery');
@@ -1036,9 +1056,9 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                                     <div className="flex flex-col gap-1.5">
                                                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Quantity ({item.product?.unit || 'Units'})</p>
                                                                         <div className="flex items-center bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                                                            <Button variant="ghost" size="icon" disabled={isApproved} className="h-9 w-9 rounded-none hover:bg-slate-50 border-r border-slate-50" onClick={() => handleUpdateQty(item, -1)}><Minus className="h-3 w-3" /></Button>
+                                                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none hover:bg-slate-50 border-r border-slate-50" onClick={() => handleUpdateQty(item, -1)}><Minus className="h-3 w-3" /></Button>
                                                                             <span className="w-10 text-center font-black text-slate-900 text-sm">{item.quantity}</span>
-                                                                            <Button variant="ghost" size="icon" disabled={isApproved} className="h-9 w-9 rounded-none hover:bg-slate-50 border-l border-slate-50 text-emerald-600" onClick={() => handleUpdateQty(item, 1)}><Plus className="h-3 w-3" /></Button>
+                                                                            <Button variant="ghost" size="icon" disabled={isApproved && item.quantity >= (activeRequest?.quantity || 0)} className="h-9 w-9 rounded-none hover:bg-slate-50 border-l border-slate-50 text-emerald-600" onClick={() => handleUpdateQty(item, 1)}><Plus className="h-3 w-3" /></Button>
                                                                         </div>
                                                                     </div>
                                                                     <div className="text-right">

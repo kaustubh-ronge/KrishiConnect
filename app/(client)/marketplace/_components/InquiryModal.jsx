@@ -157,7 +157,7 @@ export default function InquiryModal({ isOpen, onClose, product, onSuccess, isSp
             <div className="space-y-2">
               <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                 <Box className="h-4 w-4 text-emerald-500" />
-                Quantity Required
+                Quantity of {product.productName} ({product.unit})
               </Label>
               <div className="relative">
                 <Box className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />

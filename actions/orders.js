@@ -300,26 +300,35 @@ export async function initiateCheckout(params) {
 
         // 1. CHECK FOR APPROVED SPECIAL DELIVERY REQUESTS
         const sellerItems = seller.items;
-        // Check for approvals per-item to enforce quantity locking
+        let sellerNegotiatedTotal = 0;
+        let allOutOfRangeItemsApproved = true;
+        let hasOutOfRangeItems = false;
+
         for (const it of sellerItems) {
-            const approvedReq = approvedRequests.find(r => r.productId === it.productId);
-            if (approvedReq) {
-                // QUANTITY LOCKING: Approved quantity must match cart quantity exactly
-                if (it.quantity !== approvedReq.quantity) {
+            const productRange = it.product.maxDeliveryRange;
+            const effectiveMaxRange = Number(productRange ?? sellerProfile.maxDeliveryRange ?? 100);
+            
+            if (dist > effectiveMaxRange) {
+                hasOutOfRangeItems = true;
+                const approvedReq = approvedRequests.find(r => r.productId === it.productId);
+                
+                if (!approvedReq || approvedReq.negotiatedFee === null) {
+                    allOutOfRangeItemsApproved = false;
+                } else if (it.quantity > approvedReq.quantity) {
+                    // QUANTITY CAP ENFORCEMENT
                     return { 
                         success: false, 
-                        error: `Approved quantity for ${it.product.productName} is locked at ${approvedReq.quantity} ${approvedReq.unit || it.product.unit}. Please update your cart to match the approved mediation.` 
+                        error: `Approved quantity for ${it.product.productName} is limited to ${approvedReq.quantity} ${approvedReq.unit || it.product.unit}. Please update your cart or submit a new special delivery request for the extra amount.` 
                     };
+                } else {
+                    sellerNegotiatedTotal += (approvedReq.negotiatedFee || 0);
                 }
             }
         }
 
-        // Standard logistics fee calculation logic continues...
-        const sellerApprovedReq = approvedRequests.find(r => sellerItems.some(it => it.productId === r.productId));
-
-        if (sellerApprovedReq && sellerApprovedReq.negotiatedFee !== null) {
-          deliveryTotal += sellerApprovedReq.negotiatedFee;
-          continue; // Standard check bypassed for approved negotiation
+        if (hasOutOfRangeItems && allOutOfRangeItemsApproved) {
+            deliveryTotal += sellerNegotiatedTotal;
+            continue; // Bypasses standard distance checks as all OOR items are mediated
         }
 
         // 2. ENFORCE SERVICEABILITY LIMITS
@@ -830,13 +839,45 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
 
     for (const seller of sellerMap.values()) {
       const sellerItems = items.filter(it => (it.product.farmerId || it.product.agentId) === seller.id);
+      
+      let sellerNegotiatedTotal = 0;
+      let allOutOfRangeItemsApproved = true;
+      let hasOutOfRangeItems = false;
 
-      // Check if ANY item from this seller has an approved special delivery request
-      const sellerApprovedReq = approvedRequests.find(r => sellerItems.some(it => it.product.id === r.productId));
+      // Check if profile exists for range check
+      let profile;
+      if (seller.type === 'farmer') {
+        profile = await db.farmerProfile.findUnique({ where: { id: seller.id } });
+      } else {
+        profile = await db.agentProfile.findUnique({ where: { id: seller.id } });
+      }
 
-      if (sellerApprovedReq && sellerApprovedReq.negotiatedFee !== null) {
-        totalFee += sellerApprovedReq.negotiatedFee;
-        continue; // Skip standard calculation for this seller
+      if (profile?.lat && profile?.lng && targetLat && targetLng) {
+        const dist = await getOSRMDistance(profile.lat, profile.lng, targetLat, targetLng);
+        
+        for (const it of sellerItems) {
+          const productRange = it.product.maxDeliveryRange;
+          const effectiveMaxRange = Number(productRange ?? profile.maxDeliveryRange ?? 100);
+          
+          if (dist > effectiveMaxRange) {
+            hasOutOfRangeItems = true;
+            // Search for approval by productId (handling both CartItem it.productId and ProductListing it.product.id)
+            const pId = it.productId || it.product.id;
+            const approvedReq = approvedRequests.find(r => r.productId === pId);
+            
+            // Reusable logic: quantity must be <= approved quantity
+            if (!approvedReq || approvedReq.negotiatedFee === null || (it.quantity && it.quantity > approvedReq.quantity)) {
+              allOutOfRangeItemsApproved = false;
+            } else {
+              sellerNegotiatedTotal += (approvedReq.negotiatedFee || 0);
+            }
+          }
+        }
+      }
+
+      if (hasOutOfRangeItems && allOutOfRangeItemsApproved) {
+        totalFee += sellerNegotiatedTotal;
+        continue; 
       }
 
       let profile;
