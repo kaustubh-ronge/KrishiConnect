@@ -844,7 +844,7 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
       let allOutOfRangeItemsApproved = true;
       let hasOutOfRangeItems = false;
 
-      // Check if profile exists for range check
+      // 1. Fetch Profile ONCE
       let profile;
       if (seller.type === 'farmer') {
         profile = await db.farmerProfile.findUnique({ where: { id: seller.id } });
@@ -855,17 +855,16 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
       if (profile?.lat && profile?.lng && targetLat && targetLng) {
         const dist = await getOSRMDistance(profile.lat, profile.lng, targetLat, targetLng);
         
+        // 2. Specialized Check (Quantity-capped reusable mediation)
         for (const it of sellerItems) {
           const productRange = it.product.maxDeliveryRange;
           const effectiveMaxRange = Number(productRange ?? profile.maxDeliveryRange ?? 100);
           
           if (dist > effectiveMaxRange) {
             hasOutOfRangeItems = true;
-            // Search for approval by productId (handling both CartItem it.productId and ProductListing it.product.id)
             const pId = it.productId || it.product.id;
             const approvedReq = approvedRequests.find(r => r.productId === pId);
             
-            // Reusable logic: quantity must be <= approved quantity
             if (!approvedReq || approvedReq.negotiatedFee === null || (it.quantity && it.quantity > approvedReq.quantity)) {
               allOutOfRangeItemsApproved = false;
             } else {
@@ -873,23 +872,13 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
             }
           }
         }
-      }
 
-      if (hasOutOfRangeItems && allOutOfRangeItemsApproved) {
-        totalFee += sellerNegotiatedTotal;
-        continue; 
-      }
+        if (hasOutOfRangeItems && allOutOfRangeItemsApproved) {
+          totalFee += sellerNegotiatedTotal;
+          continue; 
+        }
 
-      let profile;
-      if (seller.type === 'farmer') {
-        profile = await db.farmerProfile.findUnique({ where: { id: seller.id } });
-      } else {
-        profile = await db.agentProfile.findUnique({ where: { id: seller.id } });
-      }
-
-      if (profile?.lat && profile?.lng) {
-        const dist = await getOSRMDistance(profile.lat, profile.lng, targetLat, targetLng);
-
+        // 3. Standard Fallback (If not all OOR items are approved or in-range check)
         // --- SERVICEABILITY CHECK (Per-Product Override) ---
         let isSellerOutOfRange = false;
 
@@ -905,31 +894,21 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
         }
 
         if (isSellerOutOfRange) {
-          // Use it.id if it's a CartItem, otherwise use it.product.id for single product preview
           unserviceableIds.push(...sellerItems.map(it => it.id || it.product.id));
-          isLongDistance = true; // Mark as problematic
+          isLongDistance = true; 
         } else {
-          // If distance is beyond 100km, we will FLAG it to hide the price in UI
           if (dist > 100) isLongDistance = true;
 
-          // Real-time market scan for partners within 100km of the seller
           const partnersRes = await getAvailableDeliveryBoys(profile.lat, profile.lng);
           let marketRate = profile.deliveryPricePerKm || 10;
 
           if (partnersRes.success && partnersRes.data.length > 0) {
-            // Filter: Online partners within 100km
             const localPartners = partnersRes.data.filter(p => p.isOnline && p.distance <= 100);
-
             if (localPartners.length > 0) {
-              // Use the rate of the NEAREST available partner
-              const nearestPartner = localPartners[0]; // Already sorted by distance in getAvailableDeliveryBoys
-              const nearestPartnerRate = nearestPartner.pricePerKm;
-
-              // Charge the buyer the HIGHER of seller's rate or the NEAREST partner's rate
-              marketRate = Math.max(marketRate, nearestPartnerRate);
+              const nearestPartner = localPartners[0];
+              marketRate = Math.max(marketRate, nearestPartner.pricePerKm);
             }
           }
-
           totalFee += Math.round(dist * marketRate);
         }
       }
