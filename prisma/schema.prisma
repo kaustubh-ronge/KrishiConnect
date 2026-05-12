@@ -571,6 +571,7 @@ model SpecialDeliveryRequest {
   product       ProductListing @relation(fields: [productId], references: [id], onDelete: Cascade)
   
   quantity      Float
+  unit          String?  // The unit (kg, L, etc.) at the time of request
   sellerId      String   
   
   negotiatedFee Float?   
@@ -579,6 +580,7 @@ model SpecialDeliveryRequest {
   adminNotes    String?
   rejectedAt    DateTime?
   inquirySent   Boolean  @default(false)
+  isConsumed    Boolean  @default(false) // Approval becomes invalid after successful purchase
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

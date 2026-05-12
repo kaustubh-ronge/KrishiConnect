@@ -49,7 +49,7 @@ export default function InquiryModal({ isOpen, onClose, product, onSuccess, isSp
        // 1. If special delivery, create the request FIRST (strict sequence)
        if (isSpecialDelivery && sellerId) {
           const { createSpecialDeliveryRequest } = await import("@/actions/special-delivery");
-          const createRes = await createSpecialDeliveryRequest(product.id, quantity || 1, sellerId);
+          const createRes = await createSpecialDeliveryRequest(product.id, quantity || 1, sellerId, product.unit);
           if (!createRes.success) {
              toast.error(createRes.error || "Failed to initiate mediation.");
              setIsSending(false);

@@ -300,6 +300,21 @@ export async function initiateCheckout(params) {
 
         // 1. CHECK FOR APPROVED SPECIAL DELIVERY REQUESTS
         const sellerItems = seller.items;
+        // Check for approvals per-item to enforce quantity locking
+        for (const it of sellerItems) {
+            const approvedReq = approvedRequests.find(r => r.productId === it.productId);
+            if (approvedReq) {
+                // QUANTITY LOCKING: Approved quantity must match cart quantity exactly
+                if (it.quantity !== approvedReq.quantity) {
+                    return { 
+                        success: false, 
+                        error: `Approved quantity for ${it.product.productName} is locked at ${approvedReq.quantity} ${approvedReq.unit || it.product.unit}. Please update your cart to match the approved mediation.` 
+                    };
+                }
+            }
+        }
+
+        // Standard logistics fee calculation logic continues...
         const sellerApprovedReq = approvedRequests.find(r => sellerItems.some(it => it.productId === r.productId));
 
         if (sellerApprovedReq && sellerApprovedReq.negotiatedFee !== null) {
@@ -728,6 +743,21 @@ export async function confirmOrderPayment({ orderId, razorpayPaymentId, razorpay
     revalidatePath('/farmer-dashboard/manage-orders');
     revalidatePath('/agent-dashboard/manage-orders');
 
+    // ─── CONSUME SPECIAL DELIVERY REQUESTS ───
+    // Once order is paid, approved mediation requests are consumed
+    const productIds = orderWithSellers.items.map(it => it.productId);
+    await db.specialDeliveryRequest.updateMany({
+      where: {
+        userId: orderWithSellers.buyerId,
+        productId: { in: productIds },
+        status: 'APPROVED',
+        isConsumed: false
+      },
+      data: {
+        isConsumed: true
+      }
+    });
+
     return { success: true };
 
   } catch (err) {
@@ -787,6 +817,7 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
       where: {
         userId: user.id,
         status: 'APPROVED',
+        isConsumed: false, // EXCLUDE CONSUMED REQUESTS
         productId: productId ? productId : { in: items.map(it => it.product.id) }
       },
       orderBy: { updatedAt: 'desc' }

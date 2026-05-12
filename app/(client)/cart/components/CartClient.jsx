@@ -388,6 +388,15 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     };
 
     const handleUpdateQty = async (item, change) => {
+        // --- QUANTITY LOCK FOR SPECIAL DELIVERY ---
+        const activeApproval = specialRequests?.find(r => r.productId === item.productId && r.status === 'APPROVED' && !r.isConsumed);
+        if (activeApproval) {
+            toast.error("Quantity is locked for approved special delivery.", {
+                description: `This product is locked at ${activeApproval.quantity} ${activeApproval.unit || item.product.unit} as per mediation.`
+            });
+            return;
+        }
+
         const newQty = item.quantity + change;
         const minQty = item.product.minOrderQuantity || 1;
 
@@ -919,7 +928,20 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                                         <p className="text-[9px] font-bold text-emerald-600 uppercase">Extra Logistics Fee: ₹{activeRequest.negotiatedFee}</p>
                                                                     </div>
                                                                 </div>
-                                                                <Badge className="bg-emerald-600 text-white border-0 text-[8px] font-black uppercase">READY</Badge>
+                                                                <div className="flex flex-col items-end gap-2">
+                                                                    <Badge className="bg-emerald-600 text-white border-0 text-[8px] font-black uppercase">READY</Badge>
+                                                                    <button 
+                                                                        onClick={async (e) => {
+                                                                            e.stopPropagation();
+                                                                            const { deleteSpecialDeliveryRequest } = await import('@/actions/special-delivery');
+                                                                            const res = await deleteSpecialDeliveryRequest(activeRequest.id);
+                                                                            if (res.success) toast.success("Mediation cleared. Quantity unlocked.");
+                                                                        }}
+                                                                        className="text-[8px] font-black text-rose-500 uppercase hover:underline"
+                                                                    >
+                                                                        Cancel & Re-request
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         )}
 
@@ -932,7 +954,20 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                                         <p className="text-[9px] font-bold text-indigo-500 uppercase">Admin reviewing your distance request...</p>
                                                                     </div>
                                                                 </div>
-                                                                <Badge className="bg-indigo-600 text-white border-0 text-[8px] font-black uppercase">PENDING</Badge>
+                                                                <div className="flex flex-col items-end gap-2">
+                                                                    <Badge className="bg-indigo-600 text-white border-0 text-[8px] font-black uppercase">PENDING</Badge>
+                                                                    <button 
+                                                                        onClick={async (e) => {
+                                                                            e.stopPropagation();
+                                                                            const { deleteSpecialDeliveryRequest } = await import('@/actions/special-delivery');
+                                                                            const res = await deleteSpecialDeliveryRequest(activeRequest.id);
+                                                                            if (res.success) toast.success("Mediation cancelled. You can now change quantity and re-request.");
+                                                                        }}
+                                                                        className="text-[8px] font-black text-rose-500 uppercase hover:underline"
+                                                                    >
+                                                                        Cancel Request
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         )}
 
@@ -1001,9 +1036,9 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                                     <div className="flex flex-col gap-1.5">
                                                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Quantity ({item.product?.unit || 'Units'})</p>
                                                                         <div className="flex items-center bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none hover:bg-slate-50 border-r border-slate-50" onClick={() => handleUpdateQty(item, -1)}><Minus className="h-3 w-3" /></Button>
+                                                                            <Button variant="ghost" size="icon" disabled={isApproved} className="h-9 w-9 rounded-none hover:bg-slate-50 border-r border-slate-50" onClick={() => handleUpdateQty(item, -1)}><Minus className="h-3 w-3" /></Button>
                                                                             <span className="w-10 text-center font-black text-slate-900 text-sm">{item.quantity}</span>
-                                                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none hover:bg-slate-50 border-l border-slate-50 text-emerald-600" onClick={() => handleUpdateQty(item, 1)}><Plus className="h-3 w-3" /></Button>
+                                                                            <Button variant="ghost" size="icon" disabled={isApproved} className="h-9 w-9 rounded-none hover:bg-slate-50 border-l border-slate-50 text-emerald-600" onClick={() => handleUpdateQty(item, 1)}><Plus className="h-3 w-3" /></Button>
                                                                         </div>
                                                                     </div>
                                                                     <div className="text-right">

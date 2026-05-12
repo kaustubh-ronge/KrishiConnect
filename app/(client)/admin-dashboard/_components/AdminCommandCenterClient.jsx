@@ -14,7 +14,8 @@ import {
    UserX, UserCheck2, RefreshCw, ShoppingBag,
    ListChecks, ClipboardEdit, StickyNote, Map as LucideMap,
    Zap,
-   Star
+   Star,
+   Box
 } from "lucide-react";
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -94,6 +95,7 @@ export default function AdminCommandCenterClient({
    const [isMediationModalOpen, setIsMediationModalOpen] = useState(false);
    const [selectedRequest, setSelectedRequest] = useState(null);
    const [negotiatedFee, setNegotiatedFee] = useState("");
+   const [adminQuantity, setAdminQuantity] = useState("");
 
    // Pagination
    const [currentPage, setCurrentPage] = useState(1);
@@ -1346,23 +1348,41 @@ export default function AdminCommandCenterClient({
                     )}
                     </div>
 
-                    <div className="p-8 bg-amber-50 border-2 border-amber-200 rounded-[2.5rem] space-y-6 shadow-inner">
-                       <div className="flex items-center justify-between">
-                          <h5 className="text-[11px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-2"><IndianRupee className="h-5 w-5" /> Negotiated Delivery Fee</h5>
-                          <Badge className="bg-amber-500 text-white border-0 text-[8px] px-3 py-1 uppercase font-black rounded-lg shadow-lg shadow-amber-500/20">Action: SET FEE</Badge>
-                       </div>
-                       <div className="relative">
-                          <IndianRupee className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-amber-600" />
-                          <Input 
-                             type="number"
-                             placeholder="0.00"
-                             value={negotiatedFee}
-                             onChange={(e) => setNegotiatedFee(e.target.value)}
-                             className="pl-16 h-20 bg-white border-4 border-amber-200 focus:border-amber-500 rounded-3xl text-3xl font-black tracking-tighter shadow-sm transition-all"
-                          />
-                       </div>
-                       <p className="text-[9px] text-amber-600/60 font-black text-center uppercase">This fee will be added to the buyer's checkout total.</p>
-                    </div>
+                     <div className="p-8 bg-blue-50 border-2 border-blue-200 rounded-[2.5rem] space-y-6 shadow-inner">
+                        <div className="flex items-center justify-between">
+                           <h5 className="text-[11px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-2"><Box className="h-5 w-5" /> Approved Quantity</h5>
+                           <Badge className="bg-blue-500 text-white border-0 text-[8px] px-3 py-1 uppercase font-black rounded-lg shadow-lg shadow-blue-500/20">Action: SET QTY</Badge>
+                        </div>
+                        <div className="relative">
+                           <Box className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-blue-600" />
+                           <Input 
+                              type="number"
+                              placeholder="0.00"
+                              value={adminQuantity}
+                              onChange={(e) => setAdminQuantity(e.target.value)}
+                              className="pl-16 h-20 bg-white border-4 border-blue-200 focus:border-blue-500 rounded-3xl text-3xl font-black tracking-tighter shadow-sm transition-all"
+                           />
+                        </div>
+                        <p className="text-[9px] text-blue-600/60 font-black text-center uppercase">This quantity will be LOCKED for the buyer.</p>
+                     </div>
+
+                     <div className="p-8 bg-amber-50 border-2 border-amber-200 rounded-[2.5rem] space-y-6 shadow-inner">
+                        <div className="flex items-center justify-between">
+                           <h5 className="text-[11px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-2"><IndianRupee className="h-5 w-5" /> Negotiated Delivery Fee</h5>
+                           <Badge className="bg-amber-500 text-white border-0 text-[8px] px-3 py-1 uppercase font-black rounded-lg shadow-lg shadow-amber-500/20">Action: SET FEE</Badge>
+                        </div>
+                        <div className="relative">
+                           <IndianRupee className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-amber-600" />
+                           <Input 
+                              type="number"
+                              placeholder="0.00"
+                              value={negotiatedFee}
+                              onChange={(e) => setNegotiatedFee(e.target.value)}
+                              className="pl-16 h-20 bg-white border-4 border-amber-200 focus:border-amber-500 rounded-3xl text-3xl font-black tracking-tighter shadow-sm transition-all"
+                           />
+                        </div>
+                        <p className="text-[9px] text-amber-600/60 font-black text-center uppercase">This fee will be added to the buyer's checkout total.</p>
+                     </div>
                  </div>
                  <DialogFooter className="p-8 bg-white border-t border-slate-200 flex gap-6 shrink-0">
                     <Button variant="ghost" className="flex-1 font-black text-[11px] text-slate-400 h-14 rounded-2xl uppercase tracking-widest hover:bg-slate-50" onClick={() => setIsMediationModalOpen(false)}>Back to Directory</Button>
@@ -1377,8 +1397,8 @@ export default function AdminCommandCenterClient({
                        }}>Reject Request</Button>
                        <Button className="flex-1 h-14 bg-amber-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-amber-500/30 hover:bg-amber-600 transition-all active:scale-95 group" onClick={async () => {
                           const { updateSpecialDeliveryStatus } = await import('@/actions/special-delivery');
-                          const id = toast.loading("Approving & Locking Fee...");
-                          await updateSpecialDeliveryStatus(selectedRequest.id, 'APPROVED', negotiatedFee);
+                          const id = toast.loading("Approving & Locking Logistics...");
+                          await updateSpecialDeliveryStatus(selectedRequest.id, 'APPROVED', negotiatedFee, "", adminQuantity);
                           toast.success("Logistics Approved!", { id });
                           setIsMediationModalOpen(false);
                           fetchDirectoryData('mediation');

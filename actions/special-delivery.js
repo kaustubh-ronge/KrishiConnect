@@ -8,7 +8,7 @@ import { apiResponse } from "@/lib/permissions";
 /**
  * Create a new special delivery request.
  */
-export async function createSpecialDeliveryRequest(productId, quantity, sellerId) {
+export async function createSpecialDeliveryRequest(productId, quantity, sellerId, unit = null) {
     try {
         const user = await currentUser();
         if (!user) throw new Error("Unauthorized");
@@ -44,8 +44,10 @@ export async function createSpecialDeliveryRequest(productId, quantity, sellerId
                 where: { id: existing.id },
                 data: {
                     quantity: parseFloat(quantity),
+                    unit: unit,
                     status: "PENDING",
                     inquirySent: false, // Reset inquiry status on re-request
+                    isConsumed: false, // Re-requesting makes it active again
                     rejectedAt: null, // Reset rejection timestamp
                     adminNotes: null, // Clear old notes
                     negotiatedFee: null // Clear old fee
@@ -62,9 +64,11 @@ export async function createSpecialDeliveryRequest(productId, quantity, sellerId
                 userId: user.id,
                 productId: productId,
                 quantity: parseFloat(quantity),
+                unit: unit,
                 sellerId: sellerId,
                 status: "PENDING",
-                inquirySent: false
+                inquirySent: false,
+                isConsumed: false
             }
         });
 
@@ -110,7 +114,7 @@ export async function getSpecialDeliveryRequests() {
 /**
  * Approve or reject a special delivery request.
  */
-export async function updateSpecialDeliveryStatus(requestId, status, negotiatedFee = null, notes = "") {
+export async function updateSpecialDeliveryStatus(requestId, status, negotiatedFee = null, notes = "", adminQuantity = null) {
     try {
         const user = await currentUser();
         // Admin check here
@@ -120,6 +124,7 @@ export async function updateSpecialDeliveryStatus(requestId, status, negotiatedF
             data: {
                 status: status,
                 negotiatedFee: negotiatedFee ? parseFloat(negotiatedFee) : null,
+                quantity: adminQuantity ? parseFloat(adminQuantity) : undefined, // Admin can override quantity
                 adminNotes: notes,
                 rejectedAt: status === 'REJECTED' ? new Date() : null
             }
@@ -172,7 +177,8 @@ export async function getUserSpecialDeliveryRequests() {
         const requests = await db.specialDeliveryRequest.findMany({
             where: {
                 userId: user.id,
-                status: { in: ["PENDING", "APPROVED", "REJECTED"] }
+                status: { in: ["PENDING", "APPROVED", "REJECTED"] },
+                isConsumed: false
             }
         });
 
@@ -204,6 +210,28 @@ export async function markInquiryAsSent(productId) {
         revalidatePath("/marketplace");
         revalidatePath("/cart");
         return apiResponse.success(updated, "Inquiry marked as sent.");
+    } catch (error) {
+        return apiResponse.error(error.message);
+    }
+}
+
+/**
+ * Delete a special delivery request (Cancel mediation)
+ */
+export async function deleteSpecialDeliveryRequest(requestId) {
+    try {
+        const user = await currentUser();
+        if (!user) throw new Error("Unauthorized");
+
+        await db.specialDeliveryRequest.delete({
+            where: { 
+                id: requestId,
+                userId: user.id
+            }
+        });
+
+        revalidatePath("/cart");
+        return apiResponse.success(null, "Mediation request cancelled.");
     } catch (error) {
         return apiResponse.error(error.message);
     }
