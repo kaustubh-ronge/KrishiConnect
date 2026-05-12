@@ -957,8 +957,12 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                                             <span className="text-[10px] font-black text-emerald-700">{activeRequest.quantity} {activeRequest.unit || item.product.unit}</span>
                                                                         </div>
                                                                         <div className="flex items-center gap-1">
-                                                                            <span className="text-[9px] font-bold text-emerald-600/70 uppercase">Delivery Fee:</span>
+                                                                            <span className="text-[9px] font-bold text-emerald-600/70 uppercase">Per Unit Fee:</span>
                                                                             <span className="text-[10px] font-black text-emerald-700">₹{activeRequest.negotiatedFee}</span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1 border-l border-emerald-200 pl-3">
+                                                                            <span className="text-[9px] font-bold text-emerald-600/70 uppercase">Total Delivery:</span>
+                                                                            <span className="text-[10px] font-black text-emerald-900">₹{(activeRequest.negotiatedFee * item.quantity).toLocaleString()}</span>
                                                                         </div>
                                                                     </div>
                                                                 </div>

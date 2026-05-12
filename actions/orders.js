@@ -321,7 +321,8 @@ export async function initiateCheckout(params) {
                         error: `Approved quantity for ${it.product.productName} is limited to ${approvedReq.quantity} ${approvedReq.unit || it.product.unit}. Please update your cart or submit a new special delivery request for the extra amount.` 
                     };
                 } else {
-                    sellerNegotiatedTotal += (approvedReq.negotiatedFee || 0);
+                    // FEE IS NOW PER UNIT
+                    sellerNegotiatedTotal += ((approvedReq.negotiatedFee || 0) * it.quantity);
                 }
             }
         }
@@ -868,7 +869,8 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
             if (!approvedReq || approvedReq.negotiatedFee === null || (it.quantity && it.quantity > approvedReq.quantity)) {
               allOutOfRangeItemsApproved = false;
             } else {
-              sellerNegotiatedTotal += (approvedReq.negotiatedFee || 0);
+              // FEE IS NOW PER UNIT
+              sellerNegotiatedTotal += ((approvedReq.negotiatedFee || 0) * (it.quantity || 1));
             }
           }
         }

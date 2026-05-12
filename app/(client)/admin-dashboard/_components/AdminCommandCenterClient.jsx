@@ -1360,15 +1360,18 @@ export default function AdminCommandCenterClient({
                               placeholder="0.00"
                               value={adminQuantity}
                               onChange={(e) => setAdminQuantity(e.target.value)}
-                              className="pl-16 h-20 bg-white border-4 border-blue-200 focus:border-blue-500 rounded-3xl text-3xl font-black tracking-tighter shadow-sm transition-all"
+                              className="pl-16 pr-24 h-20 bg-white border-4 border-blue-200 focus:border-blue-500 rounded-3xl text-3xl font-black tracking-tighter shadow-sm transition-all"
                            />
+                           <div className="absolute right-6 top-1/2 -translate-y-1/2 px-4 py-2 bg-blue-100 text-blue-700 rounded-xl text-xs font-black uppercase tracking-widest border-2 border-blue-200">
+                              {selectedRequest?.unit || 'Units'}
+                           </div>
                         </div>
-                        <p className="text-[9px] text-blue-600/60 font-black text-center uppercase">This quantity will be LOCKED for the buyer.</p>
+                        <p className="text-[9px] text-blue-600/60 font-black text-center uppercase tracking-widest">This quantity is the MAXIMUM allowed for this approval.</p>
                      </div>
 
                      <div className="p-8 bg-amber-50 border-2 border-amber-200 rounded-[2.5rem] space-y-6 shadow-inner">
                         <div className="flex items-center justify-between">
-                           <h5 className="text-[11px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-2"><IndianRupee className="h-5 w-5" /> Negotiated Delivery Fee</h5>
+                           <h5 className="text-[11px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-2"><IndianRupee className="h-5 w-5" /> Negotiated Fee (Per Unit)</h5>
                            <Badge className="bg-amber-500 text-white border-0 text-[8px] px-3 py-1 uppercase font-black rounded-lg shadow-lg shadow-amber-500/20">Action: SET FEE</Badge>
                         </div>
                         <div className="relative">
@@ -1381,7 +1384,7 @@ export default function AdminCommandCenterClient({
                               className="pl-16 h-20 bg-white border-4 border-amber-200 focus:border-amber-500 rounded-3xl text-3xl font-black tracking-tighter shadow-sm transition-all"
                            />
                         </div>
-                        <p className="text-[9px] text-amber-600/60 font-black text-center uppercase">This fee will be added to the buyer's checkout total.</p>
+                        <p className="text-[9px] text-amber-600/60 font-black text-center uppercase tracking-widest">This is a PER-UNIT fee. Total = Fee × Quantity.</p>
                      </div>
                  </div>
                  <DialogFooter className="p-8 bg-white border-t border-slate-200 flex gap-6 shrink-0">

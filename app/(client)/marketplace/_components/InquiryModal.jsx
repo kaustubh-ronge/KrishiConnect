@@ -157,17 +157,22 @@ export default function InquiryModal({ isOpen, onClose, product, onSuccess, isSp
             <div className="space-y-2">
               <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                 <Box className="h-4 w-4 text-emerald-500" />
-                Quantity of {product.productName} ({product.unit})
+                Quantity of {product.productName}
               </Label>
-              <div className="relative">
-                <Box className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <div className="relative group">
+                <Box className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
                 <Input
-                  placeholder={`e.g. 50 ${product.unit}`}
+                  type="number"
+                  placeholder="0.00"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
-                  className="h-14 pl-12 bg-gray-50 border-2 border-gray-200 hover:border-emerald-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 rounded-2xl transition-all text-base"
+                  className="h-14 pl-12 pr-16 bg-gray-50 border-2 border-gray-200 hover:border-emerald-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 rounded-2xl transition-all text-lg font-bold"
                 />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-200">
+                  {product.unit || 'Units'}
+                </div>
               </div>
+              <p className="text-[10px] text-gray-400 font-medium px-1">Enter numeric quantity. Unit ({product.unit || 'Units'}) is locked.</p>
             </div>
 
             <div className="space-y-2">
