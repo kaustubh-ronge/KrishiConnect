@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import GoogleTranslateManager from "@/components/GoogleTranslateManger";
 import Chatbot from "@/components/Chatbot";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -83,6 +85,8 @@ export default function RootLayout({ children }) {
             <main className="min-h-screen">{children}</main>
             <Chatbot />
             <Toaster />
+            <Analytics />
+            <SpeedInsights />
           </ThemeProvider>
         </body>
       </html>
