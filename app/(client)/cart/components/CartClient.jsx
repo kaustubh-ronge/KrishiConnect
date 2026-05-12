@@ -230,6 +230,20 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
         }
     }, [unserviceableIds, specialRequests]);
 
+    // 2.2 Auto-sync quantities with approved limits
+    useEffect(() => {
+        approvedItems.forEach(item => {
+            const approval = specialRequests.find(r => r.productId === item.product.id && r.status === 'APPROVED' && !r.isConsumed);
+            if (approval && item.quantity > approval.quantity) {
+                // Force sync quantity down to approved limit
+                updateQuantity(item.id, approval.quantity);
+                toast.info(`${item.product.productName} adjusted.`, {
+                    description: `Quantity synced to approved limit of ${approval.quantity} ${approval.unit || item.product.unit}.`
+                });
+            }
+        });
+    }, [cartItems.length, specialRequests]);
+
     // Derived state: Categorize items for UI
     const rejectedItems = cartItems.filter(it =>
         specialRequests.some(r => r.productId === it.product.id && r.status === 'REJECTED')

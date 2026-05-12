@@ -904,7 +904,13 @@ export default function AdminCommandCenterClient({
                                                    if (activeView === 'orders' || activeView === 'disputes') openOrderAudit(item.id);
                                                    else if (activeView === 'catalog') openProductAudit(item); 
                                                    else if (activeView === 'support') openSupportAudit(item);
-                                                   else if (activeView === 'mediation') { setSelectedRequest(item); setIsMediationModalOpen(true); setNegotiatedFee(item.negotiatedFee || ""); }
+                                                                                                       else if (activeView === 'mediation') { 
+                                                       setSelectedRequest(item); 
+                                                       setIsMediationModalOpen(true); 
+                                                       setNegotiatedFee(item.negotiatedFee || ""); 
+                                                       setAdminQuantity(item.quantity || "");
+                                                    }
+
                                                    else openProfileAudit(item);
                                               }}><Eye className="h-4 w-4 text-slate-400" /></Button>
                                                 {activeView === 'orders' && (
