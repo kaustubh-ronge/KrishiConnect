@@ -297,14 +297,12 @@ export async function initiateCheckout(params) {
 
       if (sellerProfile && sellerProfile.lat && sellerProfile.lng && addressData.lat && addressData.lng) {
         const dist = await getOSRMDistance(sellerProfile.lat, sellerProfile.lng, addressData.lat, addressData.lng);
-        console.log(`[Checkout Security] Dist to seller ${seller.id}: ${dist}km`);
 
         // 1. CHECK FOR APPROVED SPECIAL DELIVERY REQUESTS
         const sellerItems = seller.items;
         const sellerApprovedReq = approvedRequests.find(r => sellerItems.some(it => it.productId === r.productId));
 
         if (sellerApprovedReq && sellerApprovedReq.negotiatedFee !== null) {
-          console.log(`[Checkout Security] Using Approved Negotiated Fee: ₹${sellerApprovedReq.negotiatedFee}`);
           deliveryTotal += sellerApprovedReq.negotiatedFee;
           continue; // Standard check bypassed for approved negotiation
         }
@@ -806,7 +804,6 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
       const sellerApprovedReq = approvedRequests.find(r => sellerItems.some(it => it.product.id === r.productId));
 
       if (sellerApprovedReq && sellerApprovedReq.negotiatedFee !== null) {
-        console.log(`[Logistics] Using Negotiated Fee for Seller ${seller.id}: ₹${sellerApprovedReq.negotiatedFee}`);
         totalFee += sellerApprovedReq.negotiatedFee;
         continue; // Skip standard calculation for this seller
       }
@@ -820,7 +817,6 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
 
       if (profile?.lat && profile?.lng) {
         const dist = await getOSRMDistance(profile.lat, profile.lng, targetLat, targetLng);
-        console.log(`[Logistics] Seller ${seller.id} Dist: ${dist}km, Buyer: ${targetLat},${targetLng}`);
 
         // --- SERVICEABILITY CHECK (Per-Product Override) ---
         let isSellerOutOfRange = false;
@@ -831,7 +827,6 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
           const effectiveMaxRange = Number(productRange ?? profileRange ?? 100);
 
           if (dist > effectiveMaxRange) {
-            console.warn(`[Logistics] Out of Range: Dist ${dist}km > Max ${effectiveMaxRange}km (Product: ${productRange}, Profile: ${profileRange})`);
             isSellerOutOfRange = true;
             break;
           }

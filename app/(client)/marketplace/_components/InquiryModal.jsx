@@ -20,9 +20,9 @@ import { toast } from "sonner";
 import { sendSupportMessage } from "@/actions/support";
 import { markInquiryAsSent } from "@/actions/special-delivery";
 
-export default function InquiryModal({ isOpen, onClose, product, onSuccess }) {
+export default function InquiryModal({ isOpen, onClose, product, onSuccess, isSpecialDelivery = false, quantityRequested = "", sellerId = null }) {
   const [name, setName] = useState("");
-  const [quantity, setQuantity] = useState("");
+  const [quantity, setQuantity] = useState(quantityRequested || "");
   const [message, setMessage] = useState("");
   const [step, setStep] = useState(1);
   const [isSending, setIsSending] = useState(false);
@@ -46,14 +46,29 @@ export default function InquiryModal({ isOpen, onClose, product, onSuccess }) {
       `User Message: ${message || 'No message'}`;
 
     try {
-       const res = await sendSupportMessage(fullMessage, "PRODUCT_INQUIRY");
+       // 1. If special delivery, create the request FIRST (strict sequence)
+       if (isSpecialDelivery && sellerId) {
+          const { createSpecialDeliveryRequest } = await import("@/actions/special-delivery");
+          const createRes = await createSpecialDeliveryRequest(product.id, quantity || 1, sellerId);
+          if (!createRes.success) {
+             toast.error(createRes.error || "Failed to initiate mediation.");
+             setIsSending(false);
+             return;
+          }
+       }
+
+       // 2. Send the support message
+       const res = await sendSupportMessage(fullMessage, isSpecialDelivery ? "SPECIAL_DELIVERY_MEDIATION" : "PRODUCT_INQUIRY");
+       
        if (res.success) {
-          // Flag the request as "inquiry sent"
-          await markInquiryAsSent(product.id);
+          // 3. Flag as inquiry sent if it was a special delivery
+          if (isSpecialDelivery) {
+             await markInquiryAsSent(product.id);
+          }
 
           toast.success("Request Sent!", {
             icon: <CheckCircle2 className="h-5 w-5 text-green-500" />,
-            description: "Admin will contact the seller and get back to you."
+            description: isSpecialDelivery ? "Mediation initiated. Admin will review soon." : "Admin will contact the seller and get back to you."
           });
           setName("");
           setQuantity("");

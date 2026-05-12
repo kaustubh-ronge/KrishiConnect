@@ -33,6 +33,8 @@ export const getCart = cache(async () => {
                 availableStock: true,
                 minOrderQuantity: true,
                 sellerType: true,
+                farmerId: true,
+                agentId: true,
               }
             }
           },

@@ -110,6 +110,9 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     const [inquiryProduct, setInquiryProduct] = useState(null);
     const [selectedPendingOrder, setSelectedPendingOrder] = useState(null);
     const [initialGraceLoading, setInitialGraceLoading] = useState(true);
+    const [isInquiryForSpecialDelivery, setIsInquiryForSpecialDelivery] = useState(false);
+    const [specialDeliveryQuantity, setSpecialDeliveryQuantity] = useState("");
+    const [specialDeliverySellerId, setSpecialDeliverySellerId] = useState(null);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -380,7 +383,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
         try {
             await removeItem(itemId);
         } catch (err) {
-            console.error("Removal failed:", err);
+            // Silently fail or use a generic toast if needed, but avoid logging sensitive err objects to browser
         }
     };
 
@@ -402,26 +405,18 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
         updateQuantity(item.id, newQty);
     };
 
-    const handleRequestForSingleItem = async (item) => {
-        const { createSpecialDeliveryRequest } = await import("@/actions/special-delivery");
-        setIsPending(true);
-        try {
-            const sellerId = item.product.farmerId || item.product.agentId;
-            const res = await createSpecialDeliveryRequest(item.productId, item.quantity, sellerId);
-            if (res.success) {
-                toast.success("Special Delivery request sent for " + item.product.productName);
-                fetchPending();
-                // Open inquiry modal to allow user to provide more details/chat
-                setInquiryProduct(item.product);
-                setIsInquiryOpen(true);
-            } else {
-                toast.error(res.error || "Failed to send request");
-            }
-        } catch (err) {
-            toast.error("Failed to send request.");
-        } finally {
-            setIsPending(false);
+    const handleRequestForSingleItem = (item) => {
+        const sellerId = item.product.farmerId || item.product.agentId;
+        if (!sellerId) {
+            toast.error("Seller information missing. Please refresh and try again.");
+            return;
         }
+
+        setInquiryProduct(item.product);
+        setIsInquiryForSpecialDelivery(true);
+        setSpecialDeliveryQuantity(item.quantity);
+        setSpecialDeliverySellerId(sellerId);
+        setIsInquiryOpen(true);
     };
 
     const openPendingDetails = (order) => {
@@ -965,9 +960,10 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                             <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                                                 <input
                                                                     type="checkbox"
+                                                                    disabled={isDisabled}
                                                                     checked={selectedItemIds.includes(item.id)}
                                                                     onChange={() => toggleSelect(item.id)}
-                                                                    className={`w-6 h-6 rounded-lg accent-emerald-600 cursor-pointer`}
+                                                                    className={`w-6 h-6 rounded-lg accent-emerald-600 ${isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                                                                 />
                                                             </div>
 
@@ -1457,8 +1453,18 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
             {inquiryProduct && (
                 <InquiryModal
                     isOpen={isInquiryOpen}
-                    onClose={() => setIsInquiryOpen(false)}
+                    onClose={() => {
+                        setIsInquiryOpen(false);
+                        setInquiryProduct(null);
+                        setIsInquiryForSpecialDelivery(false);
+                        setSpecialDeliveryQuantity("");
+                        setSpecialDeliverySellerId(null);
+                    }}
                     product={inquiryProduct}
+                    onSuccess={fetchPending}
+                    isSpecialDelivery={isInquiryForSpecialDelivery}
+                    quantityRequested={specialDeliveryQuantity}
+                    sellerId={specialDeliverySellerId}
                 />
             )}
         </div>
