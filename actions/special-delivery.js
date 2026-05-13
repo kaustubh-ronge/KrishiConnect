@@ -3,12 +3,14 @@
 import { db } from "@/lib/prisma";
 import { currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { validateAction, standardRateLimit } from "@/lib/arcjet";
 import { apiResponse } from "@/lib/permissions";
 
 /**
  * Create a new special delivery request.
  */
 export async function createSpecialDeliveryRequest(productId, quantity, sellerId, unit = null) {
+    await validateAction(standardRateLimit);
     try {
         const user = await currentUser();
         if (!user) throw new Error("Unauthorized");

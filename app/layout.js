@@ -84,7 +84,11 @@ export default function RootLayout({ children }) {
             <HeaderServer />
             <main className="min-h-screen">{children}</main>
             <Chatbot />
-            <Toaster />
+            <Toaster 
+              position="top-center" 
+              richColors 
+              closeButton 
+            />
             <Analytics />
             <SpeedInsights />
           </ThemeProvider>

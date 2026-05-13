@@ -197,7 +197,10 @@ export const cancelPendingOrder = async (orderId) => {
 };
 
 
+import { validateAction, mutationRateLimit } from "@/lib/arcjet";
+
 export async function initiateCheckout(params) {
+  await validateAction(mutationRateLimit);
   const { addressData, selectedItemIds = [], forceFresh = false, forceResumeId = null } = params || {};
 
   const user = await currentUser();

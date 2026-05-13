@@ -32,14 +32,14 @@ export async function getAdminStats() {
 
     const totalGMV = financeStats._sum.totalAmount || 0;
     const totalPlatformRevenue = financeStats._sum.platformFee || 0;
-    
+
     // 2. Efficient Aggregation for Payouts
     const payoutStats = await db.orderItem.aggregate({
       _sum: {
         priceAtPurchase: true,
         quantity: true
       },
-      where: { 
+      where: {
         order: { paymentStatus: "PAID" },
         payoutStatus: "PENDING"
       }
@@ -48,7 +48,7 @@ export async function getAdminStats() {
     // Note: This is an approximation if multiple items. For exact, better to sum (price*qty) in DB.
     // However, priceAtPurchase * quantity in aggregate requires a raw query or computed column.
     // For now, let's keep the pending/settled logic but optimize the FETCH.
-    
+
     // Correct way for Pending Payouts (Still using findMany but with SELECT to minimize payload)
     const pendingItems = await db.orderItem.findMany({
       where: { order: { paymentStatus: "PAID" }, payoutStatus: "PENDING" },
@@ -130,8 +130,8 @@ export async function getAllOrders({ onlyPendingPayouts = false } = {}) {
             unit: p.unit,
             priceAtPurchase: it.priceAtPurchase,
             image: p.images?.[0],
-            seller: seller ? { 
-              type: p.farmer ? 'Farmer' : 'Agent', 
+            seller: seller ? {
+              type: p.farmer ? 'Farmer' : 'Agent',
               name: seller.name || seller.companyName,
               sellerProfile: {
                 upiId: seller.upiId,
@@ -175,7 +175,7 @@ export async function markOrderItemSettled(orderItemId) {
 
     const item = await db.orderItem.findUnique({ where: { id: orderItemId } });
     if (!item) throw new Error("Order item not found");
-    
+
     if (item.payoutStatus !== "PENDING") {
       throw new Error(`Item already settled.`);
     }
@@ -183,32 +183,32 @@ export async function markOrderItemSettled(orderItemId) {
     const now = new Date();
 
     const result = await db.$transaction(async (tx) => {
-        // 1. Lock the parent Order record to prevent concurrent settlement races
+      // 1. Lock the parent Order record to prevent concurrent settlement races
+      await tx.order.update({
+        where: { id: item.orderId },
+        data: { updatedAt: new Date() }
+      });
+
+      const updatedItem = await tx.orderItem.update({
+        where: { id: orderItemId },
+        data: {
+          payoutStatus: "SETTLED",
+          payoutSettledAt: now,
+          payoutSettledBy: user.id
+        }
+      });
+
+      // 2. Now we can safely check if all items are settled because we hold the order lock
+      const pendingItemsCount = await tx.orderItem.count({
+        where: { orderId: item.orderId, payoutStatus: "PENDING" }
+      });
+
+      if (pendingItemsCount === 0) {
         await tx.order.update({
           where: { id: item.orderId },
-          data: { updatedAt: new Date() } 
+          data: { payoutStatus: "SETTLED" }
         });
-
-        const updatedItem = await tx.orderItem.update({
-          where: { id: orderItemId },
-          data: {
-            payoutStatus: "SETTLED",
-            payoutSettledAt: now,
-            payoutSettledBy: user.id
-          }
-        });
-
-        // 2. Now we can safely check if all items are settled because we hold the order lock
-        const pendingItemsCount = await tx.orderItem.count({
-          where: { orderId: item.orderId, payoutStatus: "PENDING" }
-        });
-
-        if (pendingItemsCount === 0) {
-          await tx.order.update({
-            where: { id: item.orderId },
-            data: { payoutStatus: "SETTLED" }
-          });
-        }
+      }
 
       // Also settle delivery jobs for this order if not already done
       await tx.deliveryJob.updateMany({
@@ -254,7 +254,7 @@ export async function getSellerBankDetailsForOrder(orderId) {
 
       const sellerId = seller.id;
       const itemTotal = it.quantity * it.priceAtPurchase;
-      
+
       if (!sellerMap.has(sellerId)) {
         sellerMap.set(sellerId, {
           sellerId,
@@ -363,15 +363,15 @@ export async function approveProfile(userId, role, notes = "") {
     // 1. Check if already approved to prevent duplicate emails/actions
     const currentProfile = await (
       role === 'farmer' ? db.farmerProfile.findUnique({ where: { userId } }) :
-      role === 'agent' ? db.agentProfile.findUnique({ where: { userId } }) :
-      db.deliveryProfile.findUnique({ where: { userId } })
+        role === 'agent' ? db.agentProfile.findUnique({ where: { userId } }) :
+          db.deliveryProfile.findUnique({ where: { userId } })
     );
 
     if (!currentProfile) return { success: false, error: "Profile not found" };
-    
+
     const currentStatus = role === 'delivery' ? currentProfile.approvalStatus : currentProfile.sellingStatus;
     if (currentStatus === "APPROVED") {
-        return { success: true, message: "Already approved" };
+      return { success: true, message: "Already approved" };
     }
 
     let targetEmail;
@@ -628,12 +628,12 @@ export async function getAdminReviews() {
       orderBy: { createdAt: 'desc' },
       include: {
         user: { select: { name: true, email: true } },
-        product: { 
-          select: { 
+        product: {
+          select: {
             productName: true,
             farmer: { select: { name: true } },
             agent: { select: { name: true, companyName: true } }
-          } 
+          }
         }
       }
     });

@@ -2,6 +2,7 @@
 
 import { currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { validateAction, standardRateLimit } from "@/lib/arcjet";
 import { db } from "@/lib/prisma";
 import { cache } from "react";
 
@@ -55,6 +56,7 @@ export const getCart = cache(async () => {
  * 2. ADD TO CART
  */
 export async function addToCart(productId, quantity) {
+  await validateAction(standardRateLimit);
   const user = await currentUser();
   if (!user) return { success: false, error: "Please log in." };
   try {
@@ -151,6 +153,7 @@ export async function addToCart(productId, quantity) {
  * 3. REMOVE FROM CART
  */
 export async function removeFromCart(cartItemId) {
+  await validateAction(standardRateLimit);
   const user = await currentUser();
   if (!user) return { success: false, error: "Not logged in" };
 
@@ -184,6 +187,7 @@ export async function removeFromCart(cartItemId) {
  * 4. UPDATE CART ITEM QUANTITY
  */
 export async function updateCartItemQuantity(cartItemId, newQuantity) {
+  await validateAction(standardRateLimit);
   const user = await currentUser();
   if (!user) return { success: false, error: "Not logged in" };
 

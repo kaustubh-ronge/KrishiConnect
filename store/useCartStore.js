@@ -72,7 +72,7 @@ export const useCartStore = create((set, get) => ({
       }
     } catch (err) {
       set({ cartItems: previousItems, cartCount: previousCount });
-      toast.error("An error occurred");
+      toast.error(err.message || "An error occurred. Please try again.");
       return false;
     }
   },
@@ -100,7 +100,7 @@ export const useCartStore = create((set, get) => ({
          // Optional: get().fetchCart() to ensure sync
      } catch (err) {
          set({ cartItems: previousItems, cartCount: previousCount });
-         toast.error("An error occurred");
+         toast.error(err.message || "An error occurred while removing the item.");
      }
   },
 
@@ -133,7 +133,7 @@ export const useCartStore = create((set, get) => ({
         // unless there's a reason to believe the optimistic state is wrong.
     } catch (err) {
         set({ cartItems: previousItems, cartCount: previousCount });
-        toast.error("An error occurred");
+        toast.error(err.message || "An error occurred while updating quantity.");
     }
   },
 

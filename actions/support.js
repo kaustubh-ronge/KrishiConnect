@@ -5,10 +5,13 @@ import { currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { apiResponse } from "@/lib/permissions";
 
+import { validateAction, standardRateLimit } from "@/lib/arcjet";
+
 /**
  * Send a message to admin from any user.
  */
 export async function sendSupportMessage(message, type = "GENERAL") {
+  await validateAction(standardRateLimit);
   try {
     const user = await currentUser();
     if (!user) throw new Error("Unauthorized");
