@@ -1356,8 +1356,11 @@ export default function AdminCommandCenterClient({
 
                      <div className="p-8 bg-blue-50 border-2 border-blue-200 rounded-[2.5rem] space-y-6 shadow-inner">
                         <div className="flex items-center justify-between">
-                           <h5 className="text-[11px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-2"><Box className="h-5 w-5" /> Approved Quantity</h5>
-                           <Badge className="bg-blue-500 text-white border-0 text-[8px] px-3 py-1 uppercase font-black rounded-lg shadow-lg shadow-blue-500/20">Action: SET QTY</Badge>
+                            <h5 className="text-[11px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-2"><Box className="h-5 w-5" /> Approved Quantity</h5>
+                            <div className="flex items-center gap-2">
+                               <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[8px] px-3 py-1 uppercase font-black rounded-lg">Requested: {selectedRequest?.quantity} {selectedRequest?.product?.unit}</Badge>
+                               <Badge className="bg-blue-500 text-white border-0 text-[8px] px-3 py-1 uppercase font-black rounded-lg shadow-lg shadow-blue-500/20">Action: SET QTY</Badge>
+                            </div>
                         </div>
                         <div className="relative">
                            <Box className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-blue-600" />

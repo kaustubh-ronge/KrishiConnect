@@ -286,6 +286,15 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
 
     const pendingDeliveryTotal = selectedPending.reduce((acc, order) => acc + (order.deliveryFee || 0), 0);
 
+    // Calculate Special Delivery Fees (Negotiated per unit)
+    const negotiatedDeliveryFee = selectedActiveItems.reduce((acc, item) => {
+        const approval = specialRequests.find(r => r.productId === item.product.id && r.status === 'APPROVED' && !r.isConsumed);
+        if (approval && approval.negotiatedFee !== null) {
+            return acc + (item.quantity * approval.negotiatedFee);
+        }
+        return acc;
+    }, 0);
+
     const deliveryTotal = (lat && lng) ? dynamicDeliveryFee : (activeDeliveryTotal + pendingDeliveryTotal);
 
     const isOnline = paymentMethod === "ONLINE";
@@ -1273,16 +1282,31 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                 <span className="uppercase tracking-widest text-[10px]">Product Subtotal</span>
                                                 <span className="text-slate-900 font-black">₹{productSubtotal.toLocaleString()}</span>
                                             </div>
+
                                             <div className="flex justify-between text-slate-500 font-bold text-sm">
-                                                <span className="uppercase tracking-widest text-[10px]">Delivery Logistics</span>
+                                                <span className="uppercase tracking-widest text-[10px]">Standard Logistics</span>
                                                 <div className="flex items-center gap-2">
                                                     {isCalculatingFee && <Loader2 className="h-3 w-3 animate-spin text-emerald-500" />}
-                                                    <span className={`text-slate-900 font-black ${isCalculatingFee ? 'opacity-50' : ''}`}>₹{(deliveryTotal || 0).toLocaleString()}</span>
-                                                    {deliveryTotal > productSubtotal && productSubtotal > 0 && (
-                                                        <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200 text-[8px] font-black py-0 px-1">Long Distance</Badge>
-                                                    )}
+                                                    <span className={`text-slate-900 font-black ${isCalculatingFee ? 'opacity-50' : ''}`}>₹{(Math.max(0, deliveryTotal - negotiatedDeliveryFee)).toLocaleString()}</span>
                                                 </div>
                                             </div>
+
+                                            {negotiatedDeliveryFee > 0 && (
+                                                <motion.div 
+                                                    initial={{ opacity: 0, x: -10 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    className="flex justify-between text-amber-600 font-bold text-sm p-4 bg-amber-50/50 rounded-2xl border border-amber-100"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <ShieldCheck className="h-4 w-4" />
+                                                        <div className="flex flex-col">
+                                                            <span className="uppercase tracking-widest text-[10px]">Negotiated Fee</span>
+                                                            <span className="text-[8px] opacity-70 font-medium uppercase tracking-tight">Per Unit Pricing Applied</span>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-amber-700 font-black">₹{negotiatedDeliveryFee.toLocaleString()}</span>
+                                                </motion.div>
+                                            )}
                                             {deliveryTotal > productSubtotal && productSubtotal > 0 && (
                                                 <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex gap-3">
                                                     <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
