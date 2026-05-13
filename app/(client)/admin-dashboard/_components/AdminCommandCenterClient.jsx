@@ -1380,7 +1380,7 @@ export default function AdminCommandCenterClient({
 
                      <div className="p-8 bg-amber-50 border-2 border-amber-200 rounded-[2.5rem] space-y-6 shadow-inner">
                         <div className="flex items-center justify-between">
-                           <h5 className="text-[11px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-2"><IndianRupee className="h-5 w-5" /> Negotiated Fee (Per Unit)</h5>
+                           <h5 className="text-[11px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-2"><IndianRupee className="h-5 w-5" /> Negotiated Fee (Per {selectedRequest?.product?.unit || 'Unit'})</h5>
                            <Badge className="bg-amber-500 text-white border-0 text-[8px] px-3 py-1 uppercase font-black rounded-lg shadow-lg shadow-amber-500/20">Action: SET FEE</Badge>
                         </div>
                         <div className="relative">
@@ -1393,7 +1393,7 @@ export default function AdminCommandCenterClient({
                               className="pl-16 h-20 bg-white border-4 border-amber-200 focus:border-amber-500 rounded-3xl text-3xl font-black tracking-tighter shadow-sm transition-all"
                            />
                         </div>
-                        <p className="text-[9px] text-amber-600/60 font-black text-center uppercase tracking-widest">This is a PER-UNIT fee. Total = Fee × Quantity.</p>
+                        <p className="text-[9px] text-amber-600/60 font-black text-center uppercase tracking-widest">This is a PER-{selectedRequest?.product?.unit?.toUpperCase() || 'UNIT'} fee. Total = Fee × Quantity.</p>
                      </div>
                  </div>
                  <DialogFooter className="p-8 bg-white border-t border-slate-200 flex gap-6 shrink-0">
