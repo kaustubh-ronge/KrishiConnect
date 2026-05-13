@@ -37,7 +37,10 @@ const supportedLanguages = [
   { name: "తెలుగు", code: "te" }
 ];
 
-export default function HeaderClient({ isLoggedIn, userRole }) {
+import { ShieldAlert, AlertTriangle, LogOut } from "lucide-react";
+import { SignOutButton } from "@clerk/nextjs";
+
+export default function HeaderClient({ isLoggedIn, userRole, isDisabled, hasFarmerProfile, hasAgentProfile, hasDeliveryProfile }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedLang, setSelectedLang] = useState("English");
   const [mounted, setMounted] = useState(false);
@@ -51,14 +54,18 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
     if (isLoggedIn) fetchCart();
   }, [isLoggedIn, fetchCart]);
 
-  // --- ROLE LOGIC ---
+  // --- ROLE & DASHBOARD LOGIC ---
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-  const isDelivery = userRole === 'delivery';
-  const isFarmerAgentOrDelivery = userRole === 'farmer' || userRole === 'agent' || isDelivery;
+  
+  // Multi-Dashboard Detection
+  const availableDashboards = [];
+  if (hasFarmerProfile || userRole === 'farmer') availableDashboards.push({ name: 'Farmer', href: '/farmer-dashboard' });
+  if (hasAgentProfile || userRole === 'agent') availableDashboards.push({ name: 'Agent', href: '/agent-dashboard' });
+  if (hasDeliveryProfile || userRole === 'delivery') availableDashboards.push({ name: 'Delivery', href: '/delivery-dashboard' });
 
-  // Dashboard/Onboarding Link Logic
-  const onboardingLink = isFarmerAgentOrDelivery ? `/${userRole}-dashboard` : "/onboarding";
-  const onboardingText = isFarmerAgentOrDelivery ? "Dashboard" : "Onboarding";
+  const hasMultipleDashboards = availableDashboards.length > 1;
+  const onboardingLink = availableDashboards.length > 0 ? availableDashboards[0].href : "/onboarding";
+  const onboardingText = availableDashboards.length > 0 ? "Dashboard" : "Onboarding";
 
   // Google Translate Logic
   useEffect(() => {
@@ -91,7 +98,46 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
   );
 
   return (
-    <header className="bg-white/90 backdrop-blur-lg shadow-sm border-b border-gray-100 sticky top-0 z-50">
+    <>
+      {/* --- GLOBAL ACCOUNT DISABLED OVERLAY --- */}
+      {isDisabled && mounted && (
+        <div className="fixed inset-0 z-[9999] bg-white/95 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl border border-rose-100 p-10 text-center space-y-8 animate-in zoom-in duration-300">
+            <div className="w-24 h-24 bg-rose-50 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner">
+              <ShieldAlert className="h-12 w-12 text-rose-600 animate-pulse" />
+            </div>
+            
+            <div className="space-y-3">
+              <h1 className="text-3xl font-black text-slate-900 tracking-tighter">Account Restricted</h1>
+              <p className="text-slate-500 font-medium leading-relaxed">
+                Your KrishiConnect account has been temporarily disabled by an administrator for security or policy review.
+              </p>
+            </div>
+
+            <div className="bg-amber-50 rounded-2xl p-6 border border-amber-100 flex items-start gap-4 text-left">
+              <AlertTriangle className="h-6 w-6 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-black text-amber-900 uppercase tracking-widest mb-1">What to do?</p>
+                <p className="text-[11px] text-amber-800 font-bold leading-relaxed">
+                  If you believe this is a mistake, please contact our support team or reach out to your local agent.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-4">
+              <SignOutButton redirectUrl="/">
+                <Button className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black uppercase text-xs tracking-widest shadow-xl shadow-slate-900/20 hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
+                  <LogOut className="h-4 w-4" /> Sign Out Securely
+                </Button>
+              </SignOutButton>
+            </div>
+            
+            <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">KrishiConnect Security Node</p>
+          </div>
+        </div>
+      )}
+
+      <header className="bg-white/90 backdrop-blur-lg shadow-sm border-b border-gray-100 sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
 
@@ -110,14 +156,35 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
           <nav className="hidden md:flex items-center space-x-6">
             <Link href="/" className="text-gray-600 hover:text-green-600 font-medium transition-colors">Home</Link>
 
-            {/* Conditional Render: Hide Onboarding & Marketplace for Admin */}
+            {/* Conditional Render: Dashboards or Onboarding */}
             {!isAdmin && (
-              <Link href={onboardingLink} className="text-gray-600 hover:text-green-600 font-medium transition-colors">
-                {onboardingText}
-              </Link>
+              hasMultipleDashboards ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="text-gray-600 hover:text-green-600 font-medium transition-colors h-auto p-0 flex items-center gap-1">
+                      Dashboards
+                      <ChevronDown className="h-3 w-3 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-48">
+                    {availableDashboards.map((db) => (
+                      <DropdownMenuItem key={db.href} asChild>
+                        <Link href={db.href} className="flex items-center gap-2 cursor-pointer">
+                          <LayoutDashboard className="h-4 w-4" />
+                          {db.name} Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Link href={onboardingLink} className="text-gray-600 hover:text-green-600 font-medium transition-colors">
+                  {onboardingText}
+                </Link>
+              )
             )}
 
-            {!isAdmin && !isDelivery && (
+            {!isAdmin && (userRole !== 'delivery') && (
               <Link href="/marketplace" className="text-gray-600 hover:text-green-600 font-medium transition-colors">
                 Marketplace
               </Link>
@@ -260,12 +327,18 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
 
                     <MobileLink href="/" icon={Home}>Home</MobileLink>
 
-                    {/* Conditional Render: Hide Onboarding & Marketplace for Admin */}
+                    {/* Conditional Render: Dashboards or Onboarding */}
                     {!isAdmin && (
-                      <MobileLink href={onboardingLink} icon={LayoutDashboard}>{onboardingText}</MobileLink>
+                      availableDashboards.length > 0 ? (
+                        availableDashboards.map(db => (
+                          <MobileLink key={db.href} href={db.href} icon={LayoutDashboard}>{db.name} Dashboard</MobileLink>
+                        ))
+                      ) : (
+                        <MobileLink href="/onboarding" icon={LayoutDashboard}>Onboarding</MobileLink>
+                      )
                     )}
 
-                    {!isAdmin && !isDelivery && (
+                    {!isAdmin && (userRole !== 'delivery') && (
                       <MobileLink href="/marketplace" icon={Store}>Marketplace</MobileLink>
                     )}
 
@@ -333,6 +406,7 @@ export default function HeaderClient({ isLoggedIn, userRole }) {
           </div>
         </div>
       </div>
-    </header>
+      </header>
+    </>
   );
 }

@@ -126,8 +126,8 @@ export async function updateAgentProfile(formData) {
     }
 
     const updateData = {
-        name, companyName, phone, region, district, upiId, bankName, accountNumber, ifscCode, agentType, aadharNumber,
-        address, country, state, city, pincode, lat, lng, usagePurpose, sellingStatus: newSellingStatus
+      name, companyName, phone, region, district, upiId, bankName, accountNumber, ifscCode, agentType, aadharNumber,
+      address, country, state, city, pincode, lat, lng, usagePurpose, sellingStatus: newSellingStatus
     };
 
     if (aadharFront && aadharFront.trim() !== "") updateData.aadharFront = aadharFront;

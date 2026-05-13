@@ -15,7 +15,7 @@ export default async function AgentDashboardPage() {
   // 3. Strict Role Enforcement
   if (user.role !== 'agent') {
     if (user.role === 'none') {
-        redirect('/onboarding'); // Must choose role first
+      redirect('/onboarding'); // Must choose role first
     }
     redirect('/farmer-dashboard'); // Redirect farmers away
   }

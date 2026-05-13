@@ -380,7 +380,11 @@ export default function AdminCommandCenterClient({
          if (activeView === 'support') return matchesSearch && (statusFilter === 'ALL' ? true : (statusFilter === 'UNREAD' ? !item.isRead : item.isRead));
          if (statusFilter === 'PENDING_PAYMENT' && item.paymentStatus === 'Waiting for Payment') return matchesSearch;
          
-         return matchesSearch && (item.status === statusFilter || item.approvalStatus === statusFilter);
+         // 🛡️ SECURITY STATUS FILTERING
+         if (statusFilter === 'ACTIVE') return matchesSearch && !item.user?.isDisabled;
+         if (statusFilter === 'BLOCKED') return matchesSearch && item.user?.isDisabled;
+         
+         return matchesSearch && (item.status === statusFilter || item.approvalStatus === statusFilter || item.sellingStatus === statusFilter);
     });
 
       // Prioritize unread support messages
@@ -611,10 +615,10 @@ export default function AdminCommandCenterClient({
                               <h3 className="text-2xl font-black text-slate-900 tracking-tighter">{"\u20B9"}{sNum(stats.finance?.totalPlatformRevenue).toLocaleString()}</h3>
                               <div className="text-[9px] text-emerald-600 font-black mt-4 uppercase">Direct Profit</div>
                            </Card>
-                           <Card className="border-0 shadow-sm rounded-2xl bg-amber-500 p-6 border-t-4 border-amber-600">
-                              <p className="text-[9px] font-black text-amber-900 uppercase tracking-widest mb-1">Order Consistency</p>
-                              <h3 className="text-2xl font-black text-white tracking-tighter">100%</h3>
-                              <p className="text-[9px] font-bold text-amber-900 mt-4 uppercase tracking-tighter">Audit Verified</p>
+                           <Card className="border-0 shadow-sm rounded-2xl bg-rose-500 p-6 border-t-4 border-rose-600">
+                              <p className="text-[9px] font-black text-rose-100 uppercase tracking-widest mb-1">Blocked Accounts</p>
+                              <h3 className="text-2xl font-black text-white tracking-tighter">{sNum(stats.users?.disabledCount)} Users</h3>
+                              <p className="text-[9px] font-bold text-rose-100 mt-4 uppercase tracking-tighter">Access Restricted</p>
                            </Card>
                            <Card className="border-0 shadow-sm rounded-2xl bg-indigo-300 p-6">
                               <p className="text-[9px] font-black text-slate-900 uppercase tracking-widest mb-1">Verified Score</p>
@@ -725,10 +729,21 @@ export default function AdminCommandCenterClient({
                                     ['ALL', 'PROCESSING', 'PACKED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'PENDING_PAYMENT'] :
                                     activeView === 'catalog' ?
                                        ['ALL', 'ACTIVE', 'DEACTIVATED'] :
-                                       (activeView === 'support' ? ['ALL', 'UNREAD', 'READ'] : ['ALL', 'PENDING', 'APPROVED', 'REJECTED'])
+                                       activeView === 'support' ? ['ALL', 'UNREAD', 'READ'] : 
+                                       ['ALL', 'PENDING', 'APPROVED', 'REJECTED']
                                  ).map(f => (
                                     <Button key={f} variant={statusFilter === f ? "default" : "ghost"} size="sm" className={`h-10 px-5 rounded-xl text-[9px] font-black shrink-0 ${statusFilter === f ? "bg-slate-900 text-white shadow-xl" : "text-slate-400 hover:text-slate-900"}`} onClick={() => setStatusFilter(f)}>{f.replace('_', ' ')}</Button>
                                  ))}
+                                 
+                                 {['farmers', 'agents', 'delivery', 'verifications'].includes(activeView) && (
+                                    <>
+                                       <div className="w-[1px] h-6 bg-slate-200 mx-2" />
+                                       <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest mr-2">Security:</span>
+                                       {['ACTIVE', 'BLOCKED'].map(f => (
+                                          <Button key={f} variant={statusFilter === f ? "default" : "ghost"} size="sm" className={`h-10 px-5 rounded-xl text-[9px] font-black shrink-0 ${statusFilter === f ? (f === 'BLOCKED' ? 'bg-rose-600 text-white shadow-xl' : 'bg-emerald-600 text-white shadow-xl') : "text-slate-400 hover:text-slate-900"}`} onClick={() => setStatusFilter(f)}>{f}</Button>
+                                       ))}
+                                    </>
+                                 )}
                               </div>
                            </div>
                         </div>
@@ -829,9 +844,14 @@ export default function AdminCommandCenterClient({
                                              <div className="flex items-center gap-3">
                                                 <div className="flex flex-col">
                                                    {activeView === 'orders' || activeView === 'disputes' ? (
-                                                      <Badge className={`text-[8px] font-black uppercase px-2 py-0.5 border-0 rounded-md ${item.paymentStatus === 'Money Received' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                                         {item.paymentStatus}
-                                                      </Badge>
+                                                      <div className="flex flex-wrap items-center gap-1.5">
+                                                         <Badge className={`text-[8px] font-black uppercase px-2 py-0.5 border-0 rounded-md ${item.paymentStatus === 'Money Received' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                            {item.paymentStatus}
+                                                         </Badge>
+                                                         <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md ${item.payoutStatus === 'Paid to Seller' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                            {item.payoutStatus}
+                                                         </Badge>
+                                                      </div>
                                                    ) : activeView === 'logistics' ? (
                                                       <Badge className={`text-[8px] font-black uppercase px-2 py-0.5 border-0 rounded-md bg-indigo-100 text-indigo-700`}>
                                                          {item.status}
@@ -884,8 +904,19 @@ export default function AdminCommandCenterClient({
                                                                                      ) : activeView === 'logistics' ? (
                                               <span className="text-[10px] font-black text-slate-600 uppercase">{item.estimatedTime || 'ASAP'}</span>
                                            ) : activeView === 'farmers' || activeView === 'agents' ? (
-
-                                             <Badge className={`text-[8px] font-black uppercase px-3 py-1 border-0 rounded-lg ${item.usagePurpose === 'buy_and_sell' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{item.usagePurpose === 'buy_and_sell' ? 'BUY & SELL' : 'BUY ONLY'}</Badge>
+                                             <div className="flex flex-col gap-1.5 items-center">
+                                                <div className="flex gap-1">
+                                                   <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md ${item.sellingStatus === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                      {item.sellingStatus || 'PENDING'}
+                                                   </Badge>
+                                                   <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md ${item.usagePurpose === 'buy_and_sell' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                      {item.usagePurpose === 'buy_and_sell' ? 'BUY & SELL' : 'BUY ONLY'}
+                                                   </Badge>
+                                                </div>
+                                                <Badge variant="outline" className={`text-[8px] font-black uppercase px-4 py-1 border-0 rounded-lg shadow-sm ${item.user?.isDisabled ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                                                   {item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'}
+                                                </Badge>
+                                             </div>
                                           ) : activeView === 'mediation' ? (
                                              <div className="flex flex-col gap-1.5 items-center">
                                                 <Badge className={`text-[8px] font-black uppercase px-3 py-1 border-0 rounded-lg ${item.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700' : item.status === 'REJECTED' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-700'}`}>
@@ -896,7 +927,16 @@ export default function AdminCommandCenterClient({
                                                 </Badge>
                                              </div>
                                           ) : (
-                                             <Badge variant="outline" className={`text-[8px] font-black uppercase px-3 py-1 border-0 rounded-lg ${item.user?.isDisabled ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'}`}>{activeView === 'support' ? (item.userRole || 'USER') : (item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE')}</Badge>
+                                             <div className="flex flex-col gap-1.5 items-center">
+                                                 {(activeView === 'support' || activeView === 'delivery') && (
+                                                   <Badge className={`text-[8px] font-black uppercase px-3 py-1 border-0 rounded-lg ${item.approvalStatus === 'APPROVED' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                      {activeView === 'support' ? (item.userRole || 'USER') : (item.approvalStatus || 'PENDING')}
+                                                   </Badge>
+                                                 )}
+                                                 <Badge variant="outline" className={`text-[8px] font-black uppercase px-3 py-1 border-0 rounded-lg ${item.user?.isDisabled ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                                                    {item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'}
+                                                 </Badge>
+                                              </div>
                                           )}</TableCell>
                                           <TableCell className="pr-8 text-right">
                                              <div className="flex justify-end gap-2 transition-all">
@@ -1081,6 +1121,22 @@ export default function AdminCommandCenterClient({
                               </TabsContent>
 
                               <TabsContent value="admin" className="m-0 space-y-8 animate-in fade-in duration-300 pr-2">
+                                 <div className="p-8 bg-rose-50 rounded-[2rem] border border-rose-100 space-y-4 mb-8">
+                                    <h5 className="flex items-center gap-3 text-[10px] font-black text-rose-600 uppercase tracking-widest"><ShieldAlert className="h-5 w-5" /> Security Controls</h5>
+                                    <div className="flex items-center justify-between">
+                                       <div>
+                                          <p className="text-sm font-black text-rose-900 leading-none">Account Access</p>
+                                          <p className="text-[10px] font-bold text-rose-400 uppercase mt-1">Status: {selectedProfile?.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'}</p>
+                                       </div>
+                                       <Button 
+                                          variant={selectedProfile?.user?.isDisabled ? "default" : "outline"} 
+                                          className={`h-10 px-6 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${selectedProfile?.user?.isDisabled ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-rose-200 text-rose-600 hover:bg-rose-100'}`}
+                                          onClick={() => handleToggleStatus(selectedProfile?.userId || selectedProfile?.id, selectedProfile?.displayName)}
+                                       >
+                                          {selectedProfile?.user?.isDisabled ? <><UserCheck2 className="mr-2 h-4 w-4" /> Re-Enable Account</> : <><UserX className="mr-2 h-4 w-4" /> Disable Account</>}
+                                       </Button>
+                                    </div>
+                                 </div>
                                  <h5 className="flex items-center gap-4 text-xs font-black text-slate-400 uppercase tracking-widest"><StickyNote className="h-7 w-7 text-rose-500" /> Internal Notes</h5>
                                  <Textarea placeholder="Type internal justification or notes here..." className="h-48 rounded-3xl border-slate-200 p-8 font-bold text-slate-700 bg-slate-50 shadow-inner focus:ring-rose-500 focus:border-rose-500" value={adminNote} onChange={e => setAdminNote(e.target.value)} />
                                  <p className="text-[10px] font-black text-slate-400 uppercase text-center tracking-widest bg-slate-50 py-3 rounded-xl border border-slate-100">Confidential: Visible to admin team only.</p>
@@ -1163,9 +1219,19 @@ export default function AdminCommandCenterClient({
                                           <Card key={sIdx} className="rounded-[3rem] border-0 bg-slate-950 text-white p-10 shadow-2xl relative overflow-hidden group">
                                              <div className="relative z-10 space-y-8">
                                                 <div className="flex justify-between items-start">
-                                                   <div>
-                                                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Target Seller</p>
-                                                      <p className="text-lg font-black text-white tracking-tight">{sObj.name || 'Unknown Seller'}</p>
+                                                   <div className="flex items-center gap-4">
+                                                      <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white font-black text-xl border border-white/20">
+                                                         {sObj.name?.[0]}
+                                                      </div>
+                                                      <div>
+                                                         <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Target Seller</p>
+                                                         <div className="flex items-center gap-2">
+                                                            <p className="text-lg font-black text-white tracking-tight">{sObj.name || 'Unknown Seller'}</p>
+                                                            <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md shadow-sm ${sObj.isDisabled ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                                                               {sObj.isDisabled ? 'BLOCKED' : 'ACTIVE'}
+                                                            </Badge>
+                                                         </div>
+                                                      </div>
                                                    </div>
                                                    <div className="text-right">
                                                       <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Payout Share</p>
@@ -1419,8 +1485,8 @@ export default function AdminCommandCenterClient({
                        </Button>
                     </div>
                  </DialogFooter>
-             </DialogContent>
-          </Dialog>
+              </DialogContent>
+           </Dialog>
        </div>
     );
 }

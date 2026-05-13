@@ -308,31 +308,31 @@ export async function initiateCheckout(params) {
         let hasOutOfRangeItems = false;
 
         for (const it of sellerItems) {
-            const productRange = it.product.maxDeliveryRange;
-            const effectiveMaxRange = Number(productRange ?? sellerProfile.maxDeliveryRange ?? 100);
-            
-            if (dist > effectiveMaxRange) {
-                hasOutOfRangeItems = true;
-                const approvedReq = approvedRequests.find(r => r.productId === it.productId);
-                
-                if (!approvedReq || approvedReq.negotiatedFee === null) {
-                    allOutOfRangeItemsApproved = false;
-                } else if (it.quantity > approvedReq.quantity) {
-                    // QUANTITY CAP ENFORCEMENT
-                    return { 
-                        success: false, 
-                        error: `Approved quantity for ${it.product.productName} is limited to ${approvedReq.quantity} ${approvedReq.unit || it.product.unit}. Please update your cart or submit a new special delivery request for the extra amount.` 
-                    };
-                } else {
-                    // FEE IS NOW PER UNIT
-                    sellerNegotiatedTotal += ((approvedReq.negotiatedFee || 0) * it.quantity);
-                }
+          const productRange = it.product.maxDeliveryRange;
+          const effectiveMaxRange = Number(productRange ?? sellerProfile.maxDeliveryRange ?? 100);
+
+          if (dist > effectiveMaxRange) {
+            hasOutOfRangeItems = true;
+            const approvedReq = approvedRequests.find(r => r.productId === it.productId);
+
+            if (!approvedReq || approvedReq.negotiatedFee === null) {
+              allOutOfRangeItemsApproved = false;
+            } else if (it.quantity > approvedReq.quantity) {
+              // QUANTITY CAP ENFORCEMENT
+              return {
+                success: false,
+                error: `Approved quantity for ${it.product.productName} is limited to ${approvedReq.quantity} ${approvedReq.unit || it.product.unit}. Please update your cart or submit a new special delivery request for the extra amount.`
+              };
+            } else {
+              // FEE IS NOW PER UNIT
+              sellerNegotiatedTotal += ((approvedReq.negotiatedFee || 0) * it.quantity);
             }
+          }
         }
 
         if (hasOutOfRangeItems && allOutOfRangeItemsApproved) {
-            deliveryTotal += sellerNegotiatedTotal;
-            continue; // Bypasses standard distance checks as all OOR items are mediated
+          deliveryTotal += sellerNegotiatedTotal;
+          continue; // Bypasses standard distance checks as all OOR items are mediated
         }
 
         // 2. ENFORCE SERVICEABILITY LIMITS
@@ -418,9 +418,9 @@ export async function initiateCheckout(params) {
           data: {
             paymentMethod: addressData.paymentMethod,
             // Clear any stale Razorpay metadata if switching to COD
-            ...(addressData.paymentMethod === 'COD' ? { 
-                razorpayOrderId: null,
-                razorpayPaymentId: null 
+            ...(addressData.paymentMethod === 'COD' ? {
+              razorpayOrderId: null,
+              razorpayPaymentId: null
             } : {})
           }
         });
@@ -843,7 +843,7 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
 
     for (const seller of sellerMap.values()) {
       const sellerItems = items.filter(it => (it.product.farmerId || it.product.agentId) === seller.id);
-      
+
       let sellerNegotiatedTotal = 0;
       let allOutOfRangeItemsApproved = true;
       let hasOutOfRangeItems = false;
@@ -858,17 +858,17 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
 
       if (profile?.lat && profile?.lng && targetLat && targetLng) {
         const dist = await getOSRMDistance(profile.lat, profile.lng, targetLat, targetLng);
-        
+
         // 2. Specialized Check (Quantity-capped reusable mediation)
         for (const it of sellerItems) {
           const productRange = it.product.maxDeliveryRange;
           const effectiveMaxRange = Number(productRange ?? profile.maxDeliveryRange ?? 100);
-          
+
           if (dist > effectiveMaxRange) {
             hasOutOfRangeItems = true;
             const pId = it.productId || it.product.id;
             const approvedReq = approvedRequests.find(r => r.productId === pId);
-            
+
             if (!approvedReq || approvedReq.negotiatedFee === null || (it.quantity && it.quantity > approvedReq.quantity)) {
               allOutOfRangeItemsApproved = false;
             } else {
@@ -880,7 +880,7 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
 
         if (hasOutOfRangeItems && allOutOfRangeItemsApproved) {
           totalFee += sellerNegotiatedTotal;
-          continue; 
+          continue;
         }
 
         // 3. Standard Fallback (If not all OOR items are approved or in-range check)
@@ -900,7 +900,7 @@ export async function calculateDynamicDeliveryFee(cartItemIds = [], targetLat, t
 
         if (isSellerOutOfRange) {
           unserviceableIds.push(...sellerItems.map(it => it.id || it.product.id));
-          isLongDistance = true; 
+          isLongDistance = true;
         } else {
           if (dist > 100) isLongDistance = true;
 

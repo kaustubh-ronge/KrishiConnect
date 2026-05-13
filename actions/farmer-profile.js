@@ -39,7 +39,7 @@ export async function createFarmerProfile(formData) {
   // 3. Extract & Sanitize Data
   const formValues = Object.fromEntries(formData.entries());
   formValues.primaryProduce = formData.getAll('primaryProduce');
-  
+
   Object.keys(formValues).forEach(key => {
     if (typeof formValues[key] === 'string') {
       formValues[key] = sanitizeContent(formValues[key]);
@@ -110,7 +110,7 @@ export async function updateFarmerProfile(formData) {
   // 3. Extract & Sanitize Data
   const formValues = Object.fromEntries(formData.entries());
   formValues.primaryProduce = formData.getAll('primaryProduce');
-  
+
   Object.keys(formValues).forEach(key => {
     if (typeof formValues[key] === 'string') {
       formValues[key] = sanitizeContent(formValues[key]);
@@ -151,11 +151,11 @@ export async function updateFarmerProfile(formData) {
       newSellingStatus = 'NONE';
     }
 
-    const updateData = { 
-        name, phone, address, aadharNumber, farmName, farmSize, farmingExperience, primaryProduce, 
-        upiId, bankName, accountNumber, ifscCode, country, state, city, pincode, lat, lng, district, region,
-        usagePurpose, sellingStatus: newSellingStatus
-      };
+    const updateData = {
+      name, phone, address, aadharNumber, farmName, farmSize, farmingExperience, primaryProduce,
+      upiId, bankName, accountNumber, ifscCode, country, state, city, pincode, lat, lng, district, region,
+      usagePurpose, sellingStatus: newSellingStatus
+    };
 
     if (aadharFront && typeof aadharFront === 'string' && aadharFront.trim() !== "") updateData.aadharFront = aadharFront;
     if (aadharBack && typeof aadharBack === 'string' && aadharBack.trim() !== "") updateData.aadharBack = aadharBack;

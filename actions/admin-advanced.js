@@ -6,7 +6,7 @@ import { db } from "@/lib/prisma";
 async function ensureAdmin() {
   const user = await currentUser();
   if (!user) throw new Error("Not logged in");
-  
+
   const u = await db.user.findUnique({ where: { id: user.id }, select: { role: true } });
   if (!u || u.role !== "admin") {
     throw new Error("Unauthorized: admin only");
@@ -34,7 +34,8 @@ export async function getAdvancedAdminStats() {
       cancelledOrders,
       processingOrders,
       financeData,
-      disputedOrders
+      disputedOrders,
+      disabledCount
     ] = await Promise.all([
       db.farmerProfile.count({ where: { sellingStatus: 'APPROVED' } }),
       db.agentProfile.count({ where: { sellingStatus: 'APPROVED' } }),
@@ -54,7 +55,8 @@ export async function getAdvancedAdminStats() {
       db.order.findMany({
         where: { disputeStatus: 'OPEN' },
         select: { totalAmount: true }
-      })
+      }),
+      db.user.count({ where: { isDisabled: true } })
     ]);
 
     // Settlement Stats
@@ -72,7 +74,7 @@ export async function getAdvancedAdminStats() {
     const openDisputes = disputedOrders.length;
 
     const aov = deliveredOrders > 0 ? (totalGMV / deliveredOrders).toFixed(0) : 0;
-    
+
     // Security Audit: Check how many have uploaded ID proofs
     const [verifiedFarmers, verifiedAgents, verifiedDelivery] = await Promise.all([
       db.farmerProfile.count({ where: { aadharFront: { not: null }, sellingStatus: 'APPROVED' } }),
@@ -86,28 +88,28 @@ export async function getAdvancedAdminStats() {
 
     // Role-based Revenue
     const farmerRevenue = (await db.order.aggregate({
-        _sum: { platformFee: true },
-        where: { paymentStatus: 'PAID', items: { some: { sellerType: 'farmer' } } }
+      _sum: { platformFee: true },
+      where: { paymentStatus: 'PAID', items: { some: { sellerType: 'farmer' } } }
     }))._sum.platformFee || 0;
 
     const agentRevenue = (await db.order.aggregate({
-        _sum: { platformFee: true },
-        where: { paymentStatus: 'PAID', items: { some: { sellerType: 'agent' } } }
+      _sum: { platformFee: true },
+      where: { paymentStatus: 'PAID', items: { some: { sellerType: 'agent' } } }
     }))._sum.platformFee || 0;
 
     const profitPercentage = totalGMV > 0 ? ((totalPlatformRevenue / totalGMV) * 100).toFixed(1) : 0;
-    const orderSuccessRate = (deliveredOrders + cancelledOrders) > 0 
-      ? ((deliveredOrders / (deliveredOrders + cancelledOrders)) * 100).toFixed(1) 
+    const orderSuccessRate = (deliveredOrders + cancelledOrders) > 0
+      ? ((deliveredOrders / (deliveredOrders + cancelledOrders)) * 100).toFixed(1)
       : 0;
 
     return {
       success: true,
       data: {
-        users: { farmerCount, agentCount, adminCount, deliveryPartnerCount, profileCompleteness },
+        users: { farmerCount, agentCount, adminCount, deliveryPartnerCount, profileCompleteness, disabledCount },
         products: { totalProducts, farmerProducts, agentProducts },
-        orders: { 
-          totalDelivered: deliveredOrders, 
-          totalInTransit: inTransitOrders, 
+        orders: {
+          totalDelivered: deliveredOrders,
+          totalInTransit: inTransitOrders,
           totalProcessing: processingOrders,
           cancelledOrders,
           orderSuccessRate,
@@ -137,65 +139,65 @@ export async function getAdvancedAdminStats() {
 export async function getExportableUsers(roleType) {
   try {
     await ensureAdmin();
-    
+
     let data = [];
     if (roleType === 'farmer') {
       const farmers = await db.farmerProfile.findMany({
-        include: { 
+        include: {
           user: { select: { email: true, createdAt: true, isDisabled: true } },
-          listings: { 
+          listings: {
             include: { orderItems: { select: { quantity: true } } }
           }
         }
       });
-      
+
       data = await Promise.all(farmers.map(async (p) => {
-         const purchasedCount = await db.order.count({ where: { buyerId: p.userId } });
-         const unitsSold = p.listings.reduce((sum, l) => sum + l.orderItems.reduce((s, it) => s + it.quantity, 0), 0);
-         return {
-            ...p,
-            listingsCount: p.listings.length,
-            unitsSold,
-            purchasedCount,
-            listings: undefined // Clean up
-         };
+        const purchasedCount = await db.order.count({ where: { buyerId: p.userId } });
+        const unitsSold = p.listings.reduce((sum, l) => sum + l.orderItems.reduce((s, it) => s + it.quantity, 0), 0);
+        return {
+          ...p,
+          listingsCount: p.listings.length,
+          unitsSold,
+          purchasedCount,
+          listings: undefined // Clean up
+        };
       }));
-      
+
     } else if (roleType === 'agent') {
       const agents = await db.agentProfile.findMany({
-        include: { 
+        include: {
           user: { select: { email: true, createdAt: true, isDisabled: true } },
-          listings: { 
+          listings: {
             include: { orderItems: { select: { quantity: true } } }
           }
         }
       });
-      
+
       data = await Promise.all(agents.map(async (p) => {
-         const purchasedCount = await db.order.count({ where: { buyerId: p.userId } });
-         const unitsSold = p.listings.reduce((sum, l) => sum + l.orderItems.reduce((s, it) => s + it.quantity, 0), 0);
-         return {
-            ...p,
-            listingsCount: p.listings.length,
-            unitsSold,
-            purchasedCount,
-            listings: undefined // Clean up
-         };
+        const purchasedCount = await db.order.count({ where: { buyerId: p.userId } });
+        const unitsSold = p.listings.reduce((sum, l) => sum + l.orderItems.reduce((s, it) => s + it.quantity, 0), 0);
+        return {
+          ...p,
+          listingsCount: p.listings.length,
+          unitsSold,
+          purchasedCount,
+          listings: undefined // Clean up
+        };
       }));
 
     } else if (roleType === 'delivery') {
       const partners = await db.deliveryProfile.findMany({
-        include: { 
+        include: {
           user: { select: { email: true, createdAt: true, isDisabled: true } },
           jobs: { select: { status: true } }
         }
       });
-      
+
       data = partners.map(p => ({
-         ...p,
-         totalDeliveries: p.jobs.filter(j => j.status === 'DELIVERED').length,
-         activeJobs: p.jobs.filter(j => !['DELIVERED', 'CANCELLED', 'REJECTED'].includes(j.status)).length,
-         jobs: undefined
+        ...p,
+        totalDeliveries: p.jobs.filter(j => j.status === 'DELIVERED').length,
+        activeJobs: p.jobs.filter(j => !['DELIVERED', 'CANCELLED', 'REJECTED'].includes(j.status)).length,
+        jobs: undefined
       }));
 
     } else if (roleType === 'admin') {
@@ -224,10 +226,10 @@ export async function getExportableProducts() {
     });
 
     const mapped = products.map(p => ({
-       ...p,
-       sellerName: p.farmer?.name || p.agent?.companyName || p.agent?.name || 'N/A',
-       unitsSold: p.orderItems.reduce((sum, it) => sum + it.quantity, 0),
-       orderItems: undefined
+      ...p,
+      sellerName: p.farmer?.name || p.agent?.companyName || p.agent?.name || 'N/A',
+      unitsSold: p.orderItems.reduce((sum, it) => sum + it.quantity, 0),
+      orderItems: undefined
     }));
 
     return { success: true, data: JSON.parse(JSON.stringify(mapped)) };
@@ -245,12 +247,26 @@ export async function toggleUserStatus(userId) {
     const user = await db.user.findUnique({ where: { id: userId }, select: { isDisabled: true } });
     if (!user) throw new Error("User not found");
 
+    const newStatus = !user.isDisabled;
     await db.user.update({
       where: { id: userId },
-      data: { isDisabled: !user.isDisabled }
+      data: { isDisabled: newStatus }
     });
 
-    return { success: true, message: `User ${!user.isDisabled ? 'Disabled' : 'Enabled'} successfully.` };
+    // 🚀 SYNC WITH CLERK FOR GLOBAL OVERLAY PERFORMANCE
+    try {
+      const { createClerkClient } = await import('@clerk/nextjs/server');
+      const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+      await clerk.users.updateUserMetadata(userId, {
+        publicMetadata: {
+          isDisabled: newStatus
+        }
+      });
+    } catch (clerkErr) {
+      console.error("[toggleUserStatus] Clerk sync failed (non-blocking):", clerkErr.message);
+    }
+
+    return { success: true, message: `User ${newStatus ? 'Disabled' : 'Enabled'} successfully.` };
   } catch (error) {
     return { success: false, error: error.message };
   }

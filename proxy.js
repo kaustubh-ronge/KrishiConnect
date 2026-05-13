@@ -30,10 +30,17 @@ export default clerkMiddleware(async (auth, req) => {
     }
   }
 
-  // --- CLERK PROTECTION ---
+  // --- CLERK PROTECTION (TEMPORARILY DISABLED FOR TESTING) ---
+
   if (!isPublicRoute(req)) {
-    await auth.protect();
+    const { userId } = await auth();
+    if (!userId) {
+      const signInUrl = new URL('/sign-in', req.url);
+      signInUrl.searchParams.set('redirect_url', req.url);
+      return NextResponse.redirect(signInUrl);
+    }
   }
+
 });
 
 export const config = {

@@ -166,6 +166,63 @@ export async function getAllOrders({ onlyPendingPayouts = false } = {}) {
   }
 }
 
+export async function markOrderSettled(orderId) {
+  const user = await currentUser();
+  if (!user) return { success: false, error: "Not logged in" };
+
+  try {
+    await ensureAdmin(user.id);
+
+    const order = await db.order.findUnique({ 
+      where: { id: orderId },
+      include: { items: true }
+    });
+    if (!order) throw new Error("Order not found");
+
+    if (order.payoutStatus === "SETTLED") {
+      return { success: true, message: "Order already settled." };
+    }
+
+    const now = new Date();
+
+    await db.$transaction(async (tx) => {
+      // 1. Update all items to SETTLED
+      await tx.orderItem.updateMany({
+        where: { orderId, payoutStatus: "PENDING" },
+        data: {
+          payoutStatus: "SETTLED",
+          payoutSettledAt: now,
+          payoutSettledBy: user.id
+        }
+      });
+
+      // 2. Update the Order itself
+      await tx.order.update({
+        where: { id: orderId },
+        data: { 
+          payoutStatus: "SETTLED",
+          updatedAt: now
+        }
+      });
+
+      // 3. Update delivery jobs
+      await tx.deliveryJob.updateMany({
+        where: { orderId, payoutStatus: "PENDING" },
+        data: {
+          payoutStatus: "SETTLED",
+          payoutSettledAt: now,
+          payoutSettledBy: user.id
+        }
+      });
+    });
+
+    return { success: true, message: "Full order settled successfully." };
+  } catch (err) {
+    console.error("Settle Order Error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
 export async function markOrderItemSettled(orderItemId) {
   const user = await currentUser();
   if (!user) return { success: false, error: "Not logged in" };
@@ -323,17 +380,17 @@ export async function getPendingProfiles() {
     // Fetch EVERYTHING for deep verification
     const pendingFarmers = await db.farmerProfile.findMany({
       where: { sellingStatus: "PENDING" },
-      include: { user: { select: { email: true, name: true, createdAt: true } } }
+      include: { user: { select: { email: true, name: true, createdAt: true, isDisabled: true } } }
     });
 
     const pendingAgents = await db.agentProfile.findMany({
       where: { sellingStatus: "PENDING" },
-      include: { user: { select: { email: true, name: true, createdAt: true } } }
+      include: { user: { select: { email: true, name: true, createdAt: true, isDisabled: true } } }
     });
 
     const pendingDelivery = await db.deliveryProfile.findMany({
       where: { approvalStatus: "PENDING" },
-      include: { user: { select: { email: true, name: true, createdAt: true } } }
+      include: { user: { select: { email: true, name: true, createdAt: true, isDisabled: true } } }
     });
 
     const profiles = [
