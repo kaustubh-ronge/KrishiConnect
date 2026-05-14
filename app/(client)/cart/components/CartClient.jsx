@@ -200,7 +200,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
             }
         };
         updateSelectionFee();
-    }, [selectedItemIds, lat, lng]);
+    }, [selectedItemIds, lat, lng, cartItems]);
 
     // 2. Identify ALL unserviceable items in the cart for grayscaling
     // This ONLY runs when the cart items or location change
@@ -215,7 +215,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
             }
         };
         updateUnserviceableList();
-    }, [cartItems.length, lat, lng]);
+    }, [cartItems, lat, lng]);
 
     // 2.1 Auto-deselect unserviceable items that are not approved
     useEffect(() => {

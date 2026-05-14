@@ -137,6 +137,7 @@ export async function getAllOrders({
         buyerPhone: o.buyerPhone,
         buyerName: o.buyerName,
         buyerEmail: o.buyerUser?.email || 'N/A',
+        buyerRole: o.buyerUser?.role || (o.buyerUser?.farmerProfile ? 'farmer' : o.buyerUser?.agentProfile ? 'agent' : 'user'),
         items: o.items.map(it => {
           const p = it.product;
           const seller = p.farmer || p.agent;
@@ -146,6 +147,8 @@ export async function getAllOrders({
             quantity: it.quantity,
             unit: p.unit,
             priceAtPurchase: it.priceAtPurchase,
+            deliveryChargeAtPurchase: it.deliveryChargeAtPurchase,
+            deliveryChargeTypeAtPurchase: it.deliveryChargeTypeAtPurchase,
             image: p.images?.[0],
             seller: seller ? {
               type: p.farmer ? 'Farmer' : 'Agent',
@@ -348,6 +351,7 @@ export async function getSellerBankDetailsForOrder(orderId) {
             accountNumber: seller.accountNumber,
             ifscCode: seller.ifscCode,
           },
+          role: p.farmer ? 'farmer' : 'agent',
           totalEarned: 0,
           items: []
         });
@@ -700,7 +704,8 @@ export async function getAdminDeliveryJobs({
               id: true,
               buyerName: true,
               shippingAddress: true,
-              totalAmount: true
+              totalAmount: true,
+              buyerUser: { select: { role: true } }
             }
           }
         }

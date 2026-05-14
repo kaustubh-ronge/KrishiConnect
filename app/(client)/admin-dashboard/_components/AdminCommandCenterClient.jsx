@@ -179,7 +179,17 @@ export default function AdminCommandCenterClient({
    }, [activeView, mounted]);
 
    useEffect(() => {
-      if (mounted) fetchDirectoryData(activeView);
+      if (mounted) {
+         fetchDirectoryData(activeView);
+         // Prefetch delivery partners for filtering if in orders/logistics view
+         if (activeView === 'orders' || activeView === 'logistics') {
+            const prefetch = async () => {
+               const res = await getExportableUsers('delivery', { limit: 100 });
+               if (res.success) setDeliveryPartners(res.data.users);
+            };
+            prefetch();
+         }
+      }
    }, [search, statusFilter, advancedFilters, currentPage, sortConfig]);
 
    const fetchInitialData = async () => {
@@ -671,10 +681,11 @@ export default function AdminCommandCenterClient({
                </div>
             </header>
 
-            <div className="flex-grow overflow-y-auto custom-scrollbar relative">
+            <div className="flex-grow relative overflow-hidden">
                <AnimatePresence>
                   {isLoading && <PremiumLoader fullPage={false} message="Syncing Command Center..." />}
                </AnimatePresence>
+               <div className="absolute inset-0 overflow-y-auto custom-scrollbar">
                <div className="p-8 max-w-[1500px] mx-auto w-full space-y-10 pb-40 custom-scrollbar">
                   {activeView === 'dashboard' && (
                      <div className="space-y-10 animate-in fade-in duration-500">
@@ -800,6 +811,7 @@ export default function AdminCommandCenterClient({
                                                 sellerType: 'ALL',
                                                 stockStatus: 'ALL',
                                                 securityStatus: 'ALL',
+                                                deliveryPartnerId: 'ALL',
                                                 minAmount: '',
                                                 maxAmount: '',
                                              });
@@ -833,6 +845,7 @@ export default function AdminCommandCenterClient({
                                        sellerType: 'ALL',
                                        stockStatus: 'ALL',
                                        securityStatus: 'ALL',
+                                       deliveryPartnerId: 'ALL',
                                        minAmount: '',
                                        maxAmount: '',
                                     });
@@ -862,6 +875,17 @@ export default function AdminCommandCenterClient({
                                                 { label: 'Settled', value: 'SETTLED' },
                                                 { label: 'Pending', value: 'PENDING' },
                                              ]
+                                          }
+                                       ]
+                                    },
+                                    {
+                                       title: "Logistics & Partners",
+                                       filters: [
+                                          {
+                                             key: 'deliveryPartnerId', label: 'Delivery Partner', type: 'select', options: (deliveryPartners || []).map(dp => ({
+                                                label: dp.name || dp.displayName || dp.user?.name || 'Unknown',
+                                                value: dp.userId || dp.id
+                                             }))
                                           }
                                        ]
                                     },
@@ -975,7 +999,7 @@ export default function AdminCommandCenterClient({
                                                                activeView === 'mediation' ? item.product?.productName :
                                                                   s(item.productName || item.name || item.displayName || item.buyerName || item.userName)}
                                                       </span>
-                                                      {activeView === 'orders' && <RoleBadge role={item.buyer?.role} />}
+                                                      {activeView === 'orders' && <RoleBadge role={item.buyerRole} />}
                                                       {(activeView === 'farmers' || activeView === 'agents' || activeView === 'delivery') && <RoleBadge role={item.role || activeView.slice(0, -1)} />}
                                                       {activeView === 'support' && <RoleBadge role={item.userRole} />}
                                                    </div>
@@ -1004,10 +1028,10 @@ export default function AdminCommandCenterClient({
                                                             <StatusBadge status={item.status} type="logistics" size="xs" />
                                                             <RoleBadge role="delivery" size="xs" />
                                                          </div>
-                                                         {item.order?.buyer?.role && (
+                                                         {item.order?.buyerUser?.role && (
                                                             <div className="flex items-center gap-1.5 mt-1">
                                                                <span className="text-[7px] font-black text-slate-400 uppercase">Buyer:</span>
-                                                               <RoleBadge role={item.order.buyer.role} size="xs" />
+                                                               <RoleBadge role={item.order.buyerUser.role} size="xs" />
                                                             </div>
                                                          )}
                                                       </div>
@@ -1147,7 +1171,8 @@ export default function AdminCommandCenterClient({
                   )}
                </div>
             </div>
-         </main>
+         </div>
+      </main>
 
          {/* PRODUCT AUDIT MODAL */}
          <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
@@ -1329,7 +1354,10 @@ export default function AdminCommandCenterClient({
                                  <div className="flex items-center gap-5">
                                     <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-xl shadow-inner">BN</div>
                                     <div className="flex flex-col">
-                                       <span className="text-2xl font-black text-slate-900 leading-tight">{selectedOrder.buyerName}</span>
+                                        <div className="flex items-center gap-2">
+                                           <span className="text-2xl font-black text-slate-900 leading-tight">{selectedOrder.buyerName}</span>
+                                           <RoleBadge role={selectedOrder.buyerRole} />
+                                        </div>
                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{selectedOrder.buyerEmail}</span>
                                     </div>
                                  </div>
@@ -1355,7 +1383,17 @@ export default function AdminCommandCenterClient({
                                           <div className="w-20 h-20 bg-slate-50 rounded-3xl overflow-hidden border border-slate-100 flex items-center justify-center shadow-inner">
                                              {it.image ? <img src={it.image} alt={it.productName} className="w-full h-full object-cover" /> : <ImageIcon className="h-8 w-8 text-slate-300" />}
                                           </div>
-                                          <div className="flex flex-col"><span className="text-xl font-black text-slate-900 tracking-tight">{it.productName}</span><span className="text-[11px] font-black text-slate-400 uppercase tracking-widest mt-1">{it.quantity} {it.unit} sold</span></div>
+                                          <div className="flex flex-col">
+                                             <span className="text-xl font-black text-slate-900 tracking-tight">{it.productName}</span>
+                                             <div className="flex items-center gap-2 mt-1">
+                                                <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{it.quantity} {it.unit} sold</span>
+                                                {it.deliveryChargeAtPurchase > 0 && (
+                                                   <Badge className="bg-indigo-50 text-indigo-600 border-indigo-100 text-[8px] px-2 py-0.5 font-black uppercase rounded-md">
+                                                      + Delivery: ₹{it.deliveryChargeAtPurchase}/{it.unit}
+                                                   </Badge>
+                                                )}
+                                             </div>
+                                          </div>
                                        </div>
                                     </div>
                                  ))}
@@ -1377,6 +1415,7 @@ export default function AdminCommandCenterClient({
                                                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Target Seller</p>
                                                    <div className="flex items-center gap-2">
                                                       <p className="text-lg font-black text-white tracking-tight">{sObj.name || 'Unknown Seller'}</p>
+                                                      <RoleBadge role={sObj.role} size="xs" />
                                                       <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md shadow-sm ${sObj.isDisabled ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
                                                          {sObj.isDisabled ? 'BLOCKED' : 'ACTIVE'}
                                                       </Badge>

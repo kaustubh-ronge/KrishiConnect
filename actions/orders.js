@@ -286,6 +286,7 @@ export async function initiateCheckout(params) {
     }
 
     let deliveryTotal = 0;
+    const itemDeliveryChargeMap = new Map(); // Track per-item delivery fees
     const { getOSRMDistance } = await import('@/lib/utils');
     const { getAvailableDeliveryBoys } = await import('./delivery-job');
     const { getUserSpecialDeliveryRequests } = await import('./special-delivery');
@@ -329,7 +330,9 @@ export async function initiateCheckout(params) {
               };
             } else {
               // FEE IS NOW PER UNIT
-              sellerNegotiatedTotal += ((approvedReq.negotiatedFee || 0) * it.quantity);
+              const fee = approvedReq.negotiatedFee || 0;
+              sellerNegotiatedTotal += (fee * it.quantity);
+              itemDeliveryChargeMap.set(it.id, fee);
             }
           }
         }
@@ -377,10 +380,12 @@ export async function initiateCheckout(params) {
 
         // Fallback to product-defined flat fees if location is missing and no range limit
         deliveryTotal += seller.items.reduce((sum, it) => {
+          const charge = it.product.deliveryCharge || 0;
+          itemDeliveryChargeMap.set(it.id, charge);
           if (it.product.deliveryChargeType === 'per_unit') {
-            return sum + (it.quantity * (it.product.deliveryCharge || 0));
+            return sum + (it.quantity * charge);
           }
-          return sum + (it.product.deliveryCharge || 0);
+          return sum + charge;
         }, 0);
       }
     }
@@ -502,7 +507,7 @@ export async function initiateCheckout(params) {
             productId: it.productId,
             quantity: it.quantity,
             priceAtPurchase: it.product.pricePerUnit,
-            deliveryChargeAtPurchase: it.product.deliveryCharge || 0,
+            deliveryChargeAtPurchase: itemDeliveryChargeMap.get(it.id) ?? (it.product.deliveryCharge || 0),
             deliveryChargeTypeAtPurchase: it.product.deliveryChargeType || 'per_unit',
             sellerId,
             sellerType,
