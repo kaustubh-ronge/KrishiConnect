@@ -27,21 +27,25 @@ import {
  */
 export const StatusBadge = ({ status, type = 'general', size = 'sm' }) => {
    const config = {
-      support: {
-         OPEN: { label: 'Open', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: MessageSquare },
-         PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock },
-         RESOLVED: { label: 'Resolved', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
-         CLOSED: { label: 'Closed', color: 'bg-slate-100 text-slate-600 border-slate-200', icon: XCircle },
-         ESCALATED: { label: 'Escalated', color: 'bg-rose-100 text-rose-700 border-rose-200', icon: AlertTriangle },
+      security: {
+         ACTIVE: { label: 'Active', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: ShieldCheck },
+         BLOCKED: { label: 'Blocked', color: 'bg-rose-100 text-rose-700 border-rose-200', icon: XCircle },
+         SUSPENDED: { label: 'Suspended', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: AlertTriangle },
       },
       orders: {
          PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock },
+         PROCESSING: { label: 'Processing', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', icon: RotateCcw },
+         PACKED: { label: 'Packed', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: Package },
+         SHIPPED: { label: 'Shipped', color: 'bg-purple-100 text-purple-700 border-purple-200', icon: Truck },
+         IN_TRANSIT: { label: 'In Transit', color: 'bg-sky-100 text-sky-700 border-sky-200', icon: Truck },
+         DELIVERED: { label: 'Delivered', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
          PAID: { label: 'Paid', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', icon: CreditCard },
          COMPLETED: { label: 'Completed', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
          CANCELLED: { label: 'Cancelled', color: 'bg-rose-100 text-rose-700 border-rose-200', icon: XCircle },
          REFUNDED: { label: 'Refunded', color: 'bg-slate-100 text-slate-600 border-slate-200', icon: History },
       },
       logistics: {
+         PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock },
          IN_TRANSIT: { label: 'In Transit', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: Truck },
          DELIVERED: { label: 'Delivered', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
          FAILED: { label: 'Failed', color: 'bg-rose-100 text-rose-700 border-rose-200', icon: XCircle },
@@ -52,6 +56,7 @@ export const StatusBadge = ({ status, type = 'general', size = 'sm' }) => {
          PROCESSING: { label: 'Processing', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: RotateCcw },
          SETTLED: { label: 'Settled', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
          FAILED: { label: 'Failed', color: 'bg-rose-100 text-rose-700 border-rose-200', icon: XCircle },
+         PAID: { label: 'Paid', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
       },
       moderation: {
          PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock },
@@ -59,6 +64,13 @@ export const StatusBadge = ({ status, type = 'general', size = 'sm' }) => {
          REJECTED: { label: 'Rejected', color: 'bg-rose-100 text-rose-700 border-rose-200', icon: XCircle },
          FLAGGED: { label: 'Flagged', color: 'bg-orange-100 text-orange-700 border-orange-200', icon: AlertTriangle },
          ARCHIVED: { label: 'Archived', color: 'bg-slate-100 text-slate-600 border-slate-200', icon: Package },
+      },
+      support: {
+         OPEN: { label: 'Open', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: MessageSquare },
+         PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock },
+         RESOLVED: { label: 'Resolved', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
+         CLOSED: { label: 'Closed', color: 'bg-slate-100 text-slate-600 border-slate-200', icon: XCircle },
+         ESCALATED: { label: 'Escalated', color: 'bg-rose-100 text-rose-700 border-rose-200', icon: AlertTriangle },
       }
    };
 

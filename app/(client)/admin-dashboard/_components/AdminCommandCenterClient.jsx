@@ -419,7 +419,7 @@ export default function AdminCommandCenterClient({
       else if (activeView === 'agents') items = Array.isArray(agents) ? agents : [];
       else if (activeView === 'delivery') items = Array.isArray(deliveryPartners) ? deliveryPartners : [];
       else if (activeView === 'orders') items = Array.isArray(orders) ? orders : [];
-      else if (activeView === 'disputes') items = Array.isArray(orders) ? orders : [];
+      else if (activeView === 'disputes') items = Array.isArray(orders) ? orders.filter(o => o.disputeStatus === 'OPEN') : [];
       else if (activeView === 'catalog') items = Array.isArray(products) ? products : [];
       else if (activeView === 'logistics') items = Array.isArray(deliveryJobs) ? deliveryJobs : [];
       else if (activeView === 'reviews') items = Array.isArray(reviews) ? reviews : [];
@@ -429,7 +429,7 @@ export default function AdminCommandCenterClient({
       // Apply Status Filter
       if (statusFilter && statusFilter !== 'ALL') {
          items = items.filter(item => {
-            const status = (item.status || item.orderStatus || item.payoutStatus || item.paymentStatus || item.approvalStatus || (item.isRead ? 'CLOSED' : 'OPEN'))?.toUpperCase();
+            const status = (item.status || item.orderStatus || item.payoutStatus || item.paymentStatus || item.approvalStatus || item.sellingStatus || (item.isRead ? 'CLOSED' : 'OPEN'))?.toUpperCase();
             return status === statusFilter.toUpperCase();
          });
       }
@@ -467,7 +467,7 @@ export default function AdminCommandCenterClient({
             { label: 'Pending', value: 'PENDING' },
             { label: 'Approved', value: 'APPROVED' },
             { label: 'Rejected', value: 'REJECTED' },
-         ]
+         ],
       };
       return options[activeView] || [];
    };
@@ -1071,7 +1071,7 @@ export default function AdminCommandCenterClient({
                                                       {item.usagePurpose === 'buy_and_sell' ? 'BUY & SELL' : 'BUY ONLY'}
                                                    </Badge>
                                                 </div>
-                                                <StatusBadge status={item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'} type="support" size="xs" />
+                                                <StatusBadge status={item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'} type="security" size="xs" />
                                              </div>
                                           ) : activeView === 'mediation' ? (
                                              <div className="flex flex-col gap-1.5 items-center">
@@ -1085,7 +1085,7 @@ export default function AdminCommandCenterClient({
                                                 {(activeView === 'support' || activeView === 'delivery') && (
                                                    <StatusBadge status={activeView === 'support' ? (item.userRole || 'USER') : (item.approvalStatus || 'PENDING')} type="moderation" size="xs" />
                                                 )}
-                                                <StatusBadge status={item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'} type="support" size="xs" />
+                                                <StatusBadge status={item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'} type="security" size="xs" />
                                              </div>
                                           )}</TableCell>
                                           <TableCell className="pr-8 text-right">
