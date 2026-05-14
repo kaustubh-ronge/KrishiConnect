@@ -436,21 +436,49 @@ export default function AdminCommandCenterClient({
       else if (activeView === 'support') items = Array.isArray(supportMessages) ? supportMessages : [];
       else if (activeView === 'mediation') items = Array.isArray(specialRequests) ? specialRequests : [];
 
-      // Apply Status Filter
+      // Apply Status Filter (Domain-Aware)
       if (statusFilter && statusFilter !== 'ALL') {
+         const sf = statusFilter.toUpperCase();
          items = items.filter(item => {
-            const status = (item.status || item.orderStatus || item.payoutStatus || item.paymentStatus || item.approvalStatus || item.sellingStatus || (item.isRead ? 'CLOSED' : 'OPEN'))?.toUpperCase();
-            return status === statusFilter.toUpperCase();
+            if (activeView === 'orders' || activeView === 'disputes') {
+               return (item.orderStatus?.toUpperCase() === sf || 
+                       item.paymentStatus?.toUpperCase() === sf || 
+                       item.payoutStatus?.toUpperCase() === sf);
+            }
+            const status = (item.status || item.approvalStatus || item.sellingStatus || (item.isRead ? 'CLOSED' : 'OPEN'))?.toUpperCase();
+            return status === sf;
          });
       }
 
       // Apply Search Filter
       if (search) {
          const s = search.toLowerCase();
-         items = items.filter(item => 
+         items = items.filter(item =>
             (item.name || item.displayName || item.buyerName || item.userName || item.productName || item.product?.productName || item.user?.name || "")
-            .toLowerCase().includes(s)
+               .toLowerCase().includes(s)
          );
+      }
+
+      // Apply Advanced Filters
+      if (advancedFilters) {
+         if (advancedFilters.buyerRole && advancedFilters.buyerRole !== 'ALL') {
+            items = items.filter(it => it.buyerRole === advancedFilters.buyerRole);
+         }
+         if (advancedFilters.sellerRole && advancedFilters.sellerRole !== 'ALL') {
+            items = items.filter(it => it.sellerType === advancedFilters.sellerRole || it.role === advancedFilters.sellerRole);
+         }
+         if (advancedFilters.deliveryPartnerId && advancedFilters.deliveryPartnerId !== 'ALL') {
+            // For orders, check deliveryJobs
+            if (activeView === 'orders' || activeView === 'disputes') {
+               items = items.filter(it => it.deliveryPartners?.some(dp => dp.partnerId === advancedFilters.deliveryPartnerId || dp.userId === advancedFilters.deliveryPartnerId));
+            } else if (activeView === 'logistics') {
+               items = items.filter(it => it.deliveryBoy?.id === advancedFilters.deliveryPartnerId || it.deliveryBoy?.userId === advancedFilters.deliveryPartnerId);
+            }
+         }
+         if (advancedFilters.securityStatus && advancedFilters.securityStatus !== 'ALL') {
+            const isBlocked = advancedFilters.securityStatus === 'BLOCKED';
+            items = items.filter(it => (it.user?.isDisabled === isBlocked) || (it.isDisabled === isBlocked));
+         }
       }
 
       return items;
@@ -468,6 +496,13 @@ export default function AdminCommandCenterClient({
             { label: 'Shipped', value: 'SHIPPED' },
             { label: 'Delivered', value: 'DELIVERED' },
             { label: 'Cancelled', value: 'CANCELLED' },
+            { label: 'Paid', value: 'PAID' },
+            { label: 'Settled', value: 'SETTLED' },
+         ],
+         disputes: [
+            { label: 'Open', value: 'OPEN' },
+            { label: 'Resolved', value: 'RESOLVED' },
+            { label: 'Rejected', value: 'REJECTED' },
          ],
          payouts: [
             { label: 'Pending', value: 'PENDING' },
@@ -686,493 +721,493 @@ export default function AdminCommandCenterClient({
                   {isLoading && <PremiumLoader fullPage={false} message="Syncing Command Center..." />}
                </AnimatePresence>
                <div className="absolute inset-0 overflow-y-auto custom-scrollbar">
-               <div className="p-8 max-w-[1500px] mx-auto w-full space-y-10 pb-40 custom-scrollbar">
-                  {activeView === 'dashboard' && (
-                     <div className="space-y-10 animate-in fade-in duration-500">
-                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-                           <Card className="border-0 shadow-sm rounded-2xl bg-white p-6 border-t-4 border-emerald-500">
-                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Sales</p>
-                              <h3 className="text-2xl font-black text-slate-900 tracking-tighter">{"\u20B9"}{sNum(stats.finance?.totalGMV).toLocaleString()}</h3>
-                              <p className="text-[9px] font-bold text-slate-400 mt-4">Platform Volume</p>
-                           </Card>
-                           <Card className="border-0 shadow-sm rounded-2xl bg-white p-6 border-t-4 border-indigo-500">
-                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Platform Fees</p>
-                              <h3 className="text-2xl font-black text-slate-900 tracking-tighter">{"\u20B9"}{sNum(stats.finance?.totalPlatformRevenue).toLocaleString()}</h3>
-                              <div className="text-[9px] text-emerald-600 font-black mt-4 uppercase">Direct Profit</div>
-                           </Card>
-                           <Card className="border-0 shadow-sm rounded-2xl bg-rose-500 p-6 border-t-4 border-rose-600">
-                              <p className="text-[9px] font-black text-rose-100 uppercase tracking-widest mb-1">Blocked Accounts</p>
-                              <h3 className="text-2xl font-black text-white tracking-tighter">{sNum(stats.users?.disabledCount)} Users</h3>
-                              <p className="text-[9px] font-bold text-rose-100 mt-4 uppercase tracking-tighter">Access Restricted</p>
-                           </Card>
-                           <Card className="border-0 shadow-sm rounded-2xl bg-indigo-300 p-6">
-                              <p className="text-[9px] font-black text-slate-900 uppercase tracking-widest mb-1">Verified Score</p>
-                              <h3 className="text-2xl font-black text-slate-900 tracking-tighter">{stats.users?.profileCompleteness}%</h3>
-                              <p className="text-[9px] font-bold text-slate-900 mt-4 uppercase">Platform Trust</p>
-                           </Card>
-                           <Card className="border-0 shadow-sm rounded-2xl bg-slate-900 text-white p-6">
-                              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Active Catalog</p>
-                              <h3 className="text-2xl font-black text-white tracking-tighter">{stats.products?.totalProducts} Items</h3>
-                              <p className="text-[9px] font-black text-indigo-400 mt-4 uppercase tracking-widest">Marketplace Live</p>
-                           </Card>
-                        </div>
-
-                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                           <div className="xl:col-span-2 space-y-8">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                 <Card className="rounded-[2.5rem] border-0 shadow-sm bg-white p-10 flex flex-col justify-center">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Internal Admin Summary</p>
-                                    <h3 className="text-xl font-black text-slate-900">Platform is Healthy.</h3>
-                                    <div className="flex items-center gap-3 mt-6"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[10px] font-black text-emerald-600 uppercase">System Integrity Audit: Pass</span></div>
-                                 </Card>
-                                 <div className="grid grid-cols-2 gap-6">
-                                    <Card className="rounded-3xl border-0 shadow-sm bg-emerald-50 p-6 flex flex-col justify-center"><p className="text-[9px] font-black text-emerald-600 uppercase mb-2">Approved Sellers</p><h4 className="text-2xl font-black text-emerald-900">{sNum(stats.users?.farmerCount + stats.users?.agentCount)}</h4></Card>
-                                    <Card className="rounded-3xl border-0 shadow-sm bg-rose-50 p-6 flex flex-col justify-center"><p className="text-[9px] font-black text-rose-600 uppercase mb-2">Pending Verify</p><h4 className="text-2xl font-black text-rose-900">{pendingProfiles.length}</h4></Card>
-                                 </div>
-                              </div>
-                              <Card className="rounded-[2rem] border-0 shadow-sm bg-white overflow-hidden flex flex-col">
-                                 <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0"><h4 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-3"><LucideHistory className="h-4 w-4 text-indigo-500" /> Recent Platform Activity</h4></div>
-                                 <div className="flex-grow overflow-y-auto custom-scrollbar">
-                                    <Table>
-                                       <TableHeader className="bg-slate-50/50 text-[9px] uppercase font-black text-slate-400 h-10 border-slate-50 sticky top-0 z-10 backdrop-blur-md"><TableRow><TableHead className="pl-8">ORDER ID</TableHead><TableHead>MEMBER</TableHead><TableHead>TOTAL BILL</TableHead><TableHead>STATUS</TableHead><TableHead className="text-right pr-8">VIEW</TableHead></TableRow></TableHeader>
-                                       <TableBody>
-                                          {Array.isArray(orders) && orders.slice(0, 6).map((o, idx) => (
-                                             <TableRow key={idx} className="h-16 border-slate-50 hover:bg-slate-50/50 group">
-                                                <TableCell className="pl-8 font-black text-slate-900">#{o.id.slice(-6).toUpperCase()}</TableCell>
-                                                <TableCell className="text-[11px] font-bold text-slate-600">{s(o.buyerName)}</TableCell>
-                                                <TableCell className="font-black text-slate-900 text-xs">{"\u20B9"}{sNum(o.totalAmount).toLocaleString()}</TableCell>
-                                                <TableCell><StatusBadge status={getFriendlyStatus(o.orderStatus)} type="orders" size="xs" /></TableCell>
-                                                <TableCell className="text-right pr-8"><Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg" onClick={() => openOrderAudit(o.id)}><Eye className="h-4 w-4 text-slate-400" /></Button></TableCell>
-                                             </TableRow>
-                                          ))}
-                                       </TableBody>
-                                    </Table>
-                                 </div>
+                  <div className="p-8 max-w-[1500px] mx-auto w-full space-y-10 pb-40 custom-scrollbar">
+                     {activeView === 'dashboard' && (
+                        <div className="space-y-10 animate-in fade-in duration-500">
+                           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                              <Card className="border-0 shadow-sm rounded-2xl bg-white p-6 border-t-4 border-emerald-500">
+                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Sales</p>
+                                 <h3 className="text-2xl font-black text-slate-900 tracking-tighter">{"\u20B9"}{sNum(stats.finance?.totalGMV).toLocaleString()}</h3>
+                                 <p className="text-[9px] font-bold text-slate-400 mt-4">Platform Volume</p>
+                              </Card>
+                              <Card className="border-0 shadow-sm rounded-2xl bg-white p-6 border-t-4 border-indigo-500">
+                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Platform Fees</p>
+                                 <h3 className="text-2xl font-black text-slate-900 tracking-tighter">{"\u20B9"}{sNum(stats.finance?.totalPlatformRevenue).toLocaleString()}</h3>
+                                 <div className="text-[9px] text-emerald-600 font-black mt-4 uppercase">Direct Profit</div>
+                              </Card>
+                              <Card className="border-0 shadow-sm rounded-2xl bg-rose-500 p-6 border-t-4 border-rose-600">
+                                 <p className="text-[9px] font-black text-rose-100 uppercase tracking-widest mb-1">Blocked Accounts</p>
+                                 <h3 className="text-2xl font-black text-white tracking-tighter">{sNum(stats.users?.disabledCount)} Users</h3>
+                                 <p className="text-[9px] font-bold text-rose-100 mt-4 uppercase tracking-tighter">Access Restricted</p>
+                              </Card>
+                              <Card className="border-0 shadow-sm rounded-2xl bg-indigo-300 p-6">
+                                 <p className="text-[9px] font-black text-slate-900 uppercase tracking-widest mb-1">Verified Score</p>
+                                 <h3 className="text-2xl font-black text-slate-900 tracking-tighter">{stats.users?.profileCompleteness}%</h3>
+                                 <p className="text-[9px] font-bold text-slate-900 mt-4 uppercase">Platform Trust</p>
+                              </Card>
+                              <Card className="border-0 shadow-sm rounded-2xl bg-slate-900 text-white p-6">
+                                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Active Catalog</p>
+                                 <h3 className="text-2xl font-black text-white tracking-tighter">{stats.products?.totalProducts} Items</h3>
+                                 <p className="text-[9px] font-black text-indigo-400 mt-4 uppercase tracking-widest">Marketplace Live</p>
                               </Card>
                            </div>
 
-                           <Card className="rounded-[2.5rem] border-0 shadow-sm bg-white p-8 h-fit flex flex-col max-h-[500px]">
-                              <h4 className="text-[11px] font-black mb-10 flex items-center gap-3 uppercase tracking-widest shrink-0"><Activity className="h-5 w-5 text-indigo-600" /> Internal Action Log</h4>
-                              <div className="space-y-8 overflow-y-auto custom-scrollbar pr-4 flex-grow">
-                                 {logs.length === 0 ? <p className="text-[10px] text-slate-400 italic text-center py-20 uppercase font-black">No Recent Records.</p> : logs.map((l, i) => (
-                                    <div key={i} className="flex items-start gap-4 border-l-2 border-indigo-100 pl-4 py-1 relative">
-                                       <div className="absolute -left-1.5 top-2 w-2 h-2 bg-indigo-600 rounded-full" />
-                                       <div className="flex-grow">
-                                          <p className="text-[10px] font-black text-slate-900 uppercase leading-none">{l.action}</p>
-                                          <p className="text-[9px] text-slate-500 font-bold mt-1 tracking-tight">{l.detail}</p>
-                                       </div>
-                                       <span className="text-[8px] font-bold text-slate-300">{l.time}</span>
+                           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                              <div className="xl:col-span-2 space-y-8">
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <Card className="rounded-[2.5rem] border-0 shadow-sm bg-white p-10 flex flex-col justify-center">
+                                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Internal Admin Summary</p>
+                                       <h3 className="text-xl font-black text-slate-900">Platform is Healthy.</h3>
+                                       <div className="flex items-center gap-3 mt-6"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[10px] font-black text-emerald-600 uppercase">System Integrity Audit: Pass</span></div>
+                                    </Card>
+                                    <div className="grid grid-cols-2 gap-6">
+                                       <Card className="rounded-3xl border-0 shadow-sm bg-emerald-50 p-6 flex flex-col justify-center"><p className="text-[9px] font-black text-emerald-600 uppercase mb-2">Approved Sellers</p><h4 className="text-2xl font-black text-emerald-900">{sNum(stats.users?.farmerCount + stats.users?.agentCount)}</h4></Card>
+                                       <Card className="rounded-3xl border-0 shadow-sm bg-rose-50 p-6 flex flex-col justify-center"><p className="text-[9px] font-black text-rose-600 uppercase mb-2">Pending Verify</p><h4 className="text-2xl font-black text-rose-900">{pendingProfiles.length}</h4></Card>
                                     </div>
-                                 ))}
-                              </div>
-                           </Card>
-                        </div>
-                     </div>
-                  )}
-
-                  {/* DIRECTORY VIEWS */}
-                  {['verifications', 'disputes', 'orders', 'farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support', 'mediation'].includes(activeView) && (
-                     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
-                        <div className="flex items-center justify-between flex-wrap gap-6 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-                           <div className="flex items-center gap-6">
-                              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-xl ${activeView === 'verifications' ? 'bg-emerald-600' : 'bg-indigo-600'}`}><ShieldCheck className="h-7 w-7" /></div>
-                              <div><h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-1">{navItems.find(n => n.id === activeView)?.label}</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Master Platform Database</p></div>
-                           </div>
-
-                           <div className="flex items-center gap-3">
-                              {activeView === 'verifications' && selectedIds.length > 0 && (
-                                 <Button className="h-10 px-8 bg-emerald-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20" onClick={handleBulkApprove}><ListChecks className="mr-2 h-4 w-4" /> Approve Selected ({selectedIds.length})</Button>
-                              )}
-                              <div className="flex flex-col gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
-                                 <div className="flex flex-wrap items-center justify-between gap-4">
-                                    <div className="space-y-1">
-                                       <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">{activeView.replace('_', ' ')} Management</h2>
-                                       <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Enterprise oversight / {pagination.total} records found</p>
-                                    </div>
-
-                                    <FilterBar
-                                       search={search}
-                                       setSearch={setSearch}
-                                       activeFilters={{
-                                          ...advancedFilters,
-                                          status: statusFilter
-                                       }}
-                                       onClearFilters={(key) => {
-                                          if (!key) {
-                                             setSearch("");
-                                             setStatusFilter("ALL");
-                                             setAdvancedFilters({
-                                                orderStatus: 'ALL',
-                                                paymentStatus: 'ALL',
-                                                payoutStatus: 'ALL',
-                                                buyerRole: 'ALL',
-                                                sellerRole: 'ALL',
-                                                category: 'ALL',
-                                                sellerType: 'ALL',
-                                                stockStatus: 'ALL',
-                                                securityStatus: 'ALL',
-                                                deliveryPartnerId: 'ALL',
-                                                minAmount: '',
-                                                maxAmount: '',
-                                             });
-                                          } else {
-                                             if (key === 'status') setStatusFilter("ALL");
-                                             else setAdvancedFilters(prev => ({ ...prev, [key]: 'ALL' }));
-                                          }
-                                       }}
-                                       onOpenAdvanced={() => setIsFilterDrawerOpen(true)}
-                                       onExport={activeView === 'farmers' ? () => downloadCSV(farmers, 'farmers_export') : undefined}
-                                       statusOptions={getStatusOptions()}
-                                       onStatusChange={setStatusFilter}
-                                    />
                                  </div>
+                                 <Card className="rounded-[2rem] border-0 shadow-sm bg-white overflow-hidden flex flex-col">
+                                    <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0"><h4 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-3"><LucideHistory className="h-4 w-4 text-indigo-500" /> Recent Platform Activity</h4></div>
+                                    <div className="flex-grow overflow-y-auto custom-scrollbar">
+                                       <Table>
+                                          <TableHeader className="bg-slate-50/50 text-[9px] uppercase font-black text-slate-400 h-10 border-slate-50 sticky top-0 z-10 backdrop-blur-md"><TableRow><TableHead className="pl-8">ORDER ID</TableHead><TableHead>MEMBER</TableHead><TableHead>TOTAL BILL</TableHead><TableHead>STATUS</TableHead><TableHead className="text-right pr-8">VIEW</TableHead></TableRow></TableHeader>
+                                          <TableBody>
+                                             {Array.isArray(orders) && orders.slice(0, 6).map((o, idx) => (
+                                                <TableRow key={idx} className="h-16 border-slate-50 hover:bg-slate-50/50 group">
+                                                   <TableCell className="pl-8 font-black text-slate-900">#{o.id.slice(-6).toUpperCase()}</TableCell>
+                                                   <TableCell className="text-[11px] font-bold text-slate-600">{s(o.buyerName)}</TableCell>
+                                                   <TableCell className="font-black text-slate-900 text-xs">{"\u20B9"}{sNum(o.totalAmount).toLocaleString()}</TableCell>
+                                                   <TableCell><StatusBadge status={o.orderStatus} type="orders" size="xs" /></TableCell>
+                                                   <TableCell className="text-right pr-8"><Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg" onClick={() => openOrderAudit(o.id)}><Eye className="h-4 w-4 text-slate-400" /></Button></TableCell>
+                                                </TableRow>
+                                             ))}
+                                          </TableBody>
+                                       </Table>
+                                    </div>
+                                 </Card>
                               </div>
 
-                              <FilterDrawer
-                                 isOpen={isFilterDrawerOpen}
-                                 onClose={() => setIsFilterDrawerOpen(false)}
-                                 filters={advancedFilters}
-                                 setFilters={setAdvancedFilters}
-                                 onApply={() => setIsFilterDrawerOpen(false)}
-                                 onReset={() => {
-                                    setAdvancedFilters({
-                                       orderStatus: 'ALL',
-                                       paymentStatus: 'ALL',
-                                       payoutStatus: 'ALL',
-                                       buyerRole: 'ALL',
-                                       sellerRole: 'ALL',
-                                       category: 'ALL',
-                                       sellerType: 'ALL',
-                                       stockStatus: 'ALL',
-                                       securityStatus: 'ALL',
-                                       deliveryPartnerId: 'ALL',
-                                       minAmount: '',
-                                       maxAmount: '',
-                                    });
-                                 }}
-                                 config={[
-                                    {
-                                       title: "Order & Payment",
-                                       filters: [
-                                          {
-                                             key: 'orderStatus', label: 'Order Status', type: 'select', options: [
-                                                { label: 'Processing', value: 'PROCESSING' },
-                                                { label: 'Packed', value: 'PACKED' },
-                                                { label: 'Shipped', value: 'SHIPPED' },
-                                                { label: 'In Transit', value: 'IN_TRANSIT' },
-                                                { label: 'Delivered', value: 'DELIVERED' },
-                                                { label: 'Cancelled', value: 'CANCELLED' },
-                                             ]
-                                          },
-                                          {
-                                             key: 'paymentStatus', label: 'Payment Status', type: 'select', options: [
-                                                { label: 'Paid', value: 'PAID' },
-                                                { label: 'Pending', value: 'PENDING' },
-                                             ]
-                                          },
-                                          {
-                                             key: 'payoutStatus', label: 'Payout Status', type: 'select', options: [
-                                                { label: 'Settled', value: 'SETTLED' },
-                                                { label: 'Pending', value: 'PENDING' },
-                                             ]
-                                          }
-                                       ]
-                                    },
-                                    {
-                                       title: "Logistics & Partners",
-                                       filters: [
-                                          {
-                                             key: 'deliveryPartnerId', label: 'Delivery Partner', type: 'select', options: (deliveryPartners || []).map(dp => ({
-                                                label: dp.name || dp.displayName || dp.user?.name || 'Unknown',
-                                                value: dp.userId || dp.id
-                                             }))
-                                          }
-                                       ]
-                                    },
-                                    {
-                                       title: "Roles & Security",
-                                       filters: [
-                                          {
-                                             key: 'buyerRole', label: 'Buyer Role', type: 'select', options: [
-                                                { label: 'Farmer', value: 'farmer' },
-                                                { label: 'Agent', value: 'agent' },
-                                             ]
-                                          },
-                                          {
-                                             key: 'sellerRole', label: 'Seller Role', type: 'select', options: [
-                                                { label: 'Farmer', value: 'farmer' },
-                                                { label: 'Agent', value: 'agent' },
-                                             ]
-                                          },
-                                          {
-                                             key: 'securityStatus', label: 'Security Status', type: 'select', options: [
-                                                { label: 'Active', value: 'ACTIVE' },
-                                                { label: 'Blocked', value: 'BLOCKED' },
-                                             ]
-                                          }
-                                       ]
-                                    }
-                                 ]}
-                              />
+                              <Card className="rounded-[2.5rem] border-0 shadow-sm bg-white p-8 h-fit flex flex-col max-h-[500px]">
+                                 <h4 className="text-[11px] font-black mb-10 flex items-center gap-3 uppercase tracking-widest shrink-0"><Activity className="h-5 w-5 text-indigo-600" /> Internal Action Log</h4>
+                                 <div className="space-y-8 overflow-y-auto custom-scrollbar pr-4 flex-grow">
+                                    {logs.length === 0 ? <p className="text-[10px] text-slate-400 italic text-center py-20 uppercase font-black">No Recent Records.</p> : logs.map((l, i) => (
+                                       <div key={i} className="flex items-start gap-4 border-l-2 border-indigo-100 pl-4 py-1 relative">
+                                          <div className="absolute -left-1.5 top-2 w-2 h-2 bg-indigo-600 rounded-full" />
+                                          <div className="flex-grow">
+                                             <p className="text-[10px] font-black text-slate-900 uppercase leading-none">{l.action}</p>
+                                             <p className="text-[9px] text-slate-500 font-bold mt-1 tracking-tight">{l.detail}</p>
+                                          </div>
+                                          <span className="text-[8px] font-bold text-slate-300">{l.time}</span>
+                                       </div>
+                                    ))}
+                                 </div>
+                              </Card>
                            </div>
                         </div>
+                     )}
 
-                        {/* ACTIVE FILTER TAGS */}
-                        {(search || statusFilter !== 'ALL') && (
-                           <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
-                              {search && (
-                                 <Badge variant="secondary" className="bg-white border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 shadow-sm">
-                                    Search: {search}
-                                    <X className="h-3 w-3 cursor-pointer hover:text-rose-500" onClick={() => setSearch("")} />
-                                 </Badge>
-                              )}
-                              {statusFilter !== 'ALL' && (
-                                 <Badge variant="secondary" className="bg-white border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 shadow-sm">
-                                    Status: {statusFilter.replace('_', ' ')}
-                                    <X className="h-3 w-3 cursor-pointer hover:text-rose-500" onClick={() => setStatusFilter("ALL")} />
-                                 </Badge>
-                              )}
-                              <Button variant="ghost" size="sm" className="h-7 text-[9px] font-black uppercase text-rose-500 hover:bg-rose-50 px-3 rounded-lg" onClick={() => { setSearch(""); setStatusFilter("ALL"); }}>Clear All Filters</Button>
+                     {/* DIRECTORY VIEWS */}
+                     {['verifications', 'disputes', 'orders', 'farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support', 'mediation'].includes(activeView) && (
+                        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
+                           <div className="flex items-center justify-between flex-wrap gap-6 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+                              <div className="flex items-center gap-6">
+                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-xl ${activeView === 'verifications' ? 'bg-emerald-600' : 'bg-indigo-600'}`}><ShieldCheck className="h-7 w-7" /></div>
+                                 <div><h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-1">{navItems.find(n => n.id === activeView)?.label}</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Master Platform Database</p></div>
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                 {activeView === 'verifications' && selectedIds.length > 0 && (
+                                    <Button className="h-10 px-8 bg-emerald-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20" onClick={handleBulkApprove}><ListChecks className="mr-2 h-4 w-4" /> Approve Selected ({selectedIds.length})</Button>
+                                 )}
+                                 <div className="flex flex-col gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
+                                    <div className="flex flex-wrap items-center justify-between gap-4">
+                                       <div className="space-y-1">
+                                          <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">{activeView.replace('_', ' ')} Management</h2>
+                                          <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Enterprise oversight / {pagination.total} records found</p>
+                                       </div>
+
+                                       <FilterBar
+                                          search={search}
+                                          setSearch={setSearch}
+                                          activeFilters={{
+                                             ...advancedFilters,
+                                             status: statusFilter
+                                          }}
+                                          onClearFilters={(key) => {
+                                             if (!key) {
+                                                setSearch("");
+                                                setStatusFilter("ALL");
+                                                setAdvancedFilters({
+                                                   orderStatus: 'ALL',
+                                                   paymentStatus: 'ALL',
+                                                   payoutStatus: 'ALL',
+                                                   buyerRole: 'ALL',
+                                                   sellerRole: 'ALL',
+                                                   category: 'ALL',
+                                                   sellerType: 'ALL',
+                                                   stockStatus: 'ALL',
+                                                   securityStatus: 'ALL',
+                                                   deliveryPartnerId: 'ALL',
+                                                   minAmount: '',
+                                                   maxAmount: '',
+                                                });
+                                             } else {
+                                                if (key === 'status') setStatusFilter("ALL");
+                                                else setAdvancedFilters(prev => ({ ...prev, [key]: 'ALL' }));
+                                             }
+                                          }}
+                                          onOpenAdvanced={() => setIsFilterDrawerOpen(true)}
+                                          onExport={activeView === 'farmers' ? () => downloadCSV(farmers, 'farmers_export') : undefined}
+                                          statusOptions={getStatusOptions()}
+                                          onStatusChange={setStatusFilter}
+                                       />
+                                    </div>
+                                 </div>
+
+                                 <FilterDrawer
+                                    isOpen={isFilterDrawerOpen}
+                                    onClose={() => setIsFilterDrawerOpen(false)}
+                                    filters={advancedFilters}
+                                    setFilters={setAdvancedFilters}
+                                    onApply={() => setIsFilterDrawerOpen(false)}
+                                    onReset={() => {
+                                       setAdvancedFilters({
+                                          orderStatus: 'ALL',
+                                          paymentStatus: 'ALL',
+                                          payoutStatus: 'ALL',
+                                          buyerRole: 'ALL',
+                                          sellerRole: 'ALL',
+                                          category: 'ALL',
+                                          sellerType: 'ALL',
+                                          stockStatus: 'ALL',
+                                          securityStatus: 'ALL',
+                                          deliveryPartnerId: 'ALL',
+                                          minAmount: '',
+                                          maxAmount: '',
+                                       });
+                                    }}
+                                    config={[
+                                       {
+                                          title: "Order & Payment",
+                                          filters: [
+                                             {
+                                                key: 'orderStatus', label: 'Order Status', type: 'select', options: [
+                                                   { label: 'Processing', value: 'PROCESSING' },
+                                                   { label: 'Packed', value: 'PACKED' },
+                                                   { label: 'Shipped', value: 'SHIPPED' },
+                                                   { label: 'In Transit', value: 'IN_TRANSIT' },
+                                                   { label: 'Delivered', value: 'DELIVERED' },
+                                                   { label: 'Cancelled', value: 'CANCELLED' },
+                                                ]
+                                             },
+                                             {
+                                                key: 'paymentStatus', label: 'Payment Status', type: 'select', options: [
+                                                   { label: 'Paid', value: 'PAID' },
+                                                   { label: 'Pending', value: 'PENDING' },
+                                                ]
+                                             },
+                                             {
+                                                key: 'payoutStatus', label: 'Payout Status', type: 'select', options: [
+                                                   { label: 'Settled', value: 'SETTLED' },
+                                                   { label: 'Pending', value: 'PENDING' },
+                                                ]
+                                             }
+                                          ]
+                                       },
+                                       {
+                                          title: "Logistics & Partners",
+                                          filters: [
+                                             {
+                                                key: 'deliveryPartnerId', label: 'Delivery Partner', type: 'select', options: (deliveryPartners || []).map(dp => ({
+                                                   label: dp.name || dp.displayName || dp.user?.name || 'Unknown',
+                                                   value: dp.userId || dp.id
+                                                }))
+                                             }
+                                          ]
+                                       },
+                                       {
+                                          title: "Roles & Security",
+                                          filters: [
+                                             {
+                                                key: 'buyerRole', label: 'Buyer Role', type: 'select', options: [
+                                                   { label: 'Farmer', value: 'farmer' },
+                                                   { label: 'Agent', value: 'agent' },
+                                                ]
+                                             },
+                                             {
+                                                key: 'sellerRole', label: 'Seller Role', type: 'select', options: [
+                                                   { label: 'Farmer', value: 'farmer' },
+                                                   { label: 'Agent', value: 'agent' },
+                                                ]
+                                             },
+                                             {
+                                                key: 'securityStatus', label: 'Security Status', type: 'select', options: [
+                                                   { label: 'Active', value: 'ACTIVE' },
+                                                   { label: 'Blocked', value: 'BLOCKED' },
+                                                ]
+                                             }
+                                          ]
+                                       }
+                                    ]}
+                                 />
+                              </div>
                            </div>
-                        )}
 
-                        <Card className="rounded-[2rem] border-0 shadow-sm bg-white overflow-hidden flex flex-col">
-                           <div className="flex-grow overflow-y-auto custom-scrollbar">
-                              <Table>
-                                 <TableHeader className="bg-slate-50/50 text-[9px] font-black uppercase text-slate-400 h-12 border-slate-50 sticky top-0 z-20 backdrop-blur-md">
-                                    <TableRow>
-                                       {activeView === 'verifications' && <TableHead className="w-12 pl-6"></TableHead>}
-                                       <TableHead className={activeView === 'verifications' ? "pl-2" : "pl-8"}>
-                                          {activeView === 'orders' || activeView === 'disputes' ? 'ORDER ID & BUYER' :
-                                             activeView === 'logistics' ? 'DELIVERY BOY & ORDER' :
-                                                activeView === 'reviews' ? 'REVIEWER & PRODUCT' :
-                                                   activeView === 'support' ? 'SUPPORT USER' :
-                                                      activeView === 'mediation' ? 'PRODUCT & USER' : 'IDENTITY & NAME'}
-                                       </TableHead>
-                                       <TableHead>
-                                          {activeView === 'orders' || activeView === 'disputes' ? 'PAYMENT' :
-                                             activeView === 'logistics' ? 'CURRENT STATUS' :
-                                                activeView === 'reviews' ? 'RATING' :
-                                                   'LOCATION & DATA'}
-                                       </TableHead>
-                                       <TableHead>
-                                          {activeView === 'orders' || activeView === 'disputes' ? 'ORDER STATUS' :
-                                             activeView === 'logistics' ? 'DISTANCE/PRICE' :
-                                                activeView === 'reviews' ? 'COMMENT' :
-                                                   activeView === 'mediation' ? 'FEE/PRICE' : 'JOIN DATE'}
-                                       </TableHead>
-                                       <TableHead>
-                                          {activeView === 'orders' || activeView === 'disputes' ? 'METHOD' :
-                                             activeView === 'logistics' ? 'TIME ESTIMATE' :
-                                                activeView === 'reviews' ? 'DATE' :
-                                                   activeView === 'mediation' ? 'STATUS' : 'ACCOUNT STATE'}
-                                       </TableHead>
-                                       <TableHead className="text-right pr-8">AUDIT ACTION</TableHead>
-                                    </TableRow>
-                                 </TableHeader>
-                                 <TableBody>
-                                    {getFilteredItems().length === 0 ? <TableRow><TableCell colSpan={6} className="h-60 text-center text-slate-400 italic text-xs uppercase font-black">No Records Found matching filter.</TableCell></TableRow> : paginate(getFilteredItems()).map((item, i) => (
-                                       <TableRow key={i} className={`h-20 border-slate-50 hover:bg-slate-50/50 group ${selectedIds.includes(item.userId) ? 'bg-indigo-50/50' : ''}`}>
-                                          {activeView === 'verifications' && (
-                                             <TableCell className="pl-6">
-                                                <input type="checkbox" className="w-4 h-4 rounded-md border-slate-300 accent-indigo-600" checked={selectedIds.includes(item.userId)} onChange={(e) => {
-                                                   if (e.target.checked) setSelectedIds([...selectedIds, item.userId]);
-                                                   else setSelectedIds(selectedIds.filter(id => id !== item.userId));
-                                                }} />
-                                             </TableCell>
-                                          )}
-                                          <TableCell className={activeView === 'verifications' ? "pl-2" : "pl-8"}>
-                                             <div className="flex items-center gap-4">
-                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-sm border ${activeView === 'catalog' ? 'bg-purple-50 text-purple-600 border-purple-100' :
-                                                   activeView === 'logistics' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                                      activeView === 'reviews' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
-                                                         activeView === 'support' ? 'bg-rose-50 text-rose-600 border-rose-100' : item.role === 'farmer' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                                            'bg-indigo-50 text-indigo-600 border-indigo-100'
-                                                   }`}>
-                                                   {(item.productName || item.name || item.displayName || item.buyerName || item.userName || item.product?.productName)?.[0] || 'O'}
-                                                </div>
-                                                <div className="flex flex-col">
-                                                   <div className="flex items-center gap-2">
-                                                      <span className="font-black text-slate-900 text-sm leading-tight">
-                                                         {activeView === 'logistics' ? item.deliveryBoy?.name :
-                                                            activeView === 'reviews' ? item.user?.name :
-                                                               activeView === 'mediation' ? item.product?.productName :
-                                                                  s(item.productName || item.name || item.displayName || item.buyerName || item.userName)}
-                                                      </span>
-                                                      {activeView === 'orders' && <RoleBadge role={item.buyerRole} />}
-                                                      {(activeView === 'farmers' || activeView === 'agents' || activeView === 'delivery') && <RoleBadge role={item.role || activeView.slice(0, -1)} />}
-                                                      {activeView === 'support' && <RoleBadge role={item.userRole} />}
+                           {/* ACTIVE FILTER TAGS */}
+                           {(search || statusFilter !== 'ALL') && (
+                              <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
+                                 {search && (
+                                    <Badge variant="secondary" className="bg-white border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 shadow-sm">
+                                       Search: {search}
+                                       <X className="h-3 w-3 cursor-pointer hover:text-rose-500" onClick={() => setSearch("")} />
+                                    </Badge>
+                                 )}
+                                 {statusFilter !== 'ALL' && (
+                                    <Badge variant="secondary" className="bg-white border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 shadow-sm">
+                                       Status: {statusFilter.replace('_', ' ')}
+                                       <X className="h-3 w-3 cursor-pointer hover:text-rose-500" onClick={() => setStatusFilter("ALL")} />
+                                    </Badge>
+                                 )}
+                                 <Button variant="ghost" size="sm" className="h-7 text-[9px] font-black uppercase text-rose-500 hover:bg-rose-50 px-3 rounded-lg" onClick={() => { setSearch(""); setStatusFilter("ALL"); }}>Clear All Filters</Button>
+                              </div>
+                           )}
+
+                           <Card className="rounded-[2rem] border-0 shadow-sm bg-white overflow-hidden flex flex-col">
+                              <div className="flex-grow overflow-y-auto custom-scrollbar">
+                                 <Table>
+                                    <TableHeader className="bg-slate-50/50 text-[9px] font-black uppercase text-slate-400 h-12 border-slate-50 sticky top-0 z-20 backdrop-blur-md">
+                                       <TableRow>
+                                          {activeView === 'verifications' && <TableHead className="w-12 pl-6"></TableHead>}
+                                          <TableHead className={activeView === 'verifications' ? "pl-2" : "pl-8"}>
+                                             {activeView === 'orders' || activeView === 'disputes' ? 'ORDER ID & BUYER' :
+                                                activeView === 'logistics' ? 'DELIVERY BOY & ORDER' :
+                                                   activeView === 'reviews' ? 'REVIEWER & PRODUCT' :
+                                                      activeView === 'support' ? 'SUPPORT USER' :
+                                                         activeView === 'mediation' ? 'PRODUCT & USER' : 'IDENTITY & NAME'}
+                                          </TableHead>
+                                          <TableHead>
+                                             {activeView === 'orders' || activeView === 'disputes' ? 'PAYMENT' :
+                                                activeView === 'logistics' ? 'CURRENT STATUS' :
+                                                   activeView === 'reviews' ? 'RATING' :
+                                                      'LOCATION & DATA'}
+                                          </TableHead>
+                                          <TableHead>
+                                             {activeView === 'orders' || activeView === 'disputes' ? 'ORDER STATUS' :
+                                                activeView === 'logistics' ? 'DISTANCE/PRICE' :
+                                                   activeView === 'reviews' ? 'COMMENT' :
+                                                      activeView === 'mediation' ? 'FEE/PRICE' : 'JOIN DATE'}
+                                          </TableHead>
+                                          <TableHead>
+                                             {activeView === 'orders' || activeView === 'disputes' ? 'METHOD' :
+                                                activeView === 'logistics' ? 'TIME ESTIMATE' :
+                                                   activeView === 'reviews' ? 'DATE' :
+                                                      activeView === 'mediation' ? 'STATUS' : 'ACCOUNT STATE'}
+                                          </TableHead>
+                                          <TableHead className="text-right pr-8">AUDIT ACTION</TableHead>
+                                       </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                       {getFilteredItems().length === 0 ? <TableRow><TableCell colSpan={6} className="h-60 text-center text-slate-400 italic text-xs uppercase font-black">No Records Found matching filter.</TableCell></TableRow> : paginate(getFilteredItems()).map((item, i) => (
+                                          <TableRow key={i} className={`h-20 border-slate-50 hover:bg-slate-50/50 group ${selectedIds.includes(item.userId) ? 'bg-indigo-50/50' : ''}`}>
+                                             {activeView === 'verifications' && (
+                                                <TableCell className="pl-6">
+                                                   <input type="checkbox" className="w-4 h-4 rounded-md border-slate-300 accent-indigo-600" checked={selectedIds.includes(item.userId)} onChange={(e) => {
+                                                      if (e.target.checked) setSelectedIds([...selectedIds, item.userId]);
+                                                      else setSelectedIds(selectedIds.filter(id => id !== item.userId));
+                                                   }} />
+                                                </TableCell>
+                                             )}
+                                             <TableCell className={activeView === 'verifications' ? "pl-2" : "pl-8"}>
+                                                <div className="flex items-center gap-4">
+                                                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-sm border ${activeView === 'catalog' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                                                      activeView === 'logistics' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                                         activeView === 'reviews' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                                                            activeView === 'support' ? 'bg-rose-50 text-rose-600 border-rose-100' : item.role === 'farmer' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                               'bg-indigo-50 text-indigo-600 border-indigo-100'
+                                                      }`}>
+                                                      {(item.productName || item.name || item.displayName || item.buyerName || item.userName || item.product?.productName)?.[0] || 'O'}
                                                    </div>
-                                                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                                                      {activeView === 'orders' ? <>Bill: ₹{item.totalAmount}</> :
-                                                         activeView === 'catalog' ? <>Price: ₹{item.pricePerUnit} / {item.unit}</> :
-                                                            activeView === 'logistics' ? <>Order ID: #{item.orderId?.slice(-6).toUpperCase()}</> :
-                                                               activeView === 'reviews' ? <>Product: {item.product?.productName}</> :
-                                                                  activeView === 'mediation' ? <>User: {item.user?.name}</> :
-                                                                     activeView === 'support' ? item.userEmail : `ID: #${(item.userId || item.id)?.slice(-6).toUpperCase()}`}
-                                                   </span>
-                                                </div>
-                                             </div>
-                                          </TableCell>
-                                          <TableCell>
-                                             <div className="flex items-center gap-3">
-                                                <div className="flex flex-col">
-                                                   {activeView === 'orders' || activeView === 'disputes' ? (
-                                                      <div className="flex flex-wrap items-center gap-1.5">
-                                                         <StatusBadge status={item.paymentStatus} type="payouts" size="xs" />
-                                                         <StatusBadge status={item.payoutStatus} type="payouts" size="xs" />
-                                                      </div>
-                                                   ) : activeView === 'logistics' ? (
-                                                      <div className="flex flex-col gap-1">
-                                                         <div className="flex items-center gap-2">
-                                                            <StatusBadge status={item.status} type="logistics" size="xs" />
-                                                            <RoleBadge role="delivery" size="xs" />
-                                                         </div>
-                                                         {item.order?.buyerUser?.role && (
-                                                            <div className="flex items-center gap-1.5 mt-1">
-                                                               <span className="text-[7px] font-black text-slate-400 uppercase">Buyer:</span>
-                                                               <RoleBadge role={item.order.buyerUser.role} size="xs" />
-                                                            </div>
-                                                         )}
-                                                      </div>
-                                                   ) : activeView === 'reviews' ? (
-                                                      <div className="flex items-center gap-1">
-                                                         {[...Array(5)].map((_, i) => (
-                                                            <Star key={i} className={`h-3 w-3 ${i < item.rating ? "text-yellow-500 fill-yellow-500" : "text-slate-200"}`} />
-                                                         ))}
-                                                      </div>
-                                                   ) : activeView === 'catalog' ? (
-                                                      <div className="flex flex-col">
-                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-black text-slate-900 leading-none">{s(item.sellerName)}</span>
-                                                            <RoleBadge role={item.sellerType} />
-                                                         </div>
-                                                         <Badge variant="outline" className="text-[8px] font-black uppercase px-2 py-0.5 border-0 bg-indigo-50 text-indigo-700 rounded-md w-fit mt-1">Sold: {sNum(item.unitsSold)}</Badge>
-                                                      </div>
-                                                   ) : (
-                                                      <>
-                                                         <span className="text-[10px] font-black text-slate-900 leading-none">
-                                                            {activeView === 'support' ? (item.type?.replace('_', ' ') || 'SUPPORT REQUEST') :
-                                                               activeView === 'mediation' ? `₹${item.negotiatedFee || 0} Fee` :
-                                                                  s(item.city || item.category || item.vehicleType)}
+                                                   <div className="flex flex-col">
+                                                      <div className="flex items-center gap-2">
+                                                         <span className="font-black text-slate-900 text-sm leading-tight">
+                                                            {activeView === 'logistics' ? item.deliveryBoy?.name :
+                                                               activeView === 'reviews' ? item.user?.name :
+                                                                  activeView === 'mediation' ? item.product?.productName :
+                                                                     s(item.productName || item.name || item.displayName || item.buyerName || item.userName)}
                                                          </span>
-                                                         <div className="mt-1 flex items-center gap-2">
-                                                            {activeView === 'support' && <StatusBadge status={item.isRead ? 'CLOSED' : 'OPEN'} type="support" size="xs" />}
-                                                            {activeView === 'mediation' && <StatusBadge status={item.status} type="moderation" size="xs" />}
-                                                            <span className="text-[9px] font-bold text-slate-400 uppercase">
-                                                               {activeView === 'support' ? "" :
-                                                                  activeView === 'mediation' ? `Base: ₹${item.product?.pricePerUnit}` :
-                                                                     s(item.district)}
-                                                            </span>
-                                                         </div>
-                                                      </>
-                                                   )}
+                                                         {activeView === 'orders' && <RoleBadge role={item.buyerRole} />}
+                                                         {(activeView === 'farmers' || activeView === 'agents' || activeView === 'delivery') && <RoleBadge role={item.role || activeView.slice(0, -1)} />}
+                                                         {activeView === 'support' && <RoleBadge role={item.userRole} />}
+                                                      </div>
+                                                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                                         {activeView === 'orders' ? <>Bill: ₹{item.totalAmount}</> :
+                                                            activeView === 'catalog' ? <>Price: ₹{item.pricePerUnit} / {item.unit}</> :
+                                                               activeView === 'logistics' ? <>Order ID: #{item.orderId?.slice(-6).toUpperCase()}</> :
+                                                                  activeView === 'reviews' ? <>Product: {item.product?.productName}</> :
+                                                                     activeView === 'mediation' ? <>User: {item.user?.name}</> :
+                                                                        activeView === 'support' ? item.userEmail : `ID: #${(item.userId || item.id)?.slice(-6).toUpperCase()}`}
+                                                      </span>
+                                                   </div>
                                                 </div>
-                                             </div>
-                                          </TableCell>
-                                          <TableCell className="text-[10px] font-black text-slate-400 uppercase">{activeView === 'orders' || activeView === 'disputes' ? (
-                                             <StatusBadge status={item.orderStatus} type="orders" size="xs" />
-                                          ) : activeView === 'logistics' ? (
-                                             <div className="flex flex-col">
-                                                <span className="text-[10px] font-black text-slate-900 leading-none">{item.distance} KM</span>
-                                                <span className="text-[9px] font-bold text-indigo-600 uppercase mt-0.5">₹{item.totalPrice}</span>
-                                             </div>
-                                          ) : activeView === 'catalog' ? (
+                                             </TableCell>
+                                             <TableCell>
+                                                <div className="flex items-center gap-3">
+                                                   <div className="flex flex-col">
+                                                      {activeView === 'orders' || activeView === 'disputes' ? (
+                                                         <div className="flex flex-wrap items-center gap-1.5">
+                                                            <StatusBadge status={item.paymentStatus} type="orders" size="xs" />
+                                                            <StatusBadge status={item.payoutStatus} type="payouts" size="xs" />
+                                                         </div>
+                                                      ) : activeView === 'logistics' ? (
+                                                         <div className="flex flex-col gap-1">
+                                                            <div className="flex items-center gap-2">
+                                                               <StatusBadge status={item.status} type="logistics" size="xs" />
+                                                               <RoleBadge role="delivery" size="xs" />
+                                                            </div>
+                                                            {item.order?.buyerUser?.role && (
+                                                               <div className="flex items-center gap-1.5 mt-1">
+                                                                  <span className="text-[7px] font-black text-slate-400 uppercase">Buyer:</span>
+                                                                  <RoleBadge role={item.order.buyerUser.role} size="xs" />
+                                                               </div>
+                                                            )}
+                                                         </div>
+                                                      ) : activeView === 'reviews' ? (
+                                                         <div className="flex items-center gap-1">
+                                                            {[...Array(5)].map((_, i) => (
+                                                               <Star key={i} className={`h-3 w-3 ${i < item.rating ? "text-yellow-500 fill-yellow-500" : "text-slate-200"}`} />
+                                                            ))}
+                                                         </div>
+                                                      ) : activeView === 'catalog' ? (
+                                                         <div className="flex flex-col">
+                                                            <div className="flex items-center gap-2">
+                                                               <span className="text-[10px] font-black text-slate-900 leading-none">{s(item.sellerName)}</span>
+                                                               <RoleBadge role={item.sellerType} />
+                                                            </div>
+                                                            <Badge variant="outline" className="text-[8px] font-black uppercase px-2 py-0.5 border-0 bg-indigo-50 text-indigo-700 rounded-md w-fit mt-1">Sold: {sNum(item.unitsSold)}</Badge>
+                                                         </div>
+                                                      ) : (
+                                                         <>
+                                                            <span className="text-[10px] font-black text-slate-900 leading-none">
+                                                               {activeView === 'support' ? (item.type?.replace('_', ' ') || 'SUPPORT REQUEST') :
+                                                                  activeView === 'mediation' ? `₹${item.negotiatedFee || 0} Fee` :
+                                                                     s(item.city || item.category || item.vehicleType)}
+                                                            </span>
+                                                            <div className="mt-1 flex items-center gap-2">
+                                                               {activeView === 'support' && <StatusBadge status={item.isRead ? 'CLOSED' : 'OPEN'} type="support" size="xs" />}
+                                                               {activeView === 'mediation' && <StatusBadge status={item.status} type="moderation" size="xs" />}
+                                                               <span className="text-[9px] font-bold text-slate-400 uppercase">
+                                                                  {activeView === 'support' ? "" :
+                                                                     activeView === 'mediation' ? `Base: ₹${item.product?.pricePerUnit}` :
+                                                                        s(item.district)}
+                                                               </span>
+                                                            </div>
+                                                         </>
+                                                      )}
+                                                   </div>
+                                                </div>
+                                             </TableCell>
+                                             <TableCell className="text-[10px] font-black text-slate-400 uppercase">{activeView === 'orders' || activeView === 'disputes' ? (
+                                                <StatusBadge status={item.orderStatus} type="orders" size="xs" />
+                                             ) : activeView === 'logistics' ? (
+                                                <div className="flex flex-col">
+                                                   <span className="text-[10px] font-black text-slate-900 leading-none">{item.distance} KM</span>
+                                                   <span className="text-[9px] font-bold text-indigo-600 uppercase mt-0.5">₹{item.totalPrice}</span>
+                                                </div>
+                                             ) : activeView === 'catalog' ? (
 
-                                             <span className="text-[10px] font-black text-slate-600">{s(item.category)}</span>
-                                          ) : (
-                                             item.createdAt && mounted ? new Date(item.createdAt).toLocaleDateString() : '—'
-                                          )}</TableCell>
-                                          <TableCell>{activeView === 'orders' || activeView === 'disputes' ? (
-                                             <span className="text-[10px] font-black text-slate-600 uppercase">{item.paymentMethod}</span>
-                                          ) : activeView === 'logistics' ? (
-                                             <span className="text-[10px] font-black text-slate-600 uppercase">{item.estimatedTime || 'ASAP'}</span>
-                                          ) : activeView === 'farmers' || activeView === 'agents' ? (
-                                             <div className="flex flex-col gap-1.5 items-center">
-                                                <div className="flex gap-1">
-                                                   <StatusBadge status={item.sellingStatus || 'PENDING'} type="moderation" size="xs" />
-                                                   <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md ${item.usagePurpose === 'buy_and_sell' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                      {item.usagePurpose === 'buy_and_sell' ? 'BUY & SELL' : 'BUY ONLY'}
+                                                <span className="text-[10px] font-black text-slate-600">{s(item.category)}</span>
+                                             ) : (
+                                                item.createdAt && mounted ? new Date(item.createdAt).toLocaleDateString() : '—'
+                                             )}</TableCell>
+                                             <TableCell>{activeView === 'orders' || activeView === 'disputes' ? (
+                                                <span className="text-[10px] font-black text-slate-600 uppercase">{item.paymentMethod}</span>
+                                             ) : activeView === 'logistics' ? (
+                                                <span className="text-[10px] font-black text-slate-600 uppercase">{item.estimatedTime || 'ASAP'}</span>
+                                             ) : activeView === 'farmers' || activeView === 'agents' ? (
+                                                <div className="flex flex-col gap-1.5 items-center">
+                                                   <div className="flex gap-1">
+                                                      <StatusBadge status={item.sellingStatus || 'PENDING'} type="moderation" size="xs" />
+                                                      <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md ${item.usagePurpose === 'buy_and_sell' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                         {item.usagePurpose === 'buy_and_sell' ? 'BUY & SELL' : 'BUY ONLY'}
+                                                      </Badge>
+                                                   </div>
+                                                   <StatusBadge status={item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'} type="security" size="xs" />
+                                                </div>
+                                             ) : activeView === 'mediation' ? (
+                                                <div className="flex flex-col gap-1.5 items-center">
+                                                   <StatusBadge status={item.status} type="moderation" size="xs" />
+                                                   <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md ${item.inquirySent ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                      {item.inquirySent ? 'Message Sent' : 'No Message'}
                                                    </Badge>
                                                 </div>
-                                                <StatusBadge status={item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'} type="security" size="xs" />
-                                             </div>
-                                          ) : activeView === 'mediation' ? (
-                                             <div className="flex flex-col gap-1.5 items-center">
-                                                <StatusBadge status={item.status} type="moderation" size="xs" />
-                                                <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md ${item.inquirySent ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
-                                                   {item.inquirySent ? 'Message Sent' : 'No Message'}
-                                                </Badge>
-                                             </div>
-                                          ) : (
-                                             <div className="flex flex-col gap-1.5 items-center">
-                                                {(activeView === 'support' || activeView === 'delivery') && (
-                                                   <StatusBadge status={activeView === 'support' ? (item.userRole || 'USER') : (item.approvalStatus || 'PENDING')} type="moderation" size="xs" />
-                                                )}
-                                                <StatusBadge status={item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'} type="security" size="xs" />
-                                             </div>
-                                          )}</TableCell>
-                                          <TableCell className="pr-8 text-right">
-                                             <div className="flex justify-end gap-2 transition-all">
-                                                <Button size="icon" variant="outline" className="h-8 w-8 rounded-lg bg-white border-slate-200 shadow-sm hover:border-indigo-600 hover:text-indigo-600" onClick={() => {
-                                                   if (activeView === 'orders' || activeView === 'disputes') openOrderAudit(item.id);
-                                                   else if (activeView === 'catalog') openProductAudit(item);
-                                                   else if (activeView === 'support') openSupportAudit(item);
-                                                   else if (activeView === 'mediation') {
-                                                      setSelectedRequest(item);
-                                                      setIsMediationModalOpen(true);
-                                                      setNegotiatedFee(item.negotiatedFee || "");
-                                                      setAdminQuantity(item.quantity || "");
-                                                   }
+                                             ) : (
+                                                <div className="flex flex-col gap-1.5 items-center">
+                                                   {(activeView === 'support' || activeView === 'delivery') && (
+                                                      <StatusBadge status={activeView === 'support' ? (item.userRole || 'USER') : (item.approvalStatus || 'PENDING')} type="moderation" size="xs" />
+                                                   )}
+                                                   <StatusBadge status={item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'} type="security" size="xs" />
+                                                </div>
+                                             )}</TableCell>
+                                             <TableCell className="pr-8 text-right">
+                                                <div className="flex justify-end gap-2 transition-all">
+                                                   <Button size="icon" variant="outline" className="h-8 w-8 rounded-lg bg-white border-slate-200 shadow-sm hover:border-indigo-600 hover:text-indigo-600" onClick={() => {
+                                                      if (activeView === 'orders' || activeView === 'disputes') openOrderAudit(item.id);
+                                                      else if (activeView === 'catalog') openProductAudit(item);
+                                                      else if (activeView === 'support') openSupportAudit(item);
+                                                      else if (activeView === 'mediation') {
+                                                         setSelectedRequest(item);
+                                                         setIsMediationModalOpen(true);
+                                                         setNegotiatedFee(item.negotiatedFee || "");
+                                                         setAdminQuantity(item.quantity || "");
+                                                      }
 
-                                                   else openProfileAudit(item);
-                                                }}><Eye className="h-4 w-4 text-slate-400" /></Button>
-                                                {activeView === 'orders' && (
-                                                   <Button size="icon" variant="outline" className="h-8 w-8 rounded-lg border-slate-200 shadow-sm text-rose-500 hover:bg-rose-50" onClick={() => handleDeleteOrder(item.id)}><Trash2 className="h-4 w-4" /></Button>
-                                                )}
-                                                {activeView !== 'orders' && activeView !== 'mediation' && (
-                                                   <Button size="icon" variant="outline" className={`h-8 w-8 rounded-lg border-slate-200 shadow-sm ${item.user?.isDisabled ? 'text-emerald-500 bg-emerald-50' : 'text-rose-500 bg-rose-50'}`} onClick={() => handleToggleStatus(item.userId || item.id, item.name || item.displayName)}>{item.user?.isDisabled ? <UserCheck2 className="h-4 w-4" /> : <UserX className="h-4 w-4" />}</Button>
-                                                )}
-                                             </div>
-                                          </TableCell>
-                                       </TableRow>
-                                    ))}
-                                 </TableBody>
-                              </Table>
-                           </div>
-                           <Pagination totalItems={getFilteredItems().length} />
-                        </Card>
-                     </div>
-                  )}
-
-                  {/* FINANCE HUB */}
-                  {activeView === 'finance' && (
-                     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-700">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                           <Card className="rounded-[3.5rem] border-0 shadow-xl bg-slate-950 text-white p-14 relative overflow-hidden group">
-                              <Wallet className="h-14 w-14 text-indigo-400 mb-10" />
-                              <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Platform Cash Flow</p>
-                              <h3 className="text-6xl font-black tracking-tighter">₹{sNum(stats.finance?.totalGMV).toLocaleString()}</h3>
-                              <p className="text-[11px] font-bold text-slate-600 mt-10 uppercase tracking-widest">Total Sales Ledger</p>
-                              <div className="absolute -bottom-20 -right-20 opacity-5"><Banknote className="h-[30rem] w-[30rem]" /></div>
+                                                      else openProfileAudit(item);
+                                                   }}><Eye className="h-4 w-4 text-slate-400" /></Button>
+                                                   {activeView === 'orders' && (
+                                                      <Button size="icon" variant="outline" className="h-8 w-8 rounded-lg border-slate-200 shadow-sm text-rose-500 hover:bg-rose-50" onClick={() => handleDeleteOrder(item.id)}><Trash2 className="h-4 w-4" /></Button>
+                                                   )}
+                                                   {activeView !== 'orders' && activeView !== 'mediation' && (
+                                                      <Button size="icon" variant="outline" className={`h-8 w-8 rounded-lg border-slate-200 shadow-sm ${item.user?.isDisabled ? 'text-emerald-500 bg-emerald-50' : 'text-rose-500 bg-rose-50'}`} onClick={() => handleToggleStatus(item.userId || item.id, item.name || item.displayName)}>{item.user?.isDisabled ? <UserCheck2 className="h-4 w-4" /> : <UserX className="h-4 w-4" />}</Button>
+                                                   )}
+                                                </div>
+                                             </TableCell>
+                                          </TableRow>
+                                       ))}
+                                    </TableBody>
+                                 </Table>
+                              </div>
+                              <Pagination totalItems={getFilteredItems().length} />
                            </Card>
-                           <div className="space-y-10">
-                              <Card className="rounded-[3rem] border-0 shadow-xl bg-white p-10 border-t-[12px] border-emerald-600 flex flex-col justify-between">
-                                 <div><p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Our Net Profit</p><h3 className="text-5xl font-black text-slate-900 tracking-tighter">₹{sNum(stats.finance?.totalPlatformRevenue).toLocaleString()}</h3></div>
-                                 <div className="mt-6 flex items-center gap-3 text-emerald-600 font-black text-lg"><TrendingUp className="h-6 w-6" /> Financial Integrity Confirmed</div>
+                        </div>
+                     )}
+
+                     {/* FINANCE HUB */}
+                     {activeView === 'finance' && (
+                        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-700">
+                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                              <Card className="rounded-[3.5rem] border-0 shadow-xl bg-slate-950 text-white p-14 relative overflow-hidden group">
+                                 <Wallet className="h-14 w-14 text-indigo-400 mb-10" />
+                                 <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Platform Cash Flow</p>
+                                 <h3 className="text-6xl font-black tracking-tighter">₹{sNum(stats.finance?.totalGMV).toLocaleString()}</h3>
+                                 <p className="text-[11px] font-bold text-slate-600 mt-10 uppercase tracking-widest">Total Sales Ledger</p>
+                                 <div className="absolute -bottom-20 -right-20 opacity-5"><Banknote className="h-[30rem] w-[30rem]" /></div>
                               </Card>
-                              <Card className="rounded-[3rem] border-0 shadow-xl bg-white p-10 border-t-[12px] border-indigo-600">
-                                 <p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Money Owed to Sellers</p><h3 className="text-5xl font-black text-slate-900 tracking-tighter">₹{sNum(stats.finance?.pendingPayouts).toLocaleString()}</h3>
-                                 <p className="text-[11px] font-black text-indigo-500 uppercase tracking-widest mt-6">Awaiting Bank Transfer</p>
-                              </Card>
+                              <div className="space-y-10">
+                                 <Card className="rounded-[3rem] border-0 shadow-xl bg-white p-10 border-t-[12px] border-emerald-600 flex flex-col justify-between">
+                                    <div><p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Our Net Profit</p><h3 className="text-5xl font-black text-slate-900 tracking-tighter">₹{sNum(stats.finance?.totalPlatformRevenue).toLocaleString()}</h3></div>
+                                    <div className="mt-6 flex items-center gap-3 text-emerald-600 font-black text-lg"><TrendingUp className="h-6 w-6" /> Financial Integrity Confirmed</div>
+                                 </Card>
+                                 <Card className="rounded-[3rem] border-0 shadow-xl bg-white p-10 border-t-[12px] border-indigo-600">
+                                    <p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Money Owed to Sellers</p><h3 className="text-5xl font-black text-slate-900 tracking-tighter">₹{sNum(stats.finance?.pendingPayouts).toLocaleString()}</h3>
+                                    <p className="text-[11px] font-black text-indigo-500 uppercase tracking-widest mt-6">Awaiting Bank Transfer</p>
+                                 </Card>
+                              </div>
                            </div>
                         </div>
-                     </div>
-                  )}
+                     )}
+                  </div>
                </div>
             </div>
-         </div>
-      </main>
+         </main>
 
          {/* PRODUCT AUDIT MODAL */}
          <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
@@ -1354,10 +1389,10 @@ export default function AdminCommandCenterClient({
                                  <div className="flex items-center gap-5">
                                     <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-xl shadow-inner">BN</div>
                                     <div className="flex flex-col">
-                                        <div className="flex items-center gap-2">
-                                           <span className="text-2xl font-black text-slate-900 leading-tight">{selectedOrder.buyerName}</span>
-                                           <RoleBadge role={selectedOrder.buyerRole} />
-                                        </div>
+                                       <div className="flex items-center gap-2">
+                                          <span className="text-2xl font-black text-slate-900 leading-tight">{selectedOrder.buyerName}</span>
+                                          <RoleBadge role={selectedOrder.buyerRole} />
+                                       </div>
                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{selectedOrder.buyerEmail}</span>
                                     </div>
                                  </div>
@@ -1404,17 +1439,17 @@ export default function AdminCommandCenterClient({
                               <h5 className="flex items-center gap-4 text-xs font-black text-slate-400 uppercase tracking-widest"><Banknote className="h-7 w-7 text-emerald-600" /> Payout Intelligence</h5>
                               <div className="space-y-8">
                                  {selectedOrder.sellers?.map((sObj, sIdx) => (
-                                    <Card key={sIdx} className="rounded-[3rem] border-0 bg-slate-950 text-white p-10 shadow-2xl relative overflow-hidden group">
-                                       <div className="relative z-10 space-y-8">
-                                          <div className="flex justify-between items-start">
-                                             <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white font-black text-xl border border-white/20">
+                                    <Card key={sIdx} className="rounded-[2.5rem] border-0 bg-slate-950 text-white shadow-2xl relative overflow-hidden group flex flex-col">
+                                       <div className="p-8 pb-4 relative z-10 space-y-6">
+                                          <div className="flex justify-between items-start gap-4">
+                                             <div className="flex items-center gap-4 min-w-0">
+                                                <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-white font-black text-2xl border border-white/20 shrink-0 shadow-inner">
                                                    {sObj.name?.[0]}
                                                 </div>
-                                                <div>
-                                                   <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Target Seller</p>
-                                                   <div className="flex items-center gap-2">
-                                                      <p className="text-lg font-black text-white tracking-tight">{sObj.name || 'Unknown Seller'}</p>
+                                                <div className="min-w-0">
+                                                   <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Target Node</p>
+                                                   <div className="flex flex-wrap items-center gap-2">
+                                                      <p className="text-lg font-black text-white tracking-tight truncate max-w-[200px]">{sObj.name || 'Unknown Seller'}</p>
                                                       <RoleBadge role={sObj.role} size="xs" />
                                                       <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md shadow-sm ${sObj.isDisabled ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
                                                          {sObj.isDisabled ? 'BLOCKED' : 'ACTIVE'}
@@ -1422,32 +1457,72 @@ export default function AdminCommandCenterClient({
                                                    </div>
                                                 </div>
                                              </div>
-                                             <div className="text-right">
-                                                <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Payout Share</p>
-                                                <p className="text-2xl font-black text-white tracking-tighter">₹{sObj.totalEarned?.toLocaleString() || '0'}</p>
+                                             <div className="text-right shrink-0">
+                                                <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">Audit Total</p>
+                                                <p className="text-3xl font-black text-white tracking-tighter leading-none">₹{sObj.totalEarned?.toLocaleString() || '0'}</p>
                                              </div>
                                           </div>
+
+                                          {/* FINANCIAL BREAKDOWN ROW */}
+                                          <div className="grid grid-cols-3 gap-4 p-5 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-sm">
+                                             <div className="space-y-1">
+                                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Products</p>
+                                                <p className="text-sm font-black text-white">₹{sObj.productTotal?.toLocaleString() || '0'}</p>
+                                             </div>
+                                             <div className="space-y-1">
+                                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Base Logistics</p>
+                                                <p className="text-sm font-black text-indigo-400">₹{sObj.baseDeliveryTotal?.toLocaleString() || '0'}</p>
+                                             </div>
+                                             <div className="space-y-1">
+                                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">OOR Surcharge</p>
+                                                <p className="text-sm font-black text-amber-500">₹{sObj.oorSurchargeTotal?.toLocaleString() || '0'}</p>
+                                             </div>
+                                          </div>
+                                          
                                           {!sObj.bankDetails?.accountNumber ? (
-                                             <div className="p-6 bg-rose-500/10 border border-rose-500/20 rounded-3xl flex items-center gap-4">
-                                                <AlertTriangle className="h-6 w-6 text-rose-500" />
-                                                <div>
-                                                   <p className="text-[11px] font-black text-rose-500 uppercase tracking-widest leading-none">Security Alert</p>
-                                                   <p className="text-[10px] text-rose-400 font-bold mt-2 leading-relaxed">No verified bank account found. Funds locked until profile update.</p>
+                                             <div className="p-5 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center gap-4">
+                                                <AlertTriangle className="h-5 w-5 text-rose-500 shrink-0" />
+                                                <div className="min-w-0">
+                                                   <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest leading-none">Security Alert</p>
+                                                   <p className="text-[9px] text-rose-400 font-bold mt-1 leading-tight">No verified bank account. Funds locked.</p>
                                                 </div>
-                                                <Button size="sm" variant="secondary" className="ml-auto h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest" onClick={() => window.open(`tel:${sObj.phone}`)}>Call Node</Button>
+                                                <Button size="sm" variant="secondary" className="ml-auto h-8 px-4 rounded-xl text-[8px] font-black uppercase tracking-widest shrink-0" onClick={() => window.open(`tel:${sObj.phone}`)}>Call Node</Button>
                                              </div>
                                           ) : (
-                                             <div>
-                                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Verified Ledger Node</p>
-                                                <p className="text-2xl font-mono font-black text-white tracking-[0.2em] bg-white/5 p-4 rounded-xl shadow-inner border border-white/5">{sObj.bankDetails.accountNumber}</p>
+                                             <div className="space-y-2">
+                                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Verified Ledger Node</p>
+                                                <p className="text-xl font-mono font-black text-white tracking-[0.2em] bg-white/5 p-3 rounded-xl shadow-inner border border-white/5 break-all leading-tight">{sObj.bankDetails.accountNumber}</p>
                                              </div>
                                           )}
-                                          <div className="grid grid-cols-2 gap-8 border-t border-white/5 pt-8">
-                                             <div><p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Bank Branch</p><p className="text-sm font-black text-indigo-400 uppercase">{sObj.bankDetails?.bankName || 'NOT SET'}</p></div>
-                                             <div><p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">IFSC Routing</p><p className="text-sm font-black text-emerald-400 uppercase font-mono">{sObj.bankDetails?.ifscCode || 'NOT SET'}</p></div>
+                                          <div className="grid grid-cols-2 gap-6 border-t border-white/5 pt-6 pb-2">
+                                             <div><p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">Bank Branch</p><p className="text-xs font-black text-indigo-400 uppercase truncate">{sObj.bankDetails?.bankName || 'NOT SET'}</p></div>
+                                             <div><p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">IFSC Routing</p><p className="text-xs font-black text-emerald-400 uppercase font-mono">{sObj.bankDetails?.ifscCode || 'NOT SET'}</p></div>
+                                          </div>
+
+                                          {/* ITEM BREAKDOWN */}
+                                          <div className="pt-4 border-t border-white/5">
+                                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Payout Contributions</p>
+                                             <div className="space-y-3">
+                                                {sObj.items?.map((item, iIdx) => (
+                                                   <div key={iIdx} className="flex justify-between items-center text-[10px] bg-white/5 p-3 rounded-2xl hover:bg-white/10 transition-colors">
+                                                      <div className="min-w-0 mr-2">
+                                                         <p className="font-black text-white truncate">{item.productName}</p>
+                                                         <p className="text-slate-500 font-bold uppercase tracking-tight">{item.quantity} {item.unit} @ ₹{item.price}/{item.unit}</p>
+                                                      </div>
+                                                      <div className="text-right shrink-0">
+                                                         <p className="font-black text-white">₹{item.total?.toLocaleString()}</p>
+                                                         {(item.baseDelivery > 0 || item.oorSurcharge > 0) && (
+                                                            <p className="text-[8px] font-bold text-indigo-400">
+                                                               + Logistics: ₹{(item.baseDelivery + item.oorSurcharge).toLocaleString()}
+                                                            </p>
+                                                         )}
+                                                      </div>
+                                                   </div>
+                                                ))}
+                                             </div>
                                           </div>
                                        </div>
-                                       <div className="absolute -bottom-20 -right-20 opacity-5 group-hover:opacity-10 transition-all duration-700"><Banknote className="h-64 w-64" /></div>
+                                       <div className="absolute -bottom-10 -right-10 opacity-5 pointer-events-none"><Banknote className="h-48 w-48" /></div>
                                     </Card>
                                  ))}
                               </div>
@@ -1777,3 +1852,356 @@ export default function AdminCommandCenterClient({
       </div>
    );
 }
+
+
+
+
+
+
+
+// "use client";
+
+// import React, { useState, useEffect, useMemo } from 'react';
+// import { toast } from 'sonner';
+// import { AnimatePresence } from 'framer-motion';
+
+// import { getExportableUsers, getExportableProducts, toggleUserStatus } from '@/actions/admin-advanced';
+// import { approveProfile, rejectProfile, bulkApproveProfiles } from '@/actions/admin';
+// import { downloadCSV } from '@/lib/csvUtils';
+
+// import { CUSTOM_SCROLLBAR_CSS } from '@/data/AdminData/adminData';
+// import { getFilteredItems, getStatusOptions, paginate } from '@/lib/AdminLogic/adminLogic';
+
+// import PremiumLoader from '@/components/PremiumLoader';
+// import AdminSidebar from './_components/AdminSidebar';
+// import AdminHeader from './_components/AdminHeader';
+// import AdminDashboard from './_components/AdminDashboard';
+// import AdminFinance from './_components/AdminFinance';
+// import AdminDirectory from './_components/AdminDirectory';
+// import AdminModals from './_components/AdminModals';
+// import { AdminOverrideDialog } from './_components/WorkflowSystem';
+
+// export default function AdminCommandCenterClient({
+//    initialStats, initialOrders, initialPendingProfiles, advancedStats,
+//    settleAction, viewBankAction, statsAction, ordersAction, getPendingAction,
+//    deleteOrderAction, clearStaleAction, deliveryJobsAction, reviewsAction
+// }) {
+//    const [activeView, setActiveView] = useState("dashboard");
+//    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+//    const [stats, setStats] = useState(advancedStats?.data || {});
+//    const [orders, setOrders] = useState(initialOrders || []);
+//    const [pendingProfiles, setPendingProfiles] = useState(initialPendingProfiles || []);
+//    const [mounted, setMounted] = useState(false);
+//    const [logs, setLogs] = useState([]);
+//    const [specialRequests, setSpecialRequests] = useState([]);
+
+//    // Modals / Triggers
+//    const [isMediationModalOpen, setIsMediationModalOpen] = useState(false);
+//    const [selectedRequest, setSelectedRequest] = useState(null);
+//    const [isOverrideDialogOpen, setIsOverrideDialogOpen] = useState(false);
+//    const [pendingOverride, setPendingOverride] = useState(null);
+//    const [negotiatedFee, setNegotiatedFee] = useState("");
+//    const [adminQuantity, setAdminQuantity] = useState("");
+//    const [selectedOrder, setSelectedOrder] = useState(null);
+//    const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+//    const [selectedProfile, setSelectedProfile] = useState(null);
+//    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+//    const [selectedProduct, setSelectedProduct] = useState(null);
+//    const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+//    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+//    const [adminNote, setAdminNote] = useState("");
+//    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+//    const [selectedMessage, setSelectedMessage] = useState(null);
+
+//    // Table & Data State
+//    const [currentPage, setCurrentPage] = useState(1);
+//    const itemsPerPage = 10;
+//    const [selectedIds, setSelectedIds] = useState([]);
+//    const [farmers, setFarmers] = useState([]);
+//    const [agents, setAgents] = useState([]);
+//    const [deliveryPartners, setDeliveryPartners] = useState([]);
+//    const [products, setProducts] = useState([]);
+//    const [deliveryJobs, setDeliveryJobs] = useState([]);
+//    const [reviews, setReviews] = useState([]);
+//    const [supportMessages, setSupportMessages] = useState([]);
+//    const [unreadSupportCount, setUnreadSupportCount] = useState(0);
+//    const [isLoading, setIsLoading] = useState(false);
+
+//    // Filtering & Sorting
+//    const [search, setSearch] = useState("");
+//    const [statusFilter, setStatusFilter] = useState("ALL");
+//    const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
+//    const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+//    const [advancedFilters, setAdvancedFilters] = useState({
+//       orderStatus: 'ALL', paymentStatus: 'ALL', payoutStatus: 'ALL', buyerRole: 'ALL', sellerRole: 'ALL', category: 'ALL', sellerType: 'ALL', stockStatus: 'ALL', securityStatus: 'ALL', minAmount: '', maxAmount: '',
+//    });
+//    const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
+
+//    const disputes = useMemo(() => Array.isArray(orders) ? orders.filter(o => o.disputeStatus === 'OPEN') : [], [orders]);
+
+//    useEffect(() => {
+//       setMounted(true);
+//       fetchInitialData();
+//       const interval = setInterval(() => refreshData(), 30000);
+//       return () => clearInterval(interval);
+//    }, []);
+
+//    useEffect(() => {
+//       if (!mounted) return;
+//       setStatusFilter("ALL");
+//       if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support', 'disputes', 'orders', 'verifications', 'mediation'].includes(activeView)) {
+//          fetchDirectoryData(activeView);
+//       }
+//    }, [activeView, mounted]);
+
+//    useEffect(() => {
+//       if (mounted) {
+//          fetchDirectoryData(activeView);
+//          if (activeView === 'orders' || activeView === 'logistics') {
+//             const prefetch = async () => {
+//                const res = await getExportableUsers('delivery', { limit: 100 });
+//                if (res.success) setDeliveryPartners(res.data.users);
+//             };
+//             prefetch();
+//          }
+//       }
+//    }, [search, statusFilter, advancedFilters, currentPage, sortConfig]);
+
+//    const fetchInitialData = async () => {
+//       setIsLoading(true);
+//       try {
+//          const [resS, resO, resPR, resU] = await Promise.all([
+//             statsAction(), ordersAction(), getPendingAction(), import('@/actions/support').then(m => m.getUnreadSupportCount())
+//          ]);
+//          if (resS.success) setStats(resS.data || {});
+//          if (resO.success) setOrders(resO.data.orders || []);
+//          if (resPR.success) setPendingProfiles(resPR.data || []);
+//          if (resU.success) setUnreadSupportCount(resU.data || 0);
+//       } catch (err) { console.error("Initial load failed:", err); } finally { setIsLoading(false); }
+//    };
+
+//    const fetchDirectoryData = async (view) => {
+//       setIsLoading(true);
+//       try {
+//          const filterParams = { filters: { ...advancedFilters, search, status: statusFilter }, sort: sortConfig, page: currentPage, limit: itemsPerPage };
+//          if (view === 'farmers') {
+//             const res = await getExportableUsers('farmer', filterParams);
+//             if (res.success) { setFarmers(res.data.users); setPagination({ total: res.data.total, totalPages: res.data.totalPages }); }
+//          } else if (view === 'agents') {
+//             const res = await getExportableUsers('agent', filterParams);
+//             if (res.success) { setAgents(res.data.users); setPagination({ total: res.data.total, totalPages: res.data.totalPages }); }
+//          } else if (view === 'delivery') {
+//             const res = await getExportableUsers('delivery', filterParams);
+//             if (res.success) { setDeliveryPartners(res.data.users); setPagination({ total: res.data.total, totalPages: res.data.totalPages }); }
+//          } else if (view === 'catalog') {
+//             const res = await getExportableProducts(filterParams);
+//             if (res.success) { setProducts(res.data.products); setPagination({ total: res.data.total, totalPages: res.data.totalPages }); }
+//          } else if (view === 'logistics') {
+//             const res = await deliveryJobsAction(filterParams);
+//             if (res.success) { setDeliveryJobs(res.data.jobs); setPagination({ total: res.data.total, totalPages: res.data.totalPages }); }
+//          } else if (view === 'reviews') {
+//             const res = await reviewsAction(filterParams);
+//             if (res.success) setReviews(res.data);
+//          } else if (view === 'support') {
+//             const { getSupportMessages } = await import('@/actions/support');
+//             const res = await getSupportMessages(currentPage, search);
+//             if (res.success) {
+//                const fetchedMessages = res.data?.messages || res.data || [];
+//                setSupportMessages(Array.isArray(fetchedMessages) ? fetchedMessages : []);
+//                setPagination({ total: res.data?.total || 0, totalPages: res.data?.totalPages || 1 });
+//             }
+//          } else if (view === 'mediation') {
+//             const { getSpecialDeliveryRequests } = await import('@/actions/special-delivery');
+//             const res = await getSpecialDeliveryRequests();
+//             if (res.success) setSpecialRequests(res.data);
+//          } else if (view === 'orders' || view === 'disputes') {
+//             const params = { ...filterParams, filters: { ...filterParams.filters, ...(view === 'disputes' ? { disputeStatus: 'OPEN' } : {}) } };
+//             const res = await ordersAction(params);
+//             if (res.success) { setOrders(res.data.orders || []); setPagination({ total: res.data.total || 0, totalPages: res.data.totalPages || 1 }); }
+//          }
+//       } catch (err) { console.error(`Fetch ${view} failed:`, err); } finally { setIsLoading(false); }
+//    };
+
+//    const refreshData = async () => {
+//       if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support', 'disputes', 'orders', 'mediation'].includes(activeView)) {
+//          await fetchDirectoryData(activeView);
+//       }
+//       await fetchInitialData();
+//    };
+
+//    const addLog = (action, detail) => setLogs(prev => [{ time: new Date().toLocaleTimeString(), action, detail }, ...prev].slice(0, 20));
+
+//    const handleApprove = async (userId, role, name) => {
+//       const previousProfiles = [...pendingProfiles];
+//       setPendingProfiles(prev => prev.filter(p => p.userId !== userId));
+//       toast.success('Approval process started...');
+//       try {
+//          const res = await approveProfile(userId, role, adminNote);
+//          if (res.success) { addLog("APPROVED", `${role.toUpperCase()}: ${name}`); setAdminNote(""); toast.success(`${name} verified successfully.`); }
+//          else throw new Error(res.error);
+//       } catch (err) { setPendingProfiles(previousProfiles); toast.error(`Failed to approve ${name}: ${err.message}`); }
+//    };
+
+//    const handleReject = async (userId, role, name) => {
+//       const previousProfiles = [...pendingProfiles];
+//       setPendingProfiles(prev => prev.filter(p => p.userId !== userId));
+//       toast.success('Rejection process started...');
+//       try {
+//          const res = await rejectProfile(userId, role, adminNote);
+//          if (res.success) { addLog("REJECTED", `${role.toUpperCase()}: ${name}`); setAdminNote(""); toast.success(`Rejection sent to ${name}.`); }
+//          else throw new Error(res.error);
+//       } catch (err) { setPendingProfiles(previousProfiles); toast.error(`Failed to reject ${name}: ${err.message}`); }
+//    };
+
+//    const handleBulkApprove = async () => {
+//       if (selectedIds.length === 0) return toast.error("Please select members first.");
+//       const count = selectedIds.length;
+//       const profilesToApprove = pendingProfiles.filter(p => selectedIds.includes(p.userId));
+//       const previousProfiles = [...pendingProfiles];
+//       setPendingProfiles(prev => prev.filter(p => !selectedIds.includes(p.userId)));
+//       setSelectedIds([]);
+//       toast.success(`Approving ${count} members...`);
+//       try {
+//          const res = await bulkApproveProfiles(profilesToApprove);
+//          if (res.success) { addLog("BULK_APPROVE", `${count} members approved`); toast.success(res.message); }
+//          else throw new Error(res.error);
+//       } catch (err) { setPendingProfiles(previousProfiles); setSelectedIds(selectedIds); toast.error(`Bulk approval failed: ${err.message}`); }
+//    };
+
+//    const handleToggleStatus = async (userId, name) => {
+//       toast.promise(toggleUserStatus(userId), {
+//          loading: 'Updating Status...',
+//          success: (res) => { addLog("SECURITY_CHANGE", `${name}`); refreshData(); return res.message; },
+//          error: 'Update failed.'
+//       });
+//    };
+
+//    const handleSettle = async (orderId) => {
+//       toast.promise(settleAction(orderId), {
+//          loading: 'Releasing Funds...',
+//          success: () => { addLog("PAID_OUT", `Order #${orderId.slice(-6).toUpperCase()}`); refreshData(); return 'Payment Released to Seller.'; },
+//          error: 'Failed.'
+//       });
+//    };
+
+//    const handleDeleteOrder = async (orderId) => {
+//       if (!confirm("Are you sure you want to PERMANENTLY DELETE this order? Stock will be restored if it was not paid.")) return;
+//       toast.promise(deleteOrderAction(orderId), {
+//          loading: 'Deleting Order...',
+//          success: (res) => { addLog("DELETED_ORDER", `Order #${orderId.slice(-6).toUpperCase()}`); refreshData(); return res.message; },
+//          error: (err) => `Delete failed: ${err.message}`
+//       });
+//    };
+
+//    const openOrderAudit = async (orderId) => {
+//       setIsLoadingDetails(true);
+//       setIsOrderModalOpen(true);
+//       try {
+//          const order = Array.isArray(orders) ? orders.find(o => o.id === orderId) : null;
+//          if (!order) { toast.error("Order not found."); setIsOrderModalOpen(false); return; }
+//          const bankRes = await viewBankAction(orderId);
+//          const sellersData = bankRes.success ? bankRes.data.sellers : [];
+//          const deliveryPartners = bankRes.success ? bankRes.data.deliveryPartners : [];
+//          setSelectedOrder({ ...order, sellers: sellersData, deliveryPartners: deliveryPartners.length > 0 ? deliveryPartners : (order.deliveryPartners || []) });
+//       } catch (err) { console.error("Audit fetch failed:", err); toast.error("Failed to load full audit data."); } finally { setIsLoadingDetails(false); }
+//    };
+
+//    const openProfileAudit = (profile) => { setSelectedProfile(profile); setAdminNote(profile.user?.adminNotes || ""); setIsProfileModalOpen(true); };
+//    const openProductAudit = (product) => { setSelectedProduct(product); setIsProductModalOpen(true); };
+
+//    const openSupportAudit = async (message) => {
+//       setSelectedMessage(message);
+//       setIsSupportModalOpen(true);
+//       if (!message.isRead) {
+//          const { markSupportMessageAsRead } = await import('@/actions/support');
+//          await markSupportMessageAsRead(message.id);
+//          refreshData();
+//       }
+//    };
+
+//    const handleCloseSupportTicket = async (id) => {
+//       const { deleteSupportMessage } = await import('@/actions/support');
+//       const toastId = toast.loading("Closing and archiving ticket...");
+//       const res = await deleteSupportMessage(id);
+//       if (res.success) { toast.success(res.message, { id: toastId }); setIsSupportModalOpen(false); refreshData(); }
+//       else { toast.error(res.error, { id: toastId }); }
+//    };
+
+//    const resolvedItems = () => getFilteredItems({ activeView, pendingProfiles, farmers, agents, deliveryPartners, orders, products, deliveryJobs, reviews, supportMessages, specialRequests, statusFilter, search });
+
+//    const handleGlobalExport = () => {
+//       const dataToExport = resolvedItems();
+//       if (dataToExport.length === 0) return toast.error("No data found to export.");
+//       downloadCSV(dataToExport, `KrishiHub_${activeView}`);
+//    };
+
+//    if (!mounted) return <PremiumLoader fullPage message="KrishiHub Initializing..." />;
+
+//    return (
+//       <div className="flex h-screen overflow-hidden bg-slate-50 text-[13px] font-sans selection:bg-indigo-100 selection:text-indigo-900">
+//          <style>{CUSTOM_SCROLLBAR_CSS}</style>
+
+//          <AdminSidebar
+//             activeView={activeView} setActiveView={setActiveView}
+//             isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}
+//             badgeCounts={{
+//                pendingProfiles: pendingProfiles.length,
+//                disputes: disputes.length,
+//                specialRequests: Array.isArray(specialRequests) ? specialRequests.filter(r => r.status === 'PENDING').length : 0,
+//                unreadSupportCount: unreadSupportCount
+//             }}
+//          />
+
+//          <main className="flex-grow flex flex-col min-w-0 bg-slate-50">
+//             <AdminHeader
+//                activeView={activeView} search={search} setSearch={setSearch}
+//                handleGlobalExport={handleGlobalExport} refreshData={refreshData} isLoading={isLoading}
+//             />
+
+//             <div className="flex-grow relative overflow-hidden">
+//                <AnimatePresence>
+//                   {isLoading && <PremiumLoader fullPage={false} message="Syncing Command Center..." />}
+//                </AnimatePresence>
+//                <div className="absolute inset-0 overflow-y-auto custom-scrollbar">
+//                   <div className="p-8 max-w-[1500px] mx-auto w-full space-y-10 pb-40 custom-scrollbar">
+
+//                      {activeView === 'dashboard' && (
+//                         <AdminDashboard stats={stats} orders={orders} pendingProfiles={pendingProfiles} logs={logs} openOrderAudit={openOrderAudit} />
+//                      )}
+
+//                      {['verifications', 'disputes', 'orders', 'farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support', 'mediation'].includes(activeView) && (
+//                         <AdminDirectory
+//                            states={{ activeView, selectedIds, pagination, search, advancedFilters, statusFilter, isFilterDrawerOpen, currentPage, itemsPerPage, mounted }}
+//                            setters={{ setSelectedIds, setSearch, setAdvancedFilters, setStatusFilter, setIsFilterDrawerOpen, setCurrentPage, setSelectedRequest, setIsMediationModalOpen, setNegotiatedFee, setAdminQuantity }}
+//                            handlers={{ handleBulkApprove, getStatusOptions: () => getStatusOptions(activeView), getFilteredItems: resolvedItems, paginate, openOrderAudit, openProductAudit, openSupportAudit, openProfileAudit, handleDeleteOrder, handleToggleStatus }}
+//                            data={{ farmers, deliveryPartners }}
+//                         />
+//                      )}
+
+//                      {activeView === 'finance' && <AdminFinance stats={stats} />}
+
+//                   </div>
+//                </div>
+//             </div>
+//          </main>
+
+//          <AdminModals
+//             states={{ isProductModalOpen, selectedProduct, isProfileModalOpen, selectedProfile, adminNote, isOrderModalOpen, selectedOrder, isLoadingDetails, isSupportModalOpen, selectedMessage, isMediationModalOpen, selectedRequest, negotiatedFee, adminQuantity }}
+//             setters={{ setIsProductModalOpen, setIsProfileModalOpen, setAdminNote, setIsOrderModalOpen, setIsSupportModalOpen, setIsMediationModalOpen, setSelectedRequest, setNegotiatedFee, setAdminQuantity, setPendingOverride, setIsOverrideDialogOpen }}
+//             handlers={{ handleToggleStatus, handleReject, handleApprove, handleSettle, handleCloseSupportTicket, fetchDirectoryData }}
+//          />
+
+//          <AdminOverrideDialog
+//             isOpen={isOverrideDialogOpen}
+//             onClose={() => setIsOverrideDialogOpen(false)}
+//             onConfirm={async () => {
+//                if (pendingOverride?.action) await pendingOverride.action();
+//                setIsOverrideDialogOpen(false);
+//                setPendingOverride(null);
+//             }}
+//             title={pendingOverride?.title}
+//             message={pendingOverride?.message}
+//          />
+//       </div>
+//    );
+// }

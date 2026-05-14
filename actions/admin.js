@@ -85,18 +85,18 @@ export async function getAdminStats() {
 
 import { buildOrderFilters } from "@/lib/adminUtils";
 
-export async function getAllOrders({ 
-  filters = {}, 
+export async function getAllOrders({
+  filters = {},
   sort = { key: 'createdAt', direction: 'desc' },
   page = 1,
-  limit = 10 
+  limit = 10
 } = {}) {
   const user = await currentUser();
   if (!user) return { success: false, error: "Not logged in" };
 
   try {
     await ensureAdmin(user.id);
-    
+
     const where = buildOrderFilters(filters);
     const skip = (page - 1) * limit;
 
@@ -129,9 +129,12 @@ export async function getAllOrders({
         sellerAmount: o.sellerAmount,
         partnerPayout,
         isPartnerVerified,
-        paymentStatus: o.paymentStatus === 'PAID' ? 'Money Received' : 'Waiting for Payment',
-        orderStatus: o.orderStatus, // Will be mapped in UI
-        payoutStatus: o.payoutStatus === 'SETTLED' ? 'Paid to Seller' : 'Not Paid to Seller',
+        // paymentStatus: o.paymentStatus === 'PAID' ? 'Money Received' : 'Waiting for Payment',
+        // orderStatus: o.orderStatus, // Will be mapped in UI
+        // payoutStatus: o.payoutStatus === 'SETTLED' ? 'Paid to Seller' : 'Not Paid to Seller',
+        paymentStatus: o.paymentStatus,
+        orderStatus: o.orderStatus,
+        payoutStatus: o.payoutStatus,
         paymentMethod: o.paymentMethod,
         shippingAddress: o.shippingAddress,
         buyerPhone: o.buyerPhone,
@@ -178,13 +181,13 @@ export async function getAllOrders({
       };
     });
 
-    return { 
-      success: true, 
-      data: { 
+    return {
+      success: true,
+      data: {
         orders: JSON.parse(JSON.stringify(mapped)),
         total,
         totalPages: Math.ceil(total / limit)
-      } 
+      }
     };
 
   } catch (err) {
@@ -200,7 +203,7 @@ export async function markOrderSettled(orderId) {
   try {
     await ensureAdmin(user.id);
 
-    const order = await db.order.findUnique({ 
+    const order = await db.order.findUnique({
       where: { id: orderId },
       include: { items: true }
     });
@@ -226,7 +229,7 @@ export async function markOrderSettled(orderId) {
       // 2. Update the Order itself
       await tx.order.update({
         where: { id: orderId },
-        data: { 
+        data: {
           payoutStatus: "SETTLED",
           updatedAt: now
         }
@@ -358,12 +361,41 @@ export async function getSellerBankDetailsForOrder(orderId) {
       }
 
       const s = sellerMap.get(sellerId);
-      s.totalEarned += itemTotal;
+      const itemProductTotal = it.quantity * it.priceAtPurchase;
+
+      // Breakdown delivery: compare charge at purchase vs listing's base charge
+      const baseCharge = p.deliveryCharge || 0;
+      const chargeAtPurchase = it.deliveryChargeAtPurchase || 0;
+
+      let itemBaseDelivery = 0;
+      let itemOORSurcharge = 0;
+
+      if (chargeAtPurchase > baseCharge) {
+        // It's likely an OOR negotiated fee
+        itemBaseDelivery = it.quantity * baseCharge;
+        itemOORSurcharge = it.quantity * (chargeAtPurchase - baseCharge);
+      } else {
+        // Standard or lower than base
+        itemBaseDelivery = it.quantity * chargeAtPurchase;
+        itemOORSurcharge = 0;
+      }
+
+      s.totalEarned += (itemProductTotal + itemBaseDelivery + itemOORSurcharge);
+
+      // Track totals for the breakdown UI
+      s.productTotal = (s.productTotal || 0) + itemProductTotal;
+      s.baseDeliveryTotal = (s.baseDeliveryTotal || 0) + itemBaseDelivery;
+      s.oorSurchargeTotal = (s.oorSurchargeTotal || 0) + itemOORSurcharge;
+
       s.items.push({
         productName: p.productName,
         quantity: it.quantity,
         unit: p.unit,
-        total: itemTotal
+        price: it.priceAtPurchase,
+        total: itemProductTotal,
+        deliveryTotal: itemBaseDelivery + itemOORSurcharge,
+        baseDelivery: itemBaseDelivery,
+        oorSurcharge: itemOORSurcharge
       });
     });
 
@@ -673,11 +705,11 @@ export async function adminDeleteOrder(orderId) {
   }
 }
 
-export async function getAdminDeliveryJobs({ 
-  filters = {}, 
+export async function getAdminDeliveryJobs({
+  filters = {},
   sort = { key: 'createdAt', direction: 'desc' },
   page = 1,
-  limit = 10 
+  limit = 10
 } = {}) {
   const user = await currentUser();
   if (!user) return { success: false, error: "Not logged in" };
@@ -713,8 +745,8 @@ export async function getAdminDeliveryJobs({
       db.deliveryJob.count({ where })
     ]);
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       data: {
         jobs: JSON.parse(JSON.stringify(jobs)),
         total,

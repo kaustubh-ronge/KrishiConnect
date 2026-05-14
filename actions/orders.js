@@ -368,7 +368,17 @@ export async function initiateCheckout(params) {
           }
         }
 
-        deliveryTotal += Math.round(dist * marketRate);
+        const calculatedSellerFee = Math.round(dist * marketRate);
+        deliveryTotal += calculatedSellerFee;
+
+        // DISTRIBUTE standard fee across items from this seller for auditing
+        const totalItemsQty = seller.items.reduce((sum, it) => sum + it.quantity, 0);
+        if (totalItemsQty > 0) {
+          const feePerUnit = calculatedSellerFee / totalItemsQty;
+          seller.items.forEach(it => {
+            itemDeliveryChargeMap.set(it.id, feePerUnit);
+          });
+        }
       } else {
         // --- CRITICAL: If seller has a range limit, we MUST have a location to verify ---
         if (sellerProfile.maxDeliveryRange) {
