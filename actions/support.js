@@ -74,6 +74,23 @@ export async function getSupportMessages(page = 1, search = "") {
       take: limit
     });
 
+    // Manually fetch user profiles for contact info
+    const messagesWithProfiles = await Promise.all(messages.map(async (msg) => {
+      const profile = await db.user.findUnique({
+        where: { id: msg.userId },
+        include: {
+          farmerProfile: { select: { phone: true, address: true } },
+          agentProfile: { select: { phone: true, address: true } },
+          deliveryProfile: { select: { phone: true, address: true } }
+        }
+      });
+      return {
+        ...msg,
+        userPhone: profile?.farmerProfile?.phone || profile?.agentProfile?.phone || profile?.deliveryProfile?.phone || "NOT PROVIDED",
+        userAddress: profile?.farmerProfile?.address || profile?.agentProfile?.address || profile?.deliveryProfile?.address || "NOT PROVIDED"
+      };
+    }));
+
     const total = await db.supportMessage.count({
       where: {
         OR: [
@@ -84,7 +101,7 @@ export async function getSupportMessages(page = 1, search = "") {
       }
     });
 
-    return apiResponse.success({ messages, total, totalPages: Math.ceil(total / limit) });
+    return apiResponse.success({ messages: messagesWithProfiles, total, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     return apiResponse.error(error.message);
   }

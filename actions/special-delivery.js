@@ -94,20 +94,49 @@ export async function getSpecialDeliveryRequests() {
                 user: {
                     select: {
                         name: true,
-                        email: true
+                        email: true,
+                        farmerProfile: { select: { phone: true, address: true } },
+                        agentProfile: { select: { phone: true, address: true } },
+                        deliveryProfile: { select: { phone: true, address: true } }
                     }
                 },
                 product: {
                     include: {
-                        farmer: true,
-                        agent: true
+                        farmer: {
+                            select: {
+                                name: true,
+                                phone: true,
+                                address: true,
+                                city: true,
+                                state: true
+                            }
+                        },
+                        agent: {
+                            select: {
+                                name: true,
+                                companyName: true,
+                                phone: true,
+                                address: true,
+                                city: true,
+                                state: true
+                            }
+                        }
                     }
                 }
             },
             orderBy: { createdAt: 'desc' }
         });
 
-        return apiResponse.success(requests);
+        const formattedRequests = requests.map(req => {
+            const buyerProfile = req.user.farmerProfile || req.user.agentProfile || req.user.deliveryProfile;
+            return {
+                ...req,
+                buyerPhone: buyerProfile?.phone || "NOT PROVIDED",
+                buyerAddress: buyerProfile?.address || "NOT PROVIDED"
+            };
+        });
+
+        return apiResponse.success(formattedRequests);
     } catch (error) {
         return apiResponse.error(error.message);
     }

@@ -29,7 +29,7 @@ export default async function AdminPage() {
   return (
     <AdminCommandCenterClient
       initialStats={statsRes.data}
-      initialOrders={ordersRes.data}
+      initialOrders={ordersRes.data.orders}
       initialPendingProfiles={pendingProfilesRes.data || []}
       advancedStats={advancedStatsRes}
       settleAction={markOrderSettled}

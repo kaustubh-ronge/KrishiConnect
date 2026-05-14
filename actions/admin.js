@@ -83,20 +83,37 @@ export async function getAdminStats() {
   }
 }
 
-export async function getAllOrders({ onlyPendingPayouts = false } = {}) {
+import { buildOrderFilters } from "@/lib/adminUtils";
+
+export async function getAllOrders({ 
+  filters = {}, 
+  sort = { key: 'createdAt', direction: 'desc' },
+  page = 1,
+  limit = 10 
+} = {}) {
   const user = await currentUser();
   if (!user) return { success: false, error: "Not logged in" };
 
   try {
     await ensureAdmin(user.id);
-    const orders = await db.order.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        buyerUser: { include: { farmerProfile: true, agentProfile: true } },
-        items: { include: { product: { include: { farmer: true, agent: true } } } },
-        deliveryJobs: { include: { deliveryBoy: true } }
-      }
-    });
+    
+    const where = buildOrderFilters(filters);
+    const skip = (page - 1) * limit;
+
+    const [orders, total] = await Promise.all([
+      db.order.findMany({
+        where,
+        orderBy: { [sort.key]: sort.direction },
+        skip,
+        take: limit,
+        include: {
+          buyerUser: { include: { farmerProfile: true, agentProfile: true } },
+          items: { include: { product: { include: { farmer: true, agent: true } } } },
+          deliveryJobs: { include: { deliveryBoy: true } }
+        }
+      }),
+      db.order.count({ where })
+    ]);
 
     const mapped = orders.map(o => {
       // Calculate Partner Payout
@@ -158,7 +175,14 @@ export async function getAllOrders({ onlyPendingPayouts = false } = {}) {
       };
     });
 
-    return { success: true, data: JSON.parse(JSON.stringify(mapped)) };
+    return { 
+      success: true, 
+      data: { 
+        orders: JSON.parse(JSON.stringify(mapped)),
+        total,
+        totalPages: Math.ceil(total / limit)
+      } 
+    };
 
   } catch (err) {
     console.error("Get Orders Error:", err);
@@ -645,29 +669,53 @@ export async function adminDeleteOrder(orderId) {
   }
 }
 
-export async function getAdminDeliveryJobs() {
+export async function getAdminDeliveryJobs({ 
+  filters = {}, 
+  sort = { key: 'createdAt', direction: 'desc' },
+  page = 1,
+  limit = 10 
+} = {}) {
   const user = await currentUser();
   if (!user) return { success: false, error: "Not logged in" };
 
   try {
     await ensureAdmin(user.id);
 
-    const jobs = await db.deliveryJob.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        deliveryBoy: true,
-        order: {
-          select: {
-            id: true,
-            buyerName: true,
-            shippingAddress: true,
-            totalAmount: true
+    const where = {};
+    if (filters.status && filters.status !== 'ALL') where.status = filters.status;
+    if (filters.partnerId && filters.partnerId !== 'ALL') where.deliveryBoyId = filters.partnerId;
+
+    const skip = (page - 1) * limit;
+
+    const [jobs, total] = await Promise.all([
+      db.deliveryJob.findMany({
+        where,
+        orderBy: { [sort.key]: sort.direction },
+        skip,
+        take: limit,
+        include: {
+          deliveryBoy: true,
+          order: {
+            select: {
+              id: true,
+              buyerName: true,
+              shippingAddress: true,
+              totalAmount: true
+            }
           }
         }
-      }
-    });
+      }),
+      db.deliveryJob.count({ where })
+    ]);
 
-    return { success: true, data: JSON.parse(JSON.stringify(jobs)) };
+    return { 
+      success: true, 
+      data: {
+        jobs: JSON.parse(JSON.stringify(jobs)),
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   } catch (err) {
     console.error("Get Admin Delivery Jobs Error:", err);
     return { success: false, error: err.message };

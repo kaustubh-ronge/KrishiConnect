@@ -136,20 +136,39 @@ export async function getAdvancedAdminStats() {
   }
 }
 
-export async function getExportableUsers(roleType) {
+import { buildUserFilters } from "@/lib/adminUtils";
+
+export async function getExportableUsers(roleType, { 
+  filters = {}, 
+  sort = { key: 'createdAt', direction: 'desc' },
+  page = 1,
+  limit = 10 
+} = {}) {
   try {
     await ensureAdmin();
+    
+    const where = buildUserFilters(filters, roleType);
+    const skip = (page - 1) * limit;
 
     let data = [];
+    let total = 0;
     if (roleType === 'farmer') {
-      const farmers = await db.farmerProfile.findMany({
-        include: {
-          user: { select: { email: true, createdAt: true, isDisabled: true } },
-          listings: {
-            include: { orderItems: { select: { quantity: true } } }
+      const [farmers, farmerCount] = await Promise.all([
+        db.farmerProfile.findMany({
+          where,
+          orderBy: { [sort.key === 'createdAt' ? 'createdAt' : 'id']: sort.direction },
+          skip,
+          take: limit,
+          include: {
+            user: { select: { email: true, createdAt: true, isDisabled: true } },
+            listings: {
+              include: { orderItems: { select: { quantity: true } } }
+            }
           }
-        }
-      });
+        }),
+        db.farmerProfile.count({ where })
+      ]);
+      total = farmerCount;
 
       data = await Promise.all(farmers.map(async (p) => {
         const purchasedCount = await db.order.count({ where: { buyerId: p.userId } });
@@ -164,14 +183,22 @@ export async function getExportableUsers(roleType) {
       }));
 
     } else if (roleType === 'agent') {
-      const agents = await db.agentProfile.findMany({
-        include: {
-          user: { select: { email: true, createdAt: true, isDisabled: true } },
-          listings: {
-            include: { orderItems: { select: { quantity: true } } }
+      const [agents, agentCount] = await Promise.all([
+        db.agentProfile.findMany({
+          where,
+          orderBy: { [sort.key === 'createdAt' ? 'createdAt' : 'id']: sort.direction },
+          skip,
+          take: limit,
+          include: {
+            user: { select: { email: true, createdAt: true, isDisabled: true } },
+            listings: {
+              include: { orderItems: { select: { quantity: true } } }
+            }
           }
-        }
-      });
+        }),
+        db.agentProfile.count({ where })
+      ]);
+      total = agentCount;
 
       data = await Promise.all(agents.map(async (p) => {
         const purchasedCount = await db.order.count({ where: { buyerId: p.userId } });
@@ -186,12 +213,20 @@ export async function getExportableUsers(roleType) {
       }));
 
     } else if (roleType === 'delivery') {
-      const partners = await db.deliveryProfile.findMany({
-        include: {
-          user: { select: { email: true, createdAt: true, isDisabled: true } },
-          jobs: { select: { status: true } }
-        }
-      });
+      const [partners, deliveryCount] = await Promise.all([
+        db.deliveryProfile.findMany({
+          where,
+          orderBy: { [sort.key === 'createdAt' ? 'createdAt' : 'id']: sort.direction },
+          skip,
+          take: limit,
+          include: {
+            user: { select: { email: true, createdAt: true, isDisabled: true } },
+            jobs: { select: { status: true } }
+          }
+        }),
+        db.deliveryProfile.count({ where })
+      ]);
+      total = deliveryCount;
 
       data = partners.map(p => ({
         ...p,
@@ -206,7 +241,14 @@ export async function getExportableUsers(roleType) {
       });
     }
 
-    return { success: true, data: JSON.parse(JSON.stringify(data)) };
+    return { 
+      success: true, 
+      data: {
+        users: JSON.parse(JSON.stringify(data)),
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
 
   } catch (error) {
     console.error("[ExportUsers] Error:", error.message);
@@ -214,16 +256,34 @@ export async function getExportableUsers(roleType) {
   }
 }
 
-export async function getExportableProducts() {
+import { buildProductFilters } from "@/lib/adminUtils";
+
+export async function getExportableProducts({ 
+  filters = {}, 
+  sort = { key: 'createdAt', direction: 'desc' },
+  page = 1,
+  limit = 10 
+} = {}) {
   try {
     await ensureAdmin();
-    const products = await db.productListing.findMany({
-      include: {
-        farmer: { select: { name: true } },
-        agent: { select: { name: true, companyName: true } },
-        orderItems: { select: { quantity: true } }
-      }
-    });
+    
+    const where = buildProductFilters(filters);
+    const skip = (page - 1) * limit;
+
+    const [products, total] = await Promise.all([
+      db.productListing.findMany({
+        where,
+        orderBy: { [sort.key]: sort.direction },
+        skip,
+        take: limit,
+        include: {
+          farmer: { select: { name: true } },
+          agent: { select: { name: true, companyName: true } },
+          orderItems: { select: { quantity: true } }
+        }
+      }),
+      db.productListing.count({ where })
+    ]);
 
     const mapped = products.map(p => ({
       ...p,
@@ -232,7 +292,14 @@ export async function getExportableProducts() {
       orderItems: undefined
     }));
 
-    return { success: true, data: JSON.parse(JSON.stringify(mapped)) };
+    return { 
+      success: true, 
+      data: {
+        products: JSON.parse(JSON.stringify(mapped)),
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   } catch (error) {
     return { success: false, error: error.message };
   }

@@ -24,18 +24,22 @@ export const getSellerSales = cache(async () => {
     if (dbUser.role === 'farmer' && dbUser.farmerProfile) {
       whereClause = {
         product: { farmerId: dbUser.farmerProfile.id },
-        OR: [
-          { paymentStatus: 'PAID' },
-          { paymentMethod: 'COD', paymentStatus: 'PENDING' }
-        ]
+        order: {
+          OR: [
+            { paymentStatus: 'PAID' },
+            { paymentMethod: 'COD', paymentStatus: 'PENDING' }
+          ]
+        }
       };
     } else if (dbUser.role === 'agent' && dbUser.agentProfile) {
       whereClause = {
         product: { agentId: dbUser.agentProfile.id },
-        OR: [
-          { paymentStatus: 'PAID' },
-          { paymentMethod: 'COD', paymentStatus: 'PENDING' }
-        ]
+        order: {
+          OR: [
+            { paymentStatus: 'PAID' },
+            { paymentMethod: 'COD', paymentStatus: 'PENDING' }
+          ]
+        }
       };
     } else {
       return { success: false, data: [] };
