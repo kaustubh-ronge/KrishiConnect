@@ -153,24 +153,24 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
     }
 
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-12">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col items-center justify-center gap-6 py-12">
+        <div className="flex flex-wrap items-center justify-center gap-3">
           <Button
             variant="outline"
             size="icon"
             disabled={page === 1}
             onClick={() => handlePageChange(page - 1)}
-            className="rounded-xl border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-30"
+            className="rounded-xl border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-30 h-10 w-10"
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
 
-          <div className="flex items-center gap-1.5 mx-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             {[...Array(safeTotalPages)].map((_, i) => {
               const p = i + 1;
-              if (totalPages > 7) {
+              if (totalPages > 5) { // Reduced from 7 to 5 for better mobile fit
                 if (p > 1 && p < totalPages && (p < page - 1 || p > page + 1)) {
-                  if (p === page - 2 || p === page + 2) return <span key={p} className="text-slate-400 px-1">...</span>;
+                  if (p === page - 2 || p === page + 2) return <span key={p} className="text-slate-400 px-1 hidden sm:inline">...</span>;
                   return null;
                 }
               }
@@ -180,7 +180,7 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
                   variant={page === p ? "default" : "ghost"}
                   size="sm"
                   onClick={() => handlePageChange(p)}
-                  className={`h-9 w-9 rounded-xl font-bold text-xs ${
+                  className={`h-10 w-10 rounded-xl font-bold text-xs ${
                     page === p 
                       ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200" 
                       : "text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
@@ -197,13 +197,13 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
             size="icon"
             disabled={page === totalPages}
             onClick={() => handlePageChange(page + 1)}
-            className="rounded-xl border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-30"
+            className="rounded-xl border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-30 h-10 w-10"
           >
             <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-          Showing results {(page - 1) * metadata.limit + 1} - {Math.min(page * metadata.limit, total)} of {total}
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-4 py-1.5 rounded-full">
+          Showing {(page - 1) * metadata.limit + 1} - {Math.min(page * metadata.limit, total)} of {total} results
         </p>
       </div>
     );
@@ -220,7 +220,7 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
   if (!mounted) return <div className="min-h-screen bg-slate-50" />;
 
   return (
-    <div className="min-h-screen relative bg-gradient-to-br from-slate-50 via-emerald-50/20 to-teal-50/30">
+    <div className="min-h-screen relative bg-gradient-to-br from-slate-50 via-emerald-50/20 to-teal-50/30 overflow-x-hidden">
       {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -282,11 +282,11 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
             </div>
 
             {/* Search & Quick Stats */}
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="col-span-2 md:col-span-2 relative">
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="col-span-1 sm:col-span-2 relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
-                  placeholder="Search by crop name, description..."
+                  placeholder="Search by crop name..."
                   className="pl-12 h-14 bg-white/80 border-2 border-emerald-100 hover:border-emerald-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 rounded-2xl text-lg transition-all"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -329,27 +329,27 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
           transition={{ delay: 0.2 }}
           className="bg-white/60 backdrop-blur-xl border border-white/50 shadow-lg rounded-2xl p-4 mb-6"
         >
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); updateParams({ sellerType: val }); }} className="w-full md:w-auto">
-              <TabsList className="h-12 p-1 bg-gray-100/80 rounded-full">
+            <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); updateParams({ sellerType: val }); }} className="w-full lg:w-auto">
+              <TabsList className="h-auto lg:h-12 p-1 bg-gray-100/80 rounded-2xl lg:rounded-full flex flex-col lg:flex-row w-full lg:w-auto gap-1">
                 <TabsTrigger
                   value="all"
-                  className="rounded-full px-6 h-full text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-lg transition-all"
+                  className="rounded-xl lg:rounded-full px-6 h-12 lg:h-full text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-lg transition-all w-full lg:w-auto justify-start lg:justify-center"
                 >
                   <Grid3X3 className="h-4 w-4 mr-2" />
                   All Products
                 </TabsTrigger>
                 <TabsTrigger
                   value="farmers"
-                  className="rounded-full px-6 h-full text-sm font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
+                  className="rounded-xl lg:rounded-full px-6 h-12 lg:h-full text-sm font-bold data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all w-full lg:w-auto justify-start lg:justify-center"
                 >
                   <Sprout className="h-4 w-4 mr-2" />
                   Farm Fresh
                 </TabsTrigger>
                 <TabsTrigger
                   value="agents"
-                  className="rounded-full px-6 h-full text-sm font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
+                  className="rounded-xl lg:rounded-full px-6 h-12 lg:h-full text-sm font-bold data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all w-full lg:w-auto justify-start lg:justify-center"
                 >
                   <Briefcase className="h-4 w-4 mr-2" />
                   Traders
@@ -358,11 +358,13 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
             </Tabs>
 
             {/* Sort & Filter Controls */}
-            <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
               <Select value={sortBy} onValueChange={(val) => { setSortBy(val); updateParams({ sortBy: val }); }}>
-                <SelectTrigger className="h-12 bg-white border-2 border-gray-200 hover:border-emerald-300 rounded-xl font-medium min-w-[180px] transition-all">
-                  <ArrowUpDown className="h-4 w-4 mr-2 text-gray-500" />
-                  <SelectValue placeholder="Sort by" />
+                <SelectTrigger className="flex-1 lg:flex-none h-12 bg-white border-2 border-gray-200 hover:border-emerald-300 rounded-xl font-medium min-w-[160px] transition-all">
+                  <div className="flex items-center">
+                    <ArrowUpDown className="h-4 w-4 mr-2 text-gray-500" />
+                    <SelectValue placeholder="Sort by" />
+                  </div>
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
                   <SelectItem value="newest">🆕 Newest First</SelectItem>
@@ -408,6 +410,7 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
                       setLocationFilter={setLocationFilter}
                       freshnessFilter={freshnessFilter}
                       setFreshnessFilter={setFreshnessFilter}
+                      updateParams={updateParams}
                     />
                   </div>
                 </SheetContent>
@@ -501,6 +504,7 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
                 setLocationFilter={setLocationFilter}
                 freshnessFilter={freshnessFilter}
                 setFreshnessFilter={setFreshnessFilter}
+                updateParams={updateParams}
               />
             </div>
           </motion.div>
@@ -611,7 +615,8 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
 function FilterSidebar({
   categories, selectedCategory, setSelectedCategory,
   priceRange, setPriceRange, showOutOfStock, setShowOutOfStock,
-  locationFilter, setLocationFilter, freshnessFilter, setFreshnessFilter
+  locationFilter, setLocationFilter, freshnessFilter, setFreshnessFilter,
+  updateParams
 }) {
   return (
     <div className="space-y-8">
@@ -702,19 +707,19 @@ function FilterSidebar({
           </div>
           <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Price Range (₹)</h4>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-col sm:flex-row gap-2 items-center">
           <Input
             type="number"
             placeholder="Min"
-            className="h-11 bg-gray-50 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 rounded-xl transition-all text-center font-medium"
+            className="h-11 bg-gray-50 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 rounded-xl transition-all text-center font-medium w-full"
             value={priceRange.min}
             onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
           />
-          <span className="text-gray-400 font-bold">-</span>
+          <span className="text-gray-400 font-bold hidden sm:block">-</span>
           <Input
             type="number"
             placeholder="Max"
-            className="h-11 bg-gray-50 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 rounded-xl transition-all text-center font-medium"
+            className="h-11 bg-gray-50 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 rounded-xl transition-all text-center font-medium w-full"
             value={priceRange.max}
             onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
           />

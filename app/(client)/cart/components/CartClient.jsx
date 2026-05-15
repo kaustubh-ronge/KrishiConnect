@@ -157,9 +157,9 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
 
     const [shippingName, setShippingName] = useState(user?.fullName || "");
     const [shippingPhone, setShippingPhone] = useState(user?.phone || "");
-    const [shippingAddress, setShippingAddress] = useState(user?.address || "");
-    const [lat, setLat] = useState(user?.lat || null);
-    const [lng, setLng] = useState(user?.lng || null);
+    const [shippingAddress, setShippingAddress] = useState(user?.address || profile?.address || "");
+    const [lat, setLat] = useState(user?.lat || profile?.lat || null);
+    const [lng, setLng] = useState(user?.lng || profile?.lng || null);
     const [isLocating, setIsLocating] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState("ONLINE");
 
@@ -404,6 +404,15 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     }
 
     const handleLocationRedirect = (msg) => {
+        if (isProfileLocationSet) {
+            // User already has a profile location, just show the error without redirecting
+            toast.error(msg, {
+                duration: 4000,
+                icon: <AlertCircle className="h-5 w-5 text-rose-500" />
+            });
+            return;
+        }
+
         const fullMsg = `${msg} Please set your location in your profile. Redirecting to profile...`;
         toast.error(fullMsg, {
             duration: 4000,
@@ -416,8 +425,6 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
 
         setTimeout(() => {
             router.push(`${path}#location`);
-            // For delivery dashboard, hash might not trigger dialog automatically if already on page, 
-            // but our new useEffect in DeliveryDashboardClient handles it.
         }, 3000);
     };
 
