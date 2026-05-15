@@ -124,6 +124,22 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
 
   // Handle Add to Cart
   const handleAddToCart = async () => {
+    // Check if location is set in profile
+    if (!userLat || !userLng) {
+      toast.error("Location Required: Please set your location in your profile.", {
+        icon: <MapPin className="h-5 w-5 text-rose-500 animate-bounce" />,
+        duration: 4000
+      });
+      
+      const role = userRole || 'farmer';
+      const path = role === 'delivery' ? '/delivery-dashboard' : `/${role}-dashboard/edit`;
+      
+      setTimeout(() => {
+        router.push(`${path}#location`);
+      }, 3000);
+      return;
+    }
+
     if (qty > product.availableStock) {
       toast.error(`Only ${product.availableStock} ${product.unit} available.`, {
         icon: <AlertCircle className="h-5 w-5" />,
@@ -586,42 +602,55 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
                       </div>
                     )}
                     {!isAdmin && (
-                      <Button
-                        onClick={handleAddToCart}
-                        disabled={product.availableStock <= 0 || isAdding || isFeeLoading}
-                         className={`w-full h-14 text-lg font-black shadow-2xl transition-all duration-500 rounded-2xl ${product.availableStock > 0
-                             ? (isOutOfRange && !isBypassed && !hasRequested)
-                               ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-50"
-                               : (isAdding || isFeeLoading)
-                                 ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                                 : `bg-gradient-to-r ${themeGradient} hover:shadow-${themeColor}-500/50 text-white hover:scale-[1.02]`
-                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                           }`}
-                      >
-                        {isAdding ? (
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            className="flex items-center gap-2"
-                          >
-                            <RotateCcw className="h-5 w-5" />
-                            Adding to Cart...
-                          </motion.div>
-                        ) : isFeeLoading ? (
-                           <div className="flex items-center gap-2">
-                             <Loader2 className="h-6 w-6 animate-spin" />
-                             Calculating Logistics...
-                           </div>
-                        ) : (
-                          <span className="flex items-center gap-2">
-                            <ShoppingCart className="h-6 w-6" />
-                            {product.availableStock > 0 
-                              ? (isOutOfRange && !isBypassed && !hasRequested) ? "Awaiting Request" : "Add to Cart" 
-                              : "Out of Stock"}
-                            <ChevronRight className="h-5 w-5 ml-auto" />
-                          </span>
+                      <>
+                        <Button
+                          onClick={handleAddToCart}
+                          disabled={product.availableStock <= 0 || isAdding || isFeeLoading || !userLat || !userLng}
+                           className={`w-full h-14 text-lg font-black shadow-2xl transition-all duration-500 rounded-2xl ${product.availableStock > 0
+                               ? (isOutOfRange && !isBypassed && !hasRequested || !userLat || !userLng)
+                                 ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-50"
+                                 : (isAdding || isFeeLoading)
+                                   ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                                   : `bg-gradient-to-r ${themeGradient} hover:shadow-${themeColor}-500/50 text-white hover:scale-[1.02]`
+                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                             }`}
+                        >
+                          {isAdding ? (
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                              className="flex items-center gap-2"
+                            >
+                              <RotateCcw className="h-5 w-5" />
+                              Adding to Cart...
+                            </motion.div>
+                          ) : isFeeLoading ? (
+                             <div className="flex items-center gap-2">
+                               <Loader2 className="h-6 w-6 animate-spin" />
+                               Calculating Logistics...
+                             </div>
+                          ) : !userLat || !userLng ? (
+                            <span className="flex items-center gap-2">
+                               <MapPin className="h-6 w-6 animate-bounce" />
+                               Location Required
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-2">
+                              <ShoppingCart className="h-6 w-6" />
+                              {product.availableStock > 0 
+                                ? (isOutOfRange && !isBypassed && !hasRequested) ? "Awaiting Request" : "Add to Cart" 
+                                : "Out of Stock"}
+                              <ChevronRight className="h-5 w-5 ml-auto" />
+                            </span>
+                          )}
+                        </Button>
+
+                        {(!userLat || !userLng) && (
+                           <p className="text-[10px] text-rose-500 font-bold text-center uppercase tracking-widest animate-pulse mt-2">
+                              Please set your location in your profile to proceed.
+                           </p>
                         )}
-                      </Button>
+                      </>
                     )}
 
                     <div className="grid grid-cols-2 gap-3">

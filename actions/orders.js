@@ -384,7 +384,7 @@ export async function initiateCheckout(params) {
         if (sellerProfile.maxDeliveryRange) {
           return {
             success: false,
-            error: `Location Required: ${sellerProfile.name || sellerProfile.companyName} has a delivery range limit. Please pin your location on the cart page to proceed.`
+            error: `Location Required: ${sellerProfile.name || sellerProfile.companyName} has a delivery range limit. Please set your location in your profile to proceed.`
           };
         }
 

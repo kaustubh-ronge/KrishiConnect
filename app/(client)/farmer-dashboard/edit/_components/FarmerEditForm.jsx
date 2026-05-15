@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateFarmerProfile } from '@/actions/farmer-profile';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,12 @@ export default function FarmerEditForm({ initialProfile = {}, user }) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [activeSection, setActiveSection] = useState(1);
+
+    useEffect(() => {
+        if (window.location.hash === '#location') {
+            setActiveSection(3);
+        }
+    }, []);
 
     // Parse existing produce
     const initialProduce = initialProfile.primaryProduce || [];

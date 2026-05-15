@@ -61,7 +61,21 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+
+    // Check if location is missing in existing profile
+    if (initialProfileExists && user?.agentProfile && (!user.agentProfile.lat || !user.agentProfile.lng)) {
+      const timer = setTimeout(() => {
+        toast.error("Location not set. Please set your location in your profile.", {
+          duration: 4000,
+          icon: <MapPin className="h-5 w-5 text-rose-500 animate-bounce" />
+        });
+        setTimeout(() => {
+          router.push('/agent-dashboard/edit#location');
+        }, 3000);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [initialProfileExists, user]);
 
   // --- Agent Type State ---
   const [selectedTypes, setSelectedTypes] = useState([]);

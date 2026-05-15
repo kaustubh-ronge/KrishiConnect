@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateAgentProfile } from '@/actions/agent-profile';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,12 @@ export default function AgentEditForm({ initialProfile = {}, user }) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [activeSection, setActiveSection] = useState(1);
+
+    useEffect(() => {
+        if (window.location.hash === '#location') {
+            setActiveSection(3);
+        }
+    }, []);
 
     // --- State for Agent Types ---
     const initialTypes = initialProfile.agentType || [];

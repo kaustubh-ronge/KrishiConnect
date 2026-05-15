@@ -114,6 +114,9 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     const [specialDeliveryQuantity, setSpecialDeliveryQuantity] = useState("");
     const [specialDeliverySellerId, setSpecialDeliverySellerId] = useState(null);
 
+    const profile = user?.farmerProfile || user?.agentProfile || user?.deliveryProfile;
+    const isProfileLocationSet = !!(profile?.lat && profile?.lng);
+
     useEffect(() => {
         const timer = setTimeout(() => {
             setInitialGraceLoading(false);
@@ -400,6 +403,24 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
         );
     }
 
+    const handleLocationRedirect = (msg) => {
+        const fullMsg = `${msg} Please set your location in your profile. Redirecting to profile...`;
+        toast.error(fullMsg, {
+            duration: 4000,
+            icon: <MapPin className="h-5 w-5 text-rose-500 animate-bounce" />
+        });
+
+        // Determine redirect path based on user role
+        const role = user?.role || 'farmer';
+        const path = role === 'delivery' ? '/delivery-dashboard' : `/${role}-dashboard/edit`;
+
+        setTimeout(() => {
+            router.push(`${path}#location`);
+            // For delivery dashboard, hash might not trigger dialog automatically if already on page, 
+            // but our new useEffect in DeliveryDashboardClient handles it.
+        }, 3000);
+    };
+
     // --- Handlers ---
     const handleRemove = async (itemId) => {
         // No more isPending lock for removal, trust optimistic store
@@ -413,7 +434,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     const handleUpdateQty = async (item, change) => {
         // --- QUANTITY CAP FOR REUSABLE SPECIAL DELIVERY ---
         const activeApproval = specialRequests?.find(r => r.productId === item.productId && r.status === 'APPROVED' && !r.isConsumed);
-        
+
         if (activeApproval && change > 0 && item.quantity >= activeApproval.quantity) {
             toast.error(`Mediation limit reached.`, {
                 description: `Admin approved up to ${activeApproval.quantity} ${activeApproval.unit || item.product.unit}. For more, please submit a new request.`
@@ -486,7 +507,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                 }
             },
             (err) => {
-                toast.error("Could not get your location. Please check permissions.");
+                handleLocationRedirect("Could not get your location.");
                 setIsLocating(false);
             },
             { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
@@ -507,8 +528,13 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
             }
         }
 
-        if (!shippingName || !shippingPhone || !shippingAddress) {
-            toast.error("Please fill in all shipping details.");
+        if (!shippingName || !shippingPhone) {
+            toast.error("Please fill in your name and phone number.");
+            return;
+        }
+
+        if (!lat || !lng || !shippingAddress) {
+            handleLocationRedirect("Shipping location is missing.");
             return;
         }
 
@@ -539,7 +565,11 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
             });
 
             if (!initRes.success) {
-                toast.error(initRes.error || "Failed to start checkout", { id: checkoutId });
+                if (initRes.error?.toLowerCase().includes('location')) {
+                    handleLocationRedirect(initRes.error);
+                } else {
+                    toast.error(initRes.error || "Failed to start checkout", { id: checkoutId });
+                }
                 setIsPending(false);
                 return;
             }
@@ -1212,13 +1242,12 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
-                                                        size="icon"
                                                         onClick={handleUseCurrentLocation}
                                                         disabled={isLocating}
-                                                        className="absolute right-3 top-3 h-8 w-8 rounded-xl bg-white/80 backdrop-blur-sm border border-slate-100 hover:border-emerald-200 text-emerald-600 shadow-sm"
-                                                        title="Use Current Location"
+                                                        className="absolute right-2 top-2 h-8 px-3 rounded-xl bg-white/90 backdrop-blur-sm border border-slate-200 hover:border-emerald-300 text-emerald-700 shadow-sm flex items-center gap-2 text-[9px] font-black uppercase tracking-wider transition-all"
                                                     >
-                                                        {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
+                                                        {isLocating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Navigation className="h-3 w-3" />}
+                                                        <span>Auto Set Location</span>
                                                     </Button>
                                                 </div>
                                             </div>
@@ -1292,7 +1321,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                             </div>
 
                                             {negotiatedDeliveryFee > 0 && (
-                                                <motion.div 
+                                                <motion.div
                                                     initial={{ opacity: 0, x: -10 }}
                                                     animate={{ opacity: 1, x: 0 }}
                                                     className="flex justify-between text-amber-600 font-bold text-sm p-4 bg-amber-50/50 rounded-2xl border border-amber-100"
@@ -1354,14 +1383,19 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                     </CardContent>
                                     <CardFooter className="p-10 pt-0 flex flex-col gap-4">
                                         <Button
-                                            disabled={isPending || selectedItemIds.length === 0 || effectiveIsOutOfRange}
+                                            disabled={isPending || selectedItemIds.length === 0 || effectiveIsOutOfRange || !isProfileLocationSet}
                                             onClick={() => handleCheckout()}
-                                            className={`w-full rounded-[2rem] h-20 font-black transition-all relative overflow-hidden group shadow-2xl ${effectiveIsOutOfRange ? 'bg-amber-100 text-amber-600 cursor-not-allowed border-2 border-amber-200 shadow-amber-900/5' : 'bg-slate-900 text-white hover:scale-[1.02] active:scale-95 shadow-slate-900/20'}`}
+                                            className={`w-full rounded-[2rem] h-20 font-black transition-all relative overflow-hidden group shadow-2xl ${effectiveIsOutOfRange || !isProfileLocationSet ? 'bg-amber-100 text-amber-600 cursor-not-allowed border-2 border-amber-200 shadow-amber-900/5' : 'bg-slate-900 text-white hover:scale-[1.02] active:scale-95 shadow-slate-900/20'}`}
                                         >
                                             <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/0 via-emerald-400/10 to-emerald-600/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                                             <span className="relative flex items-center justify-center gap-4 text-sm uppercase tracking-[0.2em]">
                                                 {isPending ? (
                                                     <Loader2 className="h-6 w-6 animate-spin" />
+                                                ) : !isProfileLocationSet ? (
+                                                    <>
+                                                        <MapPin className="h-6 w-6 animate-bounce" />
+                                                        Location Required
+                                                    </>
                                                 ) : effectiveIsOutOfRange ? (
                                                     <>
                                                         <ShieldAlert className="h-6 w-6" />
@@ -1375,6 +1409,12 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                 )}
                                             </span>
                                         </Button>
+
+                                        {!isProfileLocationSet && (
+                                            <p className="text-[10px] text-rose-500 font-bold text-center uppercase tracking-widest animate-pulse">
+                                                Please set your location in your profile to proceed.
+                                            </p>
+                                        )}
 
                                         {effectiveIsOutOfRange && (
                                             <motion.p

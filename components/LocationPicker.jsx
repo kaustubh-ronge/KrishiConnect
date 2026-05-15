@@ -30,17 +30,62 @@ export default function LocationPicker({ value = {}, onChange }) {
 
   const [hasMounted, setHasMounted] = useState(false);
 
+  const reverseGeocode = async (lati, longi) => {
+    setIsGeocoding(true);
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lati}&lon=${longi}&zoom=18&addressdetails=1`);
+      const data = await response.json();
+      if (data && data.address) {
+        const addr = data.address;
+        const newCity = addr.city || addr.town || addr.village || addr.suburb || "";
+        const newStateName = addr.state || "";
+        const newPincode = addr.postcode || "";
+        const fullAddr = data.display_name || "";
+        
+        setCity(newCity);
+        setPincode(newPincode);
+        setAddress(fullAddr);
+        
+        // Match state name to stateCode
+        const allStates = State.getStatesOfCountry(country);
+        const matchedState = allStates.find(s => 
+          s.name.toLowerCase() === newStateName.toLowerCase() || 
+          newStateName.toLowerCase().includes(s.name.toLowerCase())
+        );
+        
+        let finalStateCode = stateCode;
+        if (matchedState) {
+          setStateCode(matchedState.isoCode);
+          finalStateCode = matchedState.isoCode;
+        }
+
+        notify({ 
+          city: newCity, 
+          state: finalStateCode,
+          pincode: newPincode, 
+          address: fullAddr,
+          lat: lati, 
+          lng: longi 
+        });
+      }
+    } catch (err) {
+      console.error("[Reverse Geocoding] Failed:", err);
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
   useEffect(() => {
     setHasMounted(true);
     // Auto-geolocate if we are on the default Nagpur coordinates
     if (lat === 20.5937 && lng === 78.9629 && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
           const newLat = pos.coords.latitude;
           const newLng = pos.coords.longitude;
           setLat(newLat);
           setLng(newLng);
-          onChange?.({ ...value, lat: newLat, lng: newLng });
+          await reverseGeocode(newLat, newLng);
         },
         () => {
           console.log("[LocationPicker] Geolocation declined or failed, staying on default.");
@@ -127,16 +172,18 @@ export default function LocationPicker({ value = {}, onChange }) {
     }
   };
 
+
+
   // Try to use browser geolocation to centre the map
   const handleGeolocate = () => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const newLat = pos.coords.latitude;
         const newLng = pos.coords.longitude;
         setLat(newLat);
         setLng(newLng);
-        notify({ lat: newLat, lng: newLng });
+        await reverseGeocode(newLat, newLng);
       },
       () => { }
     );
@@ -257,7 +304,7 @@ export default function LocationPicker({ value = {}, onChange }) {
             className="h-8 text-xs border-red-200 text-red-600 hover:bg-red-50"
           >
             <Navigation className="h-3 w-3 mr-1" />
-            Use My Location
+            Auto Set Location
           </Button>
         </div>
 

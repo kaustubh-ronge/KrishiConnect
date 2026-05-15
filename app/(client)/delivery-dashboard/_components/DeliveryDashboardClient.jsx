@@ -87,8 +87,29 @@ export default function DeliveryDashboardClient({
 
   useEffect(() => {
     setMounted(true);
+    
+    // Check if location is missing in existing profile
+    if (initialProfileExists && user?.deliveryProfile && (!user.deliveryProfile.lat || !user.deliveryProfile.lng)) {
+      const timer = setTimeout(() => {
+        toast.error("Location not set. Please set your location in your profile.", {
+          duration: 4000,
+          icon: <MapPin className="h-5 w-5 text-rose-500 animate-bounce" />
+        });
+        setTimeout(() => {
+          // Open dialog and step 3
+          setIsDialogOpen(true);
+          setFormStep(3);
+        }, 3000);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+
     if (!initialProfileExists) {
       setIsDialogOpen(true);
+    }
+    if (window.location.hash === '#location') {
+      setIsDialogOpen(true);
+      setFormStep(3);
     }
     if (initialProfileExists && user?.deliveryProfile) {
       const p = user.deliveryProfile;

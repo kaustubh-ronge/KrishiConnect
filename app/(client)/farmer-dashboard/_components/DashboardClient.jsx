@@ -53,7 +53,21 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+
+    // Check if location is missing in existing profile
+    if (initialProfileExists && user?.farmerProfile && (!user.farmerProfile.lat || !user.farmerProfile.lng)) {
+      const timer = setTimeout(() => {
+        toast.error("Location not set. Please set your location in your profile.", {
+          duration: 4000,
+          icon: <MapPin className="h-5 w-5 text-rose-500 animate-bounce" />
+        });
+        setTimeout(() => {
+          router.push('/farmer-dashboard/edit#location');
+        }, 3000);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [initialProfileExists, user]);
 
   // --- Form State ---
   const [selectedProduce, setSelectedProduce] = useState([]);
