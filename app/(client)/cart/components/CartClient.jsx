@@ -1759,7 +1759,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     const [specialDeliverySellerId, setSpecialDeliverySellerId] = useState(null);
 
     const profile = user?.farmerProfile || user?.agentProfile || user?.deliveryProfile;
-    const isProfileLocationSet = !!(profile?.lat && profile?.lng);
+    const isProfileLocationSet = profile && profile.lat !== null && profile.lng !== null && profile.lat !== undefined && profile.lng !== undefined;
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -1802,8 +1802,8 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
     const [shippingName, setShippingName] = useState(user?.fullName || "");
     const [shippingPhone, setShippingPhone] = useState(user?.phone || "");
     const [shippingAddress, setShippingAddress] = useState(user?.address || profile?.address || "");
-    const [lat, setLat] = useState(user?.lat || profile?.lat || null);
-    const [lng, setLng] = useState(user?.lng || profile?.lng || null);
+    const [lat, setLat] = useState(user?.lat ?? profile?.lat ?? null);
+    const [lng, setLng] = useState(user?.lng ?? profile?.lng ?? null);
     const [isLocating, setIsLocating] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState("ONLINE");
 
@@ -2057,19 +2057,11 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
             return;
         }
 
-        const fullMsg = `${msg} Please set your location in your profile. Redirecting to profile...`;
-        toast.error(fullMsg, {
+        // If location is truly missing from profile, we'll show the UI warning with button instead of toast + redirect
+        toast.error("Location Required: Please set your location in your profile.", {
             duration: 4000,
             icon: <MapPin className="h-5 w-5 text-rose-500 animate-bounce" />
         });
-
-        // Determine redirect path based on user role
-        const role = user?.role || 'farmer';
-        const path = role === 'delivery' ? '/delivery-dashboard' : `/${role}-dashboard/edit`;
-
-        setTimeout(() => {
-            router.push(`${path}#location`);
-        }, 3000);
     };
 
     // --- Handlers ---
@@ -3079,9 +3071,27 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                         </Button>
 
                                         {!isProfileLocationSet && (
-                                            <p className="text-[10px] text-rose-500 font-bold text-center uppercase tracking-widest animate-pulse break-words px-2">
-                                                Please set your location in your profile to proceed.
-                                            </p>
+                                            <div className="mt-2 p-4 bg-rose-50 border-2 border-rose-200 rounded-[2rem] space-y-3 animate-in fade-in slide-in-from-top-4 duration-500 shadow-sm">
+                                                <div className="flex items-start gap-3">
+                                                    <MapPin className="h-5 w-5 text-rose-600 shrink-0 mt-0.5 animate-bounce" />
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-rose-700 uppercase tracking-widest leading-none">Location Missing</p>
+                                                        <p className="text-[10px] text-rose-600 font-bold leading-relaxed mt-1">Please set your location in your profile to proceed with checkout and logistics calculation.</p>
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    variant="destructive"
+                                                    className="w-full h-10 rounded-xl bg-rose-600 text-white hover:bg-rose-700 font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-600/20"
+                                                    onClick={() => {
+                                                        const role = user?.role || 'farmer';
+                                                        const path = role === 'delivery' ? '/delivery-dashboard' : `/${role}-dashboard/edit`;
+                                                        router.push(`${path}#location`);
+                                                    }}
+                                                >
+                                                    <Navigation className="h-4 w-4 mr-2" /> 
+                                                    Update Location in Profile
+                                                </Button>
+                                            </div>
                                         )}
 
                                         {effectiveIsOutOfRange && (

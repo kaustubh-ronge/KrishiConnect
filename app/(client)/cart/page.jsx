@@ -20,20 +20,27 @@ export default async function CartPage() {
   const { db } = await import("@/lib/prisma");
   const dbUser = await db.user.findUnique({
       where: { id: user.id },
-      include: { farmerProfile: true, agentProfile: true }
+      include: { farmerProfile: true, agentProfile: true, deliveryProfile: true }
   });
 
   if (dbUser?.role === 'admin' || dbUser?.role === 'super_admin') {
       redirect("/");
   }
 
+  const profile = dbUser?.farmerProfile || dbUser?.agentProfile || dbUser?.deliveryProfile;
+
   const userData = {
-      fullName: dbUser?.farmerProfile?.name || dbUser?.agentProfile?.name || user.fullName || user.firstName || "",
+      fullName: profile?.name || dbUser?.name || user.fullName || user.firstName || "",
       email: user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || "",
-      phone: dbUser?.farmerProfile?.phone || dbUser?.agentProfile?.phone || user.phoneNumbers?.[0]?.phoneNumber || "",
-      address: dbUser?.farmerProfile?.address || dbUser?.agentProfile?.address || "",
-      lat: dbUser?.farmerProfile?.lat || dbUser?.agentProfile?.lat || null,
-      lng: dbUser?.farmerProfile?.lng || dbUser?.agentProfile?.lng || null
+      phone: profile?.phone || user.phoneNumbers?.[0]?.phoneNumber || "",
+      address: profile?.address || "",
+      lat: profile?.lat ?? null,
+      lng: profile?.lng ?? null,
+      // Pass the individual profiles to satisfy client-side profile detection logic
+      farmerProfile: dbUser?.farmerProfile,
+      agentProfile: dbUser?.agentProfile,
+      deliveryProfile: dbUser?.deliveryProfile,
+      role: dbUser?.role
   };
 
   const { calculateDynamicDeliveryFee } = await import("@/actions/orders");

@@ -53,20 +53,6 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
 
   useEffect(() => {
     setMounted(true);
-
-    // Check if location is missing in existing profile
-    if (initialProfileExists && user?.farmerProfile && (!user.farmerProfile.lat || !user.farmerProfile.lng)) {
-      const timer = setTimeout(() => {
-        toast.error("Location not set. Please set your location in your profile.", {
-          duration: 4000,
-          icon: <MapPin className="h-5 w-5 text-rose-500 animate-bounce" />
-        });
-        setTimeout(() => {
-          router.push('/farmer-dashboard/edit#location');
-        }, 3000);
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
   }, [initialProfileExists, user]);
 
   // --- Form State ---
@@ -1069,7 +1055,37 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
             </div>
           </div>
 
-          {/* Dashboard Cards Grid */}
+               {profileExists && user?.farmerProfile && (user.farmerProfile.lat === null || user.farmerProfile.lng === null || user.farmerProfile.lat === undefined || user.farmerProfile.lng === undefined) && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-10 p-6 bg-rose-50 border-2 border-rose-200 rounded-[2.5rem] shadow-xl shadow-rose-900/5 overflow-hidden relative group"
+          >
+            <div className="absolute top-0 right-0 p-6 opacity-10 rotate-12 group-hover:rotate-45 transition-transform duration-700">
+              <MapPin className="h-24 w-24 text-rose-600" />
+            </div>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+              <div className="flex items-center gap-5">
+                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg shadow-rose-200 shrink-0">
+                  <MapPin className="h-8 w-8 text-rose-600 animate-bounce" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-rose-900 uppercase tracking-tight leading-none mb-2">Location Missing</h3>
+                  <p className="text-rose-600 font-bold text-sm leading-relaxed max-w-md">
+                    Please set your farm location in your profile to enable logistics calculation and reach local buyers effectively.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => router.push('/farmer-dashboard/edit#location')}
+                className="w-full md:w-auto h-14 px-10 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-rose-600/20 transition-all hover:scale-[1.02] active:scale-95"
+              >
+                <Navigation className="h-5 w-5 mr-2" />
+                Update Location in Profile
+              </Button>
+            </div>
+          </motion.div>
+        )}
           {(() => {
             const isSellingApproved = user.farmerProfile?.sellingStatus === 'APPROVED';
             return (

@@ -80,7 +80,7 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
     };
 
     if (product.id) {
-       if (userLat && userLng) {
+       if (userLat !== null && userLng !== null && userLat !== undefined && userLng !== undefined) {
           // Use Profile coordinates (best for testing/consistency)
           fetchFee(userLat, userLng);
        } else if ("geolocation" in navigator) {
@@ -125,18 +125,11 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
   // Handle Add to Cart
   const handleAddToCart = async () => {
     // Check if location is set in profile
-    if (!userLat || !userLng) {
+    if (userLat === null || userLng === null || userLat === undefined || userLng === undefined) {
       toast.error("Location Required: Please set your location in your profile.", {
         icon: <MapPin className="h-5 w-5 text-rose-500 animate-bounce" />,
         duration: 4000
       });
-      
-      const role = userRole || 'farmer';
-      const path = role === 'delivery' ? '/delivery-dashboard' : `/${role}-dashboard/edit`;
-      
-      setTimeout(() => {
-        router.push(`${path}#location`);
-      }, 3000);
       return;
     }
 
@@ -645,10 +638,28 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
                           )}
                         </Button>
 
-                        {(!userLat || !userLng) && (
-                           <p className="text-[10px] text-rose-500 font-bold text-center uppercase tracking-widest animate-pulse mt-2">
-                              Please set your location in your profile to proceed.
-                           </p>
+                        {(userLat === null || userLng === null || userLat === undefined || userLng === undefined) && (
+                          <div className="mt-4 p-4 bg-rose-50 border-2 border-rose-200 rounded-3xl space-y-3 animate-in fade-in slide-in-from-top-4 duration-500 shadow-sm">
+                            <div className="flex items-start gap-3">
+                              <MapPin className="h-5 w-5 text-rose-600 shrink-0 mt-0.5 animate-bounce" />
+                              <div>
+                                <p className="text-[10px] font-black text-rose-700 uppercase tracking-widest leading-none">Location Missing</p>
+                                <p className="text-[10px] text-rose-600 font-bold leading-relaxed mt-1">Please set your location in your profile to enable purchasing and logistics calculation.</p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="destructive"
+                              className="w-full h-10 rounded-xl bg-rose-600 text-white hover:bg-rose-700 font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-600/20"
+                              onClick={() => {
+                                const role = userRole || 'farmer';
+                                const path = role === 'delivery' ? '/delivery-dashboard' : `/${role}-dashboard/edit`;
+                                router.push(`${path}#location`);
+                              }}
+                            >
+                              <Navigation className="h-4 w-4 mr-2" /> 
+                              Update Location in Profile
+                            </Button>
+                          </div>
                         )}
                       </>
                     )}

@@ -49,13 +49,14 @@ export default async function ProductPage({ params }) {
       select: { 
         role: true,
         farmerProfile: { select: { lat: true, lng: true } },
-        agentProfile: { select: { lat: true, lng: true } }
+        agentProfile: { select: { lat: true, lng: true } },
+        deliveryProfile: { select: { lat: true, lng: true } }
       } 
     });
   }
 
-  const userLat = userData?.farmerProfile?.lat || userData?.agentProfile?.lat;
-  const userLng = userData?.farmerProfile?.lng || userData?.agentProfile?.lng;
+  const userLat = userData?.farmerProfile?.lat ?? userData?.agentProfile?.lat ?? userData?.deliveryProfile?.lat ?? null;
+  const userLng = userData?.farmerProfile?.lng ?? userData?.agentProfile?.lng ?? userData?.deliveryProfile?.lng ?? null;
 
   return <ProductDetailClient 
     product={product} 

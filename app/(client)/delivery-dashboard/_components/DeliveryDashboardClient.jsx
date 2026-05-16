@@ -88,22 +88,6 @@ export default function DeliveryDashboardClient({
   useEffect(() => {
     setMounted(true);
     
-    // Check if location is missing in existing profile
-    if (initialProfileExists && user?.deliveryProfile && (!user.deliveryProfile.lat || !user.deliveryProfile.lng)) {
-      const timer = setTimeout(() => {
-        toast.error("Location not set. Please set your location in your profile.", {
-          duration: 4000,
-          icon: <MapPin className="h-5 w-5 text-rose-500 animate-bounce" />
-        });
-        setTimeout(() => {
-          // Open dialog and step 3
-          setIsDialogOpen(true);
-          setFormStep(3);
-        }, 3000);
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-
     if (!initialProfileExists) {
       setIsDialogOpen(true);
     }
@@ -751,6 +735,40 @@ export default function DeliveryDashboardClient({
       </nav>
 
       <div className="relative z-10 container mx-auto px-4 max-w-6xl mt-8 pb-20">
+        {profileExists && user?.deliveryProfile && (user.deliveryProfile.lat === null || user.deliveryProfile.lng === null || user.deliveryProfile.lat === undefined || user.deliveryProfile.lng === undefined) && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-6 bg-rose-50 border-2 border-rose-200 rounded-[2.5rem] shadow-xl shadow-rose-900/5 overflow-hidden relative group"
+          >
+            <div className="absolute top-0 right-0 p-6 opacity-10 rotate-12 group-hover:rotate-45 transition-transform duration-700">
+              <MapPin className="h-24 w-24 text-rose-600" />
+            </div>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+              <div className="flex items-center gap-5">
+                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg shadow-rose-200 shrink-0">
+                  <MapPin className="h-8 w-8 text-rose-600 animate-bounce" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-rose-900 uppercase tracking-tight leading-none mb-2">Location Missing</h3>
+                  <p className="text-rose-600 font-bold text-sm leading-relaxed max-w-md">
+                    To start receiving delivery jobs, you must set your service area location in your profile settings.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => {
+                  setIsDialogOpen(true);
+                  setFormStep(3);
+                }}
+                className="w-full md:w-auto h-14 px-10 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-rose-600/20 transition-all hover:scale-[1.02] active:scale-95"
+              >
+                <Navigation className="h-5 w-5 mr-2" />
+                Update Location in Profile
+              </Button>
+            </div>
+          </motion.div>
+        )}
         {!isApproved ? (
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
             <Card className="border-0 shadow-2xl overflow-hidden rounded-3xl bg-white/80 backdrop-blur-xl">
