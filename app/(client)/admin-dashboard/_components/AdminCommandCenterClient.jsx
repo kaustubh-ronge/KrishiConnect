@@ -486,6 +486,27 @@ export default function AdminCommandCenterClient({
 
    const getStatusOptions = () => {
       const options = {
+         farmers: [
+            { label: 'Active (Unlocked)', value: 'ACTIVE_SECURITY' },
+            { label: 'Blocked (Banned)', value: 'BLOCKED_SECURITY' },
+            { label: 'Pending Verify', value: 'PENDING' },
+            { label: 'Approved', value: 'APPROVED' },
+            { label: 'Rejected', value: 'REJECTED' },
+         ],
+         agents: [
+            { label: 'Active (Unlocked)', value: 'ACTIVE_SECURITY' },
+            { label: 'Blocked (Banned)', value: 'BLOCKED_SECURITY' },
+            { label: 'Pending Verify', value: 'PENDING' },
+            { label: 'Approved', value: 'APPROVED' },
+            { label: 'Rejected', value: 'REJECTED' },
+         ],
+         delivery: [
+            { label: 'Active (Unlocked)', value: 'ACTIVE_SECURITY' },
+            { label: 'Blocked (Banned)', value: 'BLOCKED_SECURITY' },
+            { label: 'Pending Verify', value: 'PENDING' },
+            { label: 'Approved', value: 'APPROVED' },
+            { label: 'Rejected', value: 'REJECTED' },
+         ],
          support: [
             { label: 'Open', value: 'OPEN' },
             { label: 'Closed', value: 'CLOSED' },
@@ -1053,7 +1074,7 @@ export default function AdminCommandCenterClient({
                                                 <div className="flex items-center gap-3">
                                                    <div className="flex flex-col">
                                                       {activeView === 'orders' || activeView === 'disputes' ? (
-                                                         <div className="flex flex-wrap items-center gap-1.5">
+                                                         <div className="flex items-center gap-1.5 whitespace-nowrap">
                                                             <StatusBadge status={item.paymentStatus} type="orders" size="xs" />
                                                             <StatusBadge status={item.payoutStatus} type="payouts" size="xs" />
                                                          </div>
@@ -1122,14 +1143,26 @@ export default function AdminCommandCenterClient({
                                                 <span className="text-[10px] font-black text-slate-600 uppercase">{item.paymentMethod}</span>
                                              ) : activeView === 'logistics' ? (
                                                 <span className="text-[10px] font-black text-slate-600 uppercase">{item.estimatedTime || 'ASAP'}</span>
-                                             ) : activeView === 'farmers' || activeView === 'agents' ? (
+                                             ) : activeView === 'farmers' || activeView === 'agents' || activeView === 'delivery' ? (
                                                 <div className="flex flex-col gap-1.5 items-center">
                                                    <div className="flex gap-1">
-                                                      <StatusBadge status={item.sellingStatus || 'PENDING'} type="moderation" size="xs" />
-                                                      <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md ${item.usagePurpose === 'buy_and_sell' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                         {item.usagePurpose === 'buy_and_sell' ? 'BUY & SELL' : 'BUY ONLY'}
-                                                      </Badge>
+                                                      <StatusBadge status={item.sellingStatus || item.approvalStatus || 'PENDING'} type="moderation" size="xs" />
+                                                      <StatusBadge status={item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'} type="security" size="xs" />
                                                    </div>
+                                                   {(activeView === 'farmers' || activeView === 'agents') && item.usagePurpose && (
+                                                      <Badge className={`text-[7px] font-black uppercase px-2 py-0.5 border-0 rounded-md ${item.usagePurpose === 'buy_and_sell' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                         {item.usagePurpose?.replace('_', ' ')}
+                                                      </Badge>
+                                                   )}
+                                                </div>
+                                             ) : activeView === 'reviews' ? (
+                                                <div className="flex flex-col gap-1.5 items-center">
+                                                   <div className="flex items-center gap-1">
+                                                      {[...Array(5)].map((_, i) => (
+                                                         <Star key={i} className={`h-2.5 w-2.5 ${i < item.rating ? "text-yellow-500 fill-yellow-500" : "text-slate-200"}`} />
+                                                      ))}
+                                                   </div>
+
                                                    <StatusBadge status={item.user?.isDisabled ? 'BLOCKED' : 'ACTIVE'} type="security" size="xs" />
                                                 </div>
                                              ) : activeView === 'mediation' ? (
@@ -1890,356 +1923,3 @@ export default function AdminCommandCenterClient({
       </div>
    );
 }
-
-
-
-
-
-
-
-// "use client";
-
-// import React, { useState, useEffect, useMemo } from 'react';
-// import { toast } from 'sonner';
-// import { AnimatePresence } from 'framer-motion';
-
-// import { getExportableUsers, getExportableProducts, toggleUserStatus } from '@/actions/admin-advanced';
-// import { approveProfile, rejectProfile, bulkApproveProfiles } from '@/actions/admin';
-// import { downloadCSV } from '@/lib/csvUtils';
-
-// import { CUSTOM_SCROLLBAR_CSS } from '@/data/AdminData/adminData';
-// import { getFilteredItems, getStatusOptions, paginate } from '@/lib/AdminLogic/adminLogic';
-
-// import PremiumLoader from '@/components/PremiumLoader';
-// import AdminSidebar from './_components/AdminSidebar';
-// import AdminHeader from './_components/AdminHeader';
-// import AdminDashboard from './_components/AdminDashboard';
-// import AdminFinance from './_components/AdminFinance';
-// import AdminDirectory from './_components/AdminDirectory';
-// import AdminModals from './_components/AdminModals';
-// import { AdminOverrideDialog } from './_components/WorkflowSystem';
-
-// export default function AdminCommandCenterClient({
-//    initialStats, initialOrders, initialPendingProfiles, advancedStats,
-//    settleAction, viewBankAction, statsAction, ordersAction, getPendingAction,
-//    deleteOrderAction, clearStaleAction, deliveryJobsAction, reviewsAction
-// }) {
-//    const [activeView, setActiveView] = useState("dashboard");
-//    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-//    const [stats, setStats] = useState(advancedStats?.data || {});
-//    const [orders, setOrders] = useState(initialOrders || []);
-//    const [pendingProfiles, setPendingProfiles] = useState(initialPendingProfiles || []);
-//    const [mounted, setMounted] = useState(false);
-//    const [logs, setLogs] = useState([]);
-//    const [specialRequests, setSpecialRequests] = useState([]);
-
-//    // Modals / Triggers
-//    const [isMediationModalOpen, setIsMediationModalOpen] = useState(false);
-//    const [selectedRequest, setSelectedRequest] = useState(null);
-//    const [isOverrideDialogOpen, setIsOverrideDialogOpen] = useState(false);
-//    const [pendingOverride, setPendingOverride] = useState(null);
-//    const [negotiatedFee, setNegotiatedFee] = useState("");
-//    const [adminQuantity, setAdminQuantity] = useState("");
-//    const [selectedOrder, setSelectedOrder] = useState(null);
-//    const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-//    const [selectedProfile, setSelectedProfile] = useState(null);
-//    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-//    const [selectedProduct, setSelectedProduct] = useState(null);
-//    const [isProductModalOpen, setIsProductModalOpen] = useState(false);
-//    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-//    const [adminNote, setAdminNote] = useState("");
-//    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-//    const [selectedMessage, setSelectedMessage] = useState(null);
-
-//    // Table & Data State
-//    const [currentPage, setCurrentPage] = useState(1);
-//    const itemsPerPage = 10;
-//    const [selectedIds, setSelectedIds] = useState([]);
-//    const [farmers, setFarmers] = useState([]);
-//    const [agents, setAgents] = useState([]);
-//    const [deliveryPartners, setDeliveryPartners] = useState([]);
-//    const [products, setProducts] = useState([]);
-//    const [deliveryJobs, setDeliveryJobs] = useState([]);
-//    const [reviews, setReviews] = useState([]);
-//    const [supportMessages, setSupportMessages] = useState([]);
-//    const [unreadSupportCount, setUnreadSupportCount] = useState(0);
-//    const [isLoading, setIsLoading] = useState(false);
-
-//    // Filtering & Sorting
-//    const [search, setSearch] = useState("");
-//    const [statusFilter, setStatusFilter] = useState("ALL");
-//    const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
-//    const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
-//    const [advancedFilters, setAdvancedFilters] = useState({
-//       orderStatus: 'ALL', paymentStatus: 'ALL', payoutStatus: 'ALL', buyerRole: 'ALL', sellerRole: 'ALL', category: 'ALL', sellerType: 'ALL', stockStatus: 'ALL', securityStatus: 'ALL', minAmount: '', maxAmount: '',
-//    });
-//    const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
-
-//    const disputes = useMemo(() => Array.isArray(orders) ? orders.filter(o => o.disputeStatus === 'OPEN') : [], [orders]);
-
-//    useEffect(() => {
-//       setMounted(true);
-//       fetchInitialData();
-//       const interval = setInterval(() => refreshData(), 30000);
-//       return () => clearInterval(interval);
-//    }, []);
-
-//    useEffect(() => {
-//       if (!mounted) return;
-//       setStatusFilter("ALL");
-//       if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support', 'disputes', 'orders', 'verifications', 'mediation'].includes(activeView)) {
-//          fetchDirectoryData(activeView);
-//       }
-//    }, [activeView, mounted]);
-
-//    useEffect(() => {
-//       if (mounted) {
-//          fetchDirectoryData(activeView);
-//          if (activeView === 'orders' || activeView === 'logistics') {
-//             const prefetch = async () => {
-//                const res = await getExportableUsers('delivery', { limit: 100 });
-//                if (res.success) setDeliveryPartners(res.data.users);
-//             };
-//             prefetch();
-//          }
-//       }
-//    }, [search, statusFilter, advancedFilters, currentPage, sortConfig]);
-
-//    const fetchInitialData = async () => {
-//       setIsLoading(true);
-//       try {
-//          const [resS, resO, resPR, resU] = await Promise.all([
-//             statsAction(), ordersAction(), getPendingAction(), import('@/actions/support').then(m => m.getUnreadSupportCount())
-//          ]);
-//          if (resS.success) setStats(resS.data || {});
-//          if (resO.success) setOrders(resO.data.orders || []);
-//          if (resPR.success) setPendingProfiles(resPR.data || []);
-//          if (resU.success) setUnreadSupportCount(resU.data || 0);
-//       } catch (err) { console.error("Initial load failed:", err); } finally { setIsLoading(false); }
-//    };
-
-//    const fetchDirectoryData = async (view) => {
-//       setIsLoading(true);
-//       try {
-//          const filterParams = { filters: { ...advancedFilters, search, status: statusFilter }, sort: sortConfig, page: currentPage, limit: itemsPerPage };
-//          if (view === 'farmers') {
-//             const res = await getExportableUsers('farmer', filterParams);
-//             if (res.success) { setFarmers(res.data.users); setPagination({ total: res.data.total, totalPages: res.data.totalPages }); }
-//          } else if (view === 'agents') {
-//             const res = await getExportableUsers('agent', filterParams);
-//             if (res.success) { setAgents(res.data.users); setPagination({ total: res.data.total, totalPages: res.data.totalPages }); }
-//          } else if (view === 'delivery') {
-//             const res = await getExportableUsers('delivery', filterParams);
-//             if (res.success) { setDeliveryPartners(res.data.users); setPagination({ total: res.data.total, totalPages: res.data.totalPages }); }
-//          } else if (view === 'catalog') {
-//             const res = await getExportableProducts(filterParams);
-//             if (res.success) { setProducts(res.data.products); setPagination({ total: res.data.total, totalPages: res.data.totalPages }); }
-//          } else if (view === 'logistics') {
-//             const res = await deliveryJobsAction(filterParams);
-//             if (res.success) { setDeliveryJobs(res.data.jobs); setPagination({ total: res.data.total, totalPages: res.data.totalPages }); }
-//          } else if (view === 'reviews') {
-//             const res = await reviewsAction(filterParams);
-//             if (res.success) setReviews(res.data);
-//          } else if (view === 'support') {
-//             const { getSupportMessages } = await import('@/actions/support');
-//             const res = await getSupportMessages(currentPage, search);
-//             if (res.success) {
-//                const fetchedMessages = res.data?.messages || res.data || [];
-//                setSupportMessages(Array.isArray(fetchedMessages) ? fetchedMessages : []);
-//                setPagination({ total: res.data?.total || 0, totalPages: res.data?.totalPages || 1 });
-//             }
-//          } else if (view === 'mediation') {
-//             const { getSpecialDeliveryRequests } = await import('@/actions/special-delivery');
-//             const res = await getSpecialDeliveryRequests();
-//             if (res.success) setSpecialRequests(res.data);
-//          } else if (view === 'orders' || view === 'disputes') {
-//             const params = { ...filterParams, filters: { ...filterParams.filters, ...(view === 'disputes' ? { disputeStatus: 'OPEN' } : {}) } };
-//             const res = await ordersAction(params);
-//             if (res.success) { setOrders(res.data.orders || []); setPagination({ total: res.data.total || 0, totalPages: res.data.totalPages || 1 }); }
-//          }
-//       } catch (err) { console.error(`Fetch ${view} failed:`, err); } finally { setIsLoading(false); }
-//    };
-
-//    const refreshData = async () => {
-//       if (['farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support', 'disputes', 'orders', 'mediation'].includes(activeView)) {
-//          await fetchDirectoryData(activeView);
-//       }
-//       await fetchInitialData();
-//    };
-
-//    const addLog = (action, detail) => setLogs(prev => [{ time: new Date().toLocaleTimeString(), action, detail }, ...prev].slice(0, 20));
-
-//    const handleApprove = async (userId, role, name) => {
-//       const previousProfiles = [...pendingProfiles];
-//       setPendingProfiles(prev => prev.filter(p => p.userId !== userId));
-//       toast.success('Approval process started...');
-//       try {
-//          const res = await approveProfile(userId, role, adminNote);
-//          if (res.success) { addLog("APPROVED", `${role.toUpperCase()}: ${name}`); setAdminNote(""); toast.success(`${name} verified successfully.`); }
-//          else throw new Error(res.error);
-//       } catch (err) { setPendingProfiles(previousProfiles); toast.error(`Failed to approve ${name}: ${err.message}`); }
-//    };
-
-//    const handleReject = async (userId, role, name) => {
-//       const previousProfiles = [...pendingProfiles];
-//       setPendingProfiles(prev => prev.filter(p => p.userId !== userId));
-//       toast.success('Rejection process started...');
-//       try {
-//          const res = await rejectProfile(userId, role, adminNote);
-//          if (res.success) { addLog("REJECTED", `${role.toUpperCase()}: ${name}`); setAdminNote(""); toast.success(`Rejection sent to ${name}.`); }
-//          else throw new Error(res.error);
-//       } catch (err) { setPendingProfiles(previousProfiles); toast.error(`Failed to reject ${name}: ${err.message}`); }
-//    };
-
-//    const handleBulkApprove = async () => {
-//       if (selectedIds.length === 0) return toast.error("Please select members first.");
-//       const count = selectedIds.length;
-//       const profilesToApprove = pendingProfiles.filter(p => selectedIds.includes(p.userId));
-//       const previousProfiles = [...pendingProfiles];
-//       setPendingProfiles(prev => prev.filter(p => !selectedIds.includes(p.userId)));
-//       setSelectedIds([]);
-//       toast.success(`Approving ${count} members...`);
-//       try {
-//          const res = await bulkApproveProfiles(profilesToApprove);
-//          if (res.success) { addLog("BULK_APPROVE", `${count} members approved`); toast.success(res.message); }
-//          else throw new Error(res.error);
-//       } catch (err) { setPendingProfiles(previousProfiles); setSelectedIds(selectedIds); toast.error(`Bulk approval failed: ${err.message}`); }
-//    };
-
-//    const handleToggleStatus = async (userId, name) => {
-//       toast.promise(toggleUserStatus(userId), {
-//          loading: 'Updating Status...',
-//          success: (res) => { addLog("SECURITY_CHANGE", `${name}`); refreshData(); return res.message; },
-//          error: 'Update failed.'
-//       });
-//    };
-
-//    const handleSettle = async (orderId) => {
-//       toast.promise(settleAction(orderId), {
-//          loading: 'Releasing Funds...',
-//          success: () => { addLog("PAID_OUT", `Order #${orderId.slice(-6).toUpperCase()}`); refreshData(); return 'Payment Released to Seller.'; },
-//          error: 'Failed.'
-//       });
-//    };
-
-//    const handleDeleteOrder = async (orderId) => {
-//       if (!confirm("Are you sure you want to PERMANENTLY DELETE this order? Stock will be restored if it was not paid.")) return;
-//       toast.promise(deleteOrderAction(orderId), {
-//          loading: 'Deleting Order...',
-//          success: (res) => { addLog("DELETED_ORDER", `Order #${orderId.slice(-6).toUpperCase()}`); refreshData(); return res.message; },
-//          error: (err) => `Delete failed: ${err.message}`
-//       });
-//    };
-
-//    const openOrderAudit = async (orderId) => {
-//       setIsLoadingDetails(true);
-//       setIsOrderModalOpen(true);
-//       try {
-//          const order = Array.isArray(orders) ? orders.find(o => o.id === orderId) : null;
-//          if (!order) { toast.error("Order not found."); setIsOrderModalOpen(false); return; }
-//          const bankRes = await viewBankAction(orderId);
-//          const sellersData = bankRes.success ? bankRes.data.sellers : [];
-//          const deliveryPartners = bankRes.success ? bankRes.data.deliveryPartners : [];
-//          setSelectedOrder({ ...order, sellers: sellersData, deliveryPartners: deliveryPartners.length > 0 ? deliveryPartners : (order.deliveryPartners || []) });
-//       } catch (err) { console.error("Audit fetch failed:", err); toast.error("Failed to load full audit data."); } finally { setIsLoadingDetails(false); }
-//    };
-
-//    const openProfileAudit = (profile) => { setSelectedProfile(profile); setAdminNote(profile.user?.adminNotes || ""); setIsProfileModalOpen(true); };
-//    const openProductAudit = (product) => { setSelectedProduct(product); setIsProductModalOpen(true); };
-
-//    const openSupportAudit = async (message) => {
-//       setSelectedMessage(message);
-//       setIsSupportModalOpen(true);
-//       if (!message.isRead) {
-//          const { markSupportMessageAsRead } = await import('@/actions/support');
-//          await markSupportMessageAsRead(message.id);
-//          refreshData();
-//       }
-//    };
-
-//    const handleCloseSupportTicket = async (id) => {
-//       const { deleteSupportMessage } = await import('@/actions/support');
-//       const toastId = toast.loading("Closing and archiving ticket...");
-//       const res = await deleteSupportMessage(id);
-//       if (res.success) { toast.success(res.message, { id: toastId }); setIsSupportModalOpen(false); refreshData(); }
-//       else { toast.error(res.error, { id: toastId }); }
-//    };
-
-//    const resolvedItems = () => getFilteredItems({ activeView, pendingProfiles, farmers, agents, deliveryPartners, orders, products, deliveryJobs, reviews, supportMessages, specialRequests, statusFilter, search });
-
-//    const handleGlobalExport = () => {
-//       const dataToExport = resolvedItems();
-//       if (dataToExport.length === 0) return toast.error("No data found to export.");
-//       downloadCSV(dataToExport, `KrishiHub_${activeView}`);
-//    };
-
-//    if (!mounted) return <PremiumLoader fullPage message="KrishiHub Initializing..." />;
-
-//    return (
-//       <div className="flex h-screen overflow-hidden bg-slate-50 text-[13px] font-sans selection:bg-indigo-100 selection:text-indigo-900">
-//          <style>{CUSTOM_SCROLLBAR_CSS}</style>
-
-//          <AdminSidebar
-//             activeView={activeView} setActiveView={setActiveView}
-//             isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}
-//             badgeCounts={{
-//                pendingProfiles: pendingProfiles.length,
-//                disputes: disputes.length,
-//                specialRequests: Array.isArray(specialRequests) ? specialRequests.filter(r => r.status === 'PENDING').length : 0,
-//                unreadSupportCount: unreadSupportCount
-//             }}
-//          />
-
-//          <main className="flex-grow flex flex-col min-w-0 bg-slate-50">
-//             <AdminHeader
-//                activeView={activeView} search={search} setSearch={setSearch}
-//                handleGlobalExport={handleGlobalExport} refreshData={refreshData} isLoading={isLoading}
-//             />
-
-//             <div className="flex-grow relative overflow-hidden">
-//                <AnimatePresence>
-//                   {isLoading && <PremiumLoader fullPage={false} message="Syncing Command Center..." />}
-//                </AnimatePresence>
-//                <div className="absolute inset-0 overflow-y-auto custom-scrollbar">
-//                   <div className="p-8 max-w-[1500px] mx-auto w-full space-y-10 pb-40 custom-scrollbar">
-
-//                      {activeView === 'dashboard' && (
-//                         <AdminDashboard stats={stats} orders={orders} pendingProfiles={pendingProfiles} logs={logs} openOrderAudit={openOrderAudit} />
-//                      )}
-
-//                      {['verifications', 'disputes', 'orders', 'farmers', 'agents', 'delivery', 'catalog', 'logistics', 'reviews', 'support', 'mediation'].includes(activeView) && (
-//                         <AdminDirectory
-//                            states={{ activeView, selectedIds, pagination, search, advancedFilters, statusFilter, isFilterDrawerOpen, currentPage, itemsPerPage, mounted }}
-//                            setters={{ setSelectedIds, setSearch, setAdvancedFilters, setStatusFilter, setIsFilterDrawerOpen, setCurrentPage, setSelectedRequest, setIsMediationModalOpen, setNegotiatedFee, setAdminQuantity }}
-//                            handlers={{ handleBulkApprove, getStatusOptions: () => getStatusOptions(activeView), getFilteredItems: resolvedItems, paginate, openOrderAudit, openProductAudit, openSupportAudit, openProfileAudit, handleDeleteOrder, handleToggleStatus }}
-//                            data={{ farmers, deliveryPartners }}
-//                         />
-//                      )}
-
-//                      {activeView === 'finance' && <AdminFinance stats={stats} />}
-
-//                   </div>
-//                </div>
-//             </div>
-//          </main>
-
-//          <AdminModals
-//             states={{ isProductModalOpen, selectedProduct, isProfileModalOpen, selectedProfile, adminNote, isOrderModalOpen, selectedOrder, isLoadingDetails, isSupportModalOpen, selectedMessage, isMediationModalOpen, selectedRequest, negotiatedFee, adminQuantity }}
-//             setters={{ setIsProductModalOpen, setIsProfileModalOpen, setAdminNote, setIsOrderModalOpen, setIsSupportModalOpen, setIsMediationModalOpen, setSelectedRequest, setNegotiatedFee, setAdminQuantity, setPendingOverride, setIsOverrideDialogOpen }}
-//             handlers={{ handleToggleStatus, handleReject, handleApprove, handleSettle, handleCloseSupportTicket, fetchDirectoryData }}
-//          />
-
-//          <AdminOverrideDialog
-//             isOpen={isOverrideDialogOpen}
-//             onClose={() => setIsOverrideDialogOpen(false)}
-//             onConfirm={async () => {
-//                if (pendingOverride?.action) await pendingOverride.action();
-//                setIsOverrideDialogOpen(false);
-//                setPendingOverride(null);
-//             }}
-//             title={pendingOverride?.title}
-//             message={pendingOverride?.message}
-//          />
-//       </div>
-//    );
-// }

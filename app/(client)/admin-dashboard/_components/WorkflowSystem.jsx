@@ -52,11 +52,11 @@ export const StatusBadge = ({ status, type = 'general', size = 'sm' }) => {
          DELAYED: { label: 'Delayed', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: AlertTriangle },
       },
       payouts: {
-         PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock },
+         PENDING: { label: 'Not Paid', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock },
          PROCESSING: { label: 'Processing', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: RotateCcw },
-         SETTLED: { label: 'Settled', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
+         SETTLED: { label: 'Paid to Seller', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
          FAILED: { label: 'Failed', color: 'bg-rose-100 text-rose-700 border-rose-200', icon: XCircle },
-         PAID: { label: 'Paid', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
+         PAID: { label: 'Paid to Seller', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
       },
       moderation: {
          PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock },

@@ -2595,9 +2595,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                 const isApproved = activeRequest?.status === 'APPROVED';
                                                 const isPendingReq = activeRequest?.status === 'PENDING';
 
-                                                if (isRejected) return null;
-
-                                                const isDisabled = isUnserviceable && !isApproved;
+                                                const isDisabled = (isUnserviceable && !isApproved) || isRejected;
 
                                                 return (
                                                     <motion.div
@@ -2687,6 +2685,32 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                                         className="text-[8px] font-black text-rose-500 uppercase hover:underline shrink-0"
                                                                     >
                                                                         Cancel Request
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {isRejected && (
+                                                            <div className="mb-4 p-3 sm:p-4 bg-rose-50 border border-rose-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+                                                                <div className="flex items-center gap-3 min-w-0">
+                                                                    <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0"><ShieldAlert className="h-4 w-4 text-rose-600" /></div>
+                                                                    <div className="min-w-0">
+                                                                        <p className="text-[10px] font-black uppercase tracking-widest text-rose-800 break-words">Mediation Rejected</p>
+                                                                        <p className="text-[9px] font-bold text-rose-500 uppercase break-words">Admin has declined special delivery for this item.</p>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                                                                    <Badge className="bg-rose-600 text-white border-0 text-[8px] font-black uppercase shrink-0">LOCKED</Badge>
+                                                                    <button
+                                                                        onClick={async (e) => {
+                                                                            e.stopPropagation();
+                                                                            const { deleteSpecialDeliveryRequest } = await import('@/actions/special-delivery');
+                                                                            const res = await deleteSpecialDeliveryRequest(activeRequest.id);
+                                                                            if (res.success) toast.success("Mediation cleared. You can try requesting again with different details.");
+                                                                        }}
+                                                                        className="text-[8px] font-black text-rose-500 uppercase hover:underline shrink-0"
+                                                                    >
+                                                                        Clear & Retry
                                                                     </button>
                                                                 </div>
                                                             </div>

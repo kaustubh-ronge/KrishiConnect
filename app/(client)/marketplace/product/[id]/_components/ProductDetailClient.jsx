@@ -73,7 +73,7 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
         const existingReq = reqRes.data.find(r => r.productId === product.id && r.status === 'PENDING');
         if (existingReq) {
            setRequestRecordExists(true);
-           setHasRequested(existingReq.inquirySent);
+           setHasRequested(true); // Unlock Add to Cart if request exists
         }
       }
       setIsFeeLoading(false);
@@ -137,9 +137,10 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
     
     if (res.success) {
       toast.info("Request Initiated", {
-        description: "Now please send a support message to confirm your delivery details and enable Add to Cart."
+        description: "Now please send a support message to confirm your delivery details."
       });
       setRequestRecordExists(true);
+      setHasRequested(true); // Unlock Add to Cart immediately
       setShowInquiry(true);
     } else {
       toast.error(res.error || "Failed to send request.");
@@ -780,6 +781,9 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
           });
         }}
         product={product}
+        isSpecialDelivery={true}
+        quantityRequested={qty}
+        sellerId={product.farmerId || product.agentId}
       />
     </div>
   );

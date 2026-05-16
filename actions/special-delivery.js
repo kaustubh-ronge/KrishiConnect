@@ -26,9 +26,21 @@ export async function createSpecialDeliveryRequest(productId, quantity, sellerId
         const COOLDOWN_MINUTES = 15;
 
         if (existing) {
-            // Logic for existing requests
+            // --- NEW: STRICT RE-REQUEST LOGIC ---
+            // Case 1: Already Approved & Not Consumed
+            if (existing.status === 'APPROVED' && !existing.isConsumed) {
+                if (parseFloat(quantity) <= existing.quantity) {
+                    return apiResponse.success(existing, "Current quantity is already covered by an approved mediation.");
+                }
+                // If quantity exceeds, fall through to update to PENDING below
+            }
+
+            // Case 2: Already Pending
             if (existing.status === 'PENDING') {
-                return apiResponse.error("You already have a pending request for this product.");
+                if (parseFloat(quantity) === existing.quantity) {
+                    return apiResponse.success(existing, "You already have a pending request for this exact quantity.");
+                }
+                // Fall through to update quantity below
             }
 
             if (existing.status === 'REJECTED' && existing.rejectedAt) {
@@ -57,7 +69,7 @@ export async function createSpecialDeliveryRequest(productId, quantity, sellerId
             });
 
             revalidatePath("/cart");
-            return apiResponse.success(updated, "Request re-submitted for approval.");
+            return apiResponse.success(updated, "Request submitted for approval.");
         }
 
         // Create new if none exists
