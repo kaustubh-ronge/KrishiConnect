@@ -532,7 +532,7 @@
 //                 </div>
 //                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 //                   {recentlyViewed.slice(0, 3).map((product) => (
-//                     <ProductCard key={product.id} product={product} index={0} />
+//                     <ProductCard key={product.id} product={product} index={0} userRole={userRole} />
 //                   ))}
 //                 </div>
 //                 <Separator className="mt-8 bg-gray-200" />
@@ -567,7 +567,7 @@
 //                       exit={{ opacity: 0, scale: 0.9 }}
 //                       transition={{ delay: index * 0.05 }}
 //                     >
-//                       <ProductCard product={product} index={index} />
+//                       <ProductCard product={product} index={index} userRole={userRole} />
 //                     </motion.div>
 //                   ))}
 //                 </AnimatePresence>
@@ -797,7 +797,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-export default function MarketplaceClient({ initialListings, metadata, userRole, recentlyViewed }) {
+export default function MarketplaceClient({ initialListings, metadata, userRole, userId, recentlyViewed }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
@@ -1305,7 +1305,7 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
                   {recentlyViewed.slice(0, 3).map((product) => (
-                    <ProductCard key={product.id} product={product} index={0} />
+                    <ProductCard key={product.id} product={product} index={0} userRole={userRole} userId={userId} />
                   ))}
                 </div>
                 <Separator className="mt-8 bg-gray-200" />
@@ -1341,7 +1341,7 @@ export default function MarketplaceClient({ initialListings, metadata, userRole,
                       transition={{ delay: index * 0.05 }}
                       className="w-full"
                     >
-                      <ProductCard product={product} index={index} />
+                      <ProductCard product={product} index={index} userRole={userRole} userId={userId} />
                     </motion.div>
                   ))}
                 </AnimatePresence>

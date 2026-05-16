@@ -369,117 +369,108 @@ export async function getMarketplaceListings({
 } = {}) {
   const user = await currentUser();
   
-  // Use a cache key that depends on the filters
-  const cacheKey = `marketplace-${page}-${limit}-${search}-${category}-${sellerType}-${sortBy}-${region}-${district}-${user?.id || 'public'}`;
-  
-  return await unstable_cache(
-    async () => {
-      try {
-        const skip = (page - 1) * limit;
-        
-        let whereClause = {
-          isAvailable: true,
-          availableStock: { gt: 0 }
-        };
+  try {
+    const skip = (page - 1) * limit;
+    
+    let whereClause = {
+      isAvailable: true,
+      availableStock: { gt: 0 }
+    };
 
-        if (search) {
-          whereClause.OR = [
-            { productName: { contains: search, mode: 'insensitive' } },
-            { description: { contains: search, mode: 'insensitive' } }
-          ];
-        }
+    if (search) {
+      whereClause.OR = [
+        { productName: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } }
+      ];
+    }
 
-        if (category !== "All") {
-          whereClause.category = category;
-        }
+    if (category !== "All") {
+      whereClause.category = category;
+    }
 
-        if (sellerType !== "all") {
-          whereClause.sellerType = sellerType === 'farmers' ? 'farmer' : 'agent';
-        }
+    if (sellerType !== "all") {
+      whereClause.sellerType = sellerType === 'farmers' ? 'farmer' : 'agent';
+    }
 
-        // Region/District filtering
-        if (region || district) {
-          const geoConditions = [];
-          if (region) {
-            geoConditions.push({ farmer: { region: { contains: region, mode: 'insensitive' } } });
-            geoConditions.push({ agent: { region: { contains: region, mode: 'insensitive' } } });
-          }
-          if (district) {
-            geoConditions.push({ farmer: { district: { contains: district, mode: 'insensitive' } } });
-            geoConditions.push({ agent: { district: { contains: district, mode: 'insensitive' } } });
-          }
-          whereClause.AND = whereClause.AND || [];
-          whereClause.AND.push({ OR: geoConditions });
-        }
-
-        if (user) {
-          const dbUser = await db.user.findUnique({
-            where: { id: user.id },
-            select: { 
-              farmerProfile: { select: { id: true } }, 
-              agentProfile: { select: { id: true } } 
-            }
-          });
-
-          if (dbUser) {
-            whereClause.AND = whereClause.AND || [];
-            if (dbUser.farmerProfile) {
-              whereClause.AND.push({
-                OR: [
-                  { farmerId: { not: dbUser.farmerProfile.id } },
-                  { farmerId: null }
-                ]
-              });
-            }
-            if (dbUser.agentProfile) {
-              whereClause.AND.push({
-                OR: [
-                  { agentId: { not: dbUser.agentProfile.id } },
-                  { agentId: null }
-                ]
-              });
-            }
-          }
-        }
-
-        const [listings, totalCount] = await Promise.all([
-          db.productListing.findMany({
-            where: whereClause,
-            skip,
-            take: limit,
-            orderBy: sortBy === "price_low" ? { pricePerUnit: 'asc' } :
-                     sortBy === "price_high" ? { pricePerUnit: 'desc' } :
-                     sortBy === "rating" ? { averageRating: 'desc' } :
-                     { createdAt: 'desc' },
-            include: {
-              farmer: {
-                select: { name: true, farmName: true, region: true, district: true, averageRating: true }
-              },
-              agent: {
-                select: { name: true, companyName: true, region: true, district: true, averageRating: true }
-              }
-            }
-          }),
-          db.productListing.count({ where: whereClause })
-        ]);
-
-        return { 
-          success: true, 
-          data: listings, 
-          pagination: {
-            total: totalCount,
-            pages: Math.ceil(totalCount / limit),
-            currentPage: page
-          }
-        };
-      } catch (err) {
-        console.error("Marketplace Error:", err);
-        return { success: false, error: "Failed to load marketplace." };
+    // Region/District filtering
+    if (region || district) {
+      const geoConditions = [];
+      if (region) {
+        geoConditions.push({ farmer: { region: { contains: region, mode: 'insensitive' } } });
+        geoConditions.push({ agent: { region: { contains: region, mode: 'insensitive' } } });
       }
-    },
-    [cacheKey],
-    { revalidate: 60, tags: ['marketplace'] }
-  )();
+      if (district) {
+        geoConditions.push({ farmer: { district: { contains: district, mode: 'insensitive' } } });
+        geoConditions.push({ agent: { district: { contains: district, mode: 'insensitive' } } });
+      }
+      whereClause.AND = whereClause.AND || [];
+      whereClause.AND.push({ OR: geoConditions });
+    }
+
+    if (user) {
+      const dbUser = await db.user.findUnique({
+        where: { id: user.id },
+        select: { 
+          farmerProfile: { select: { id: true } }, 
+          agentProfile: { select: { id: true } } 
+        }
+      });
+
+      if (dbUser) {
+        whereClause.AND = whereClause.AND || [];
+        if (dbUser.farmerProfile) {
+          whereClause.AND.push({
+            OR: [
+              { farmerId: { not: dbUser.farmerProfile.id } },
+              { farmerId: null }
+            ]
+          });
+        }
+        if (dbUser.agentProfile) {
+          whereClause.AND.push({
+            OR: [
+              { agentId: { not: dbUser.agentProfile.id } },
+              { agentId: null }
+            ]
+          });
+        }
+      }
+    }
+
+    const [listings, totalCount] = await Promise.all([
+      db.productListing.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: sortBy === "price_low" ? { pricePerUnit: 'asc' } :
+                 sortBy === "price_high" ? { pricePerUnit: 'desc' } :
+                 sortBy === "rating" ? { averageRating: 'desc' } :
+                 { createdAt: 'desc' },
+        include: {
+          farmer: {
+            select: { name: true, farmName: true, region: true, district: true, averageRating: true }
+          },
+          agent: {
+            select: { name: true, companyName: true, region: true, district: true, averageRating: true }
+          }
+        }
+      }),
+      db.productListing.count({ where: whereClause })
+    ]);
+
+    return { 
+      success: true, 
+      data: listings, 
+      pagination: {
+        total: totalCount,
+        pages: Math.ceil(totalCount / limit),
+        currentPage: page
+      }
+    };
+  } catch (err) {
+    console.error("Marketplace Error:", err);
+    return { success: false, error: "Failed to load marketplace." };
+  }
 }
 
 /**

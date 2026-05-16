@@ -12,7 +12,7 @@ import {
   Share2, Star, Award, Clock, Package, Leaf, Sparkles,
   ChevronRight, Minus, Plus, RotateCcw, Zap, TrendingUp,
   BadgeCheck, Phone, Navigation, IndianRupee, AlertCircle, Loader2,
-  HelpCircle
+  HelpCircle, Shield
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -22,7 +22,7 @@ import { useCartStore } from "@/store/useCartStore";
 import { toast } from "sonner";
 import { trackProductView } from "@/actions/products-enhanced";
 
-export default function ProductDetailClient({ product, userRole, userLat, userLng }) {
+export default function ProductDetailClient({ product, userRole, userLat, userLng, userId }) {
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const router = useRouter();
   const [activeImage, setActiveImage] = useState(product.images[0]);
@@ -105,6 +105,30 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
   const themeBorder = isFarmer ? "border-emerald-200" : "border-blue-200";
 
   const handleRequestSpecialDelivery = async () => {
+    if (userRole === 'none') {
+      if (!userId) {
+        toast.info("Identification Required", {
+          description: "Please sign in to request special delivery approval.",
+          icon: <User className="h-5 w-5" />
+        });
+        router.push(`/sign-in?redirect_url=/marketplace/product/${product.id}`);
+      } else {
+        toast.info("Profile Incomplete", {
+          description: "Please complete your profile as a Farmer or Agent to send inquiries.",
+          icon: <User className="h-5 w-5" />
+        });
+        router.push(`/onboarding`);
+      }
+      return;
+    }
+
+    if (userRole === 'delivery') {
+      toast.error("Restricted Access", {
+        description: "Special delivery requests are only available for Farmer and Agent accounts.",
+      });
+      return;
+    }
+
     const { createSpecialDeliveryRequest } = await import("@/actions/special-delivery");
     setIsAdding(true);
     const sellerId = product.farmerId || product.agentId;
@@ -124,9 +148,35 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
 
   // Handle Add to Cart
   const handleAddToCart = async () => {
-    // Check if location is set in profile
+    // 1. Auth & Role Barrier
+    if (userRole === 'none') {
+      if (!userId) {
+        toast.info("Identification Required", {
+          description: "Please sign in and complete your profile as a Farmer or Agent to start purchasing.",
+          icon: <User className="h-5 w-5" />
+        });
+        router.push(`/sign-in?redirect_url=/marketplace/product/${product.id}`);
+      } else {
+        toast.info("Profile Incomplete", {
+          description: "Please complete your profile as a Farmer or Agent to start purchasing.",
+          icon: <User className="h-5 w-5" />
+        });
+        router.push(`/onboarding`);
+      }
+      return;
+    }
+
+    if (userRole === 'delivery') {
+      toast.error("Restricted Access", {
+        description: "Marketplace purchases are currently reserved for Farmer and Agent accounts.",
+        icon: <Shield className="h-5 w-5" />
+      });
+      return;
+    }
+
+    // 2. Location Check (now only for logged in Farmers/Agents)
     if (userLat === null || userLng === null || userLat === undefined || userLng === undefined) {
-      toast.error("Location Required: Please set your location in your profile.", {
+      toast.error("Location Required: Please set your business location in your profile.", {
         icon: <MapPin className="h-5 w-5 text-rose-500 animate-bounce" />,
         duration: 4000
       });
@@ -598,13 +648,15 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
                       <>
                         <Button
                           onClick={handleAddToCart}
-                          disabled={product.availableStock <= 0 || isAdding || isFeeLoading || !userLat || !userLng}
+                          disabled={product.availableStock <= 0 || isAdding || isFeeLoading || (userRole !== 'none' && (!userLat || !userLng))}
                            className={`w-full h-14 text-lg font-black shadow-2xl transition-all duration-500 rounded-2xl ${product.availableStock > 0
-                               ? (isOutOfRange && !isBypassed && !hasRequested || !userLat || !userLng)
-                                 ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-50"
-                                 : (isAdding || isFeeLoading)
-                                   ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                                   : `bg-gradient-to-r ${themeGradient} hover:shadow-${themeColor}-500/50 text-white hover:scale-[1.02]`
+                               ? (userRole === 'none')
+                                 ? `bg-gradient-to-r ${themeGradient} text-white hover:scale-[1.02]`
+                                 : (isOutOfRange && !isBypassed && !hasRequested || !userLat || !userLng)
+                                   ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-50"
+                                   : (isAdding || isFeeLoading)
+                                     ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                                     : `bg-gradient-to-r ${themeGradient} hover:shadow-${themeColor}-500/50 text-white hover:scale-[1.02]`
                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                              }`}
                         >
@@ -622,6 +674,12 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
                                <Loader2 className="h-6 w-6 animate-spin" />
                                Calculating Logistics...
                              </div>
+                          ) : userRole === 'none' ? (
+                            <span className="flex items-center gap-2">
+                               <ShoppingCart className="h-6 w-6" />
+                               {userId ? "Complete Profile" : "Login to Purchase"}
+                               <ChevronRight className="h-5 w-5 ml-auto" />
+                            </span>
                           ) : !userLat || !userLng ? (
                             <span className="flex items-center gap-2">
                                <MapPin className="h-6 w-6 animate-bounce" />
@@ -638,7 +696,7 @@ export default function ProductDetailClient({ product, userRole, userLat, userLn
                           )}
                         </Button>
 
-                        {(userLat === null || userLng === null || userLat === undefined || userLng === undefined) && (
+                        {userRole !== 'none' && (userLat === null || userLng === null || userLat === undefined || userLng === undefined) && (
                           <div className="mt-4 p-4 bg-rose-50 border-2 border-rose-200 rounded-3xl space-y-3 animate-in fade-in slide-in-from-top-4 duration-500 shadow-sm">
                             <div className="flex items-start gap-3">
                               <MapPin className="h-5 w-5 text-rose-600 shrink-0 mt-0.5 animate-bounce" />

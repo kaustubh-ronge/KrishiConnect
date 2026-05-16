@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowRight, PlayCircle, CheckCircle } from "lucide-react";
+import { ArrowRight, PlayCircle, CheckCircle, Store } from "lucide-react";
 
 export default function HeroClient({ title, subtitle, description, stats, isLoggedIn, userRole }) {
 
@@ -90,13 +90,22 @@ export default function HeroClient({ title, subtitle, description, stats, isLogg
             {description}
           </motion.p>
 
-          {/* Single CTA Button */}
-          <motion.div className="flex justify-center items-center mb-16" variants={itemVariants}>
+          {/* CTA Buttons */}
+          <motion.div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-16" variants={itemVariants}>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button asChild size="lg" className="bg-green-600 hover:bg-green-700 text-lg px-12 py-6 text-white font-semibold">
+              <Button asChild size="lg" className="bg-green-600 hover:bg-green-700 text-lg px-10 py-6 text-white font-semibold w-full sm:w-auto">
                 <Link href={buttonState.href}>
                   {buttonState.text}
                   <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+            </motion.div>
+
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button asChild variant="outline" size="lg" className="border-green-600 text-green-600 hover:bg-green-50 text-lg px-10 py-6 font-semibold w-full sm:w-auto">
+                <Link href="/marketplace">
+                  Browse Marketplace
+                  <Store className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
             </motion.div>

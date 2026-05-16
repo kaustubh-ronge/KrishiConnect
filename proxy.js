@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   "/how-it-works(.*)",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/marketplace(.*)",
   "/sitemap.xml",
   "/robots.txt",
   "/.well-known(.*)",
@@ -24,6 +25,7 @@ export default clerkMiddleware(async (auth, req) => {
     path === "/sitemap.xml" ||
     path.startsWith("/about") ||
     path.startsWith("/how-it-works") ||
+    path.startsWith("/marketplace") ||
     path.startsWith("/.well-known")
   ) {
     return NextResponse.next();

@@ -24,8 +24,8 @@ export async function generateMetadata({ params }) {
       canonical: `/marketplace/product/${id}`,
     },
     robots: {
-      index: false,
-      follow: false,
+      index: true,
+      follow: true,
     },
     openGraph: {
       title: `${product.productName} | KrishiConnect Marketplace`,
@@ -121,15 +121,22 @@ export default async function ProductPage({ params }) {
     ]
   };
 
+  // Robust Role Verification
+  let userRole = userData?.role || 'none';
+  if (userRole === 'farmer' && !userData?.farmerProfile) userRole = 'none';
+  if (userRole === 'agent' && !userData?.agentProfile) userRole = 'none';
+  if (userRole === 'delivery' && !userData?.deliveryProfile) userRole = 'none';
+
   return (
     <>
       <Schema data={productSchema} />
       <Schema data={breadcrumbSchema} />
       <ProductDetailClient 
         product={product} 
-        userRole={userData?.role || 'none'} 
+        userRole={userRole} 
         userLat={userLat}
         userLng={userLng}
+        userId={user?.id}
       />
     </>
   );

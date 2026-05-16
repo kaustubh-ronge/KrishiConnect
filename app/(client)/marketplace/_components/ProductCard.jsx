@@ -15,9 +15,11 @@ import {
 import Image from "next/image";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import InquiryModal from "./InquiryModal";
 
-export default function ProductCard({ product, index }) {
+export default function ProductCard({ product, index, userRole = "none", userId = null }) {
+  const router = useRouter();
   const [showInquiry, setShowInquiry] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -204,7 +206,17 @@ export default function ProductCard({ product, index }) {
           <CardFooter className="p-5 pt-0 grid grid-cols-2 gap-3">
             <Button
               variant="outline"
-              onClick={() => setShowInquiry(true)}
+              onClick={() => {
+                if (userRole === "none") {
+                  if (!userId) {
+                    router.push(`/sign-in?redirect_url=/marketplace`);
+                  } else {
+                    router.push(`/onboarding`);
+                  }
+                  return;
+                }
+                setShowInquiry(true);
+              }}
               className={`w-full border-2 ${isFarmer ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' : 'border-blue-200 text-blue-700 hover:bg-blue-50'} h-11 text-sm font-semibold rounded-xl transition-all`}
             >
               <MessageCircle className="h-4 w-4 mr-1.5" /> Inquiry
