@@ -28,7 +28,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from 'jspdf-autotable';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function DeliveryDashboardClient({
   user,

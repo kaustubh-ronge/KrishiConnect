@@ -30,7 +30,6 @@ import {
     Sparkles,
     LayoutDashboard
 } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import LocationPicker from '@/components/LocationPicker';
 import { agentSchema } from '@/lib/zodSchema';
 import { z } from 'zod';
