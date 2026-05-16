@@ -16,7 +16,7 @@
 
 // // Constants
 // const produceCategories = ["Tomatoes", "Onions", "Potatoes", "Grapes", "Pomegranate", "Sugarcane", "Wheat", "Rice", "Soybean", "Cotton", "Ginger", "Turmeric", "Green Chilli", "Lemon", "Other"];
-// const unitOptions = ["kg", "ton", "quintal", "crate", "box"];
+// const unitOptions = ["kg", "ton", "quintal", "crate", "box", "Other"];
 // const gradeOptions = ["Export Quality", "Grade A (Premium)", "Grade B (Standard)", "Grade C (Mixed)", "Organic Certified"];
 
 // // Helper to check if the current product name is one of the standard categories
@@ -314,7 +314,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // Constants
 const produceCategories = ["Tomatoes", "Onions", "Potatoes", "Grapes", "Pomegranate", "Sugarcane", "Wheat", "Rice", "Soybean", "Cotton", "Ginger", "Turmeric", "Green Chilli", "Lemon", "Other"];
-const unitOptions = ["kg", "ton", "quintal", "crate", "box"];
+const unitOptions = ["kg", "ton", "quintal", "crate", "box", "Other"];
 const gradeOptions = ["Export Quality", "Grade A (Premium)", "Grade B (Standard)", "Grade C (Mixed)", "Organic Certified"];
 
 // Helper to check if the current product name is one of the standard categories
@@ -337,6 +337,9 @@ export default function EditListingClient({ product }) {
   const [productName, setProductName] = useState(initialProductName);
   const [selectedCategory, setSelectedCategory] = useState(isStandardCategory(initialCategory) ? initialCategory : (initialCategory ? "Other" : ""));
   const [customCategory, setCustomCategory] = useState(isStandardCategory(initialCategory) ? "" : initialCategory);
+
+  const [unit, setUnit] = useState(unitOptions.includes(product.unit) ? product.unit : "Other");
+  const [customUnit, setCustomUnit] = useState(unitOptions.includes(product.unit) ? "" : product.unit);
 
   // --- Handlers ---
   const handleAddTag = (e) => {
@@ -374,6 +377,7 @@ export default function EditListingClient({ product }) {
 
     // 1. Handle Category Logic
     const category = selectedCategory === "Other" ? customCategory.trim() : selectedCategory;
+    const unitToSubmit = unit === "Other" ? customUnit.trim() : unit;
     
     if (!productName || productName.trim().length < 3) {
       toast.error("Please enter a valid product name (min 3 chars).");
@@ -391,7 +395,7 @@ export default function EditListingClient({ product }) {
 
     // Ensure Select values are captured (sometimes Shadcn Select needs explicit setting in formData)
     if (!formData.get("qualityGrade") && product.qualityGrade) formData.set("qualityGrade", product.qualityGrade);
-    if (!formData.get("unit") && product.unit) formData.set("unit", product.unit);
+    formData.set("unit", unitToSubmit);
     if (!formData.get("deliveryChargeType") && product.deliveryChargeType) formData.set("deliveryChargeType", product.deliveryChargeType);
 
     // 2. Append Images
@@ -677,7 +681,7 @@ export default function EditListingClient({ product }) {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Shelf Life</Label>
+                          <Label className="text-sm font-medium text-gray-700">Shelf Life <span className="text-red-500">*</span></Label>
                           <Input
                             name="shelfLife"
                             defaultValue={product.shelfLife}
@@ -737,8 +741,11 @@ export default function EditListingClient({ product }) {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Unit <span className="text-red-500">*</span></Label>
-                          <Select name="unit" defaultValue={product.unit}>
+                          <Select
+                            name="unit"
+                            value={unit}
+                            onValueChange={setUnit}
+                          >
                             <SelectTrigger className="h-12 bg-white/70 backdrop-blur-sm border-emerald-200 hover:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 rounded-xl">
                               <SelectValue />
                             </SelectTrigger>
@@ -748,6 +755,28 @@ export default function EditListingClient({ product }) {
                               ))}
                             </SelectContent>
                           </Select>
+
+                          <AnimatePresence>
+                            {unit === "Other" && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="pt-2 overflow-hidden"
+                              >
+                                <Label className="text-emerald-700 text-[10px] font-bold uppercase tracking-wider mb-1 block">
+                                  Enter Custom Unit
+                                </Label>
+                                <Input
+                                  placeholder="e.g. bundle, bunch"
+                                  value={customUnit}
+                                  onChange={(e) => setCustomUnit(e.target.value)}
+                                  className="h-10 bg-white border-emerald-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-lg"
+                                  required={unit === "Other"}
+                                />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
 
                         <div className="space-y-2">
@@ -769,7 +798,7 @@ export default function EditListingClient({ product }) {
                         <div className="space-y-2">
                           <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                             <Truck className="h-4 w-4 text-gray-400" />
-                            Delivery Charge
+                            Delivery Charge <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             name="deliveryCharge"
@@ -799,7 +828,7 @@ export default function EditListingClient({ product }) {
                         <div className="space-y-2">
                           <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                             <Truck className="h-4 w-4 text-emerald-500" />
-                            Max Delivery Range (KM)
+                            Max Delivery Range (KM) <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             name="maxDeliveryRange"
@@ -815,7 +844,7 @@ export default function EditListingClient({ product }) {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Min Order Qty</Label>
+                          <Label className="text-sm font-medium text-gray-700">Min Order Qty <span className="text-red-500">*</span></Label>
                           <Input
                             name="minOrderQuantity"
                             type="number"

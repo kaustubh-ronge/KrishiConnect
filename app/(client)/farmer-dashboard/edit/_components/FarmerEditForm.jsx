@@ -302,7 +302,7 @@ export default function FarmerEditForm({ initialProfile = {}, user }) {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="space-y-2 group">
                                                 <Label className="text-sm font-medium text-gray-700 group-focus-within:text-green-700 transition-colors">
-                                                    Full Name *
+                                                    Full Name <span className="text-red-500 font-bold">*</span>
                                                 </Label>
                                                 <Input
                                                     name="name"
@@ -315,7 +315,7 @@ export default function FarmerEditForm({ initialProfile = {}, user }) {
                                             <div className="space-y-2 group">
                                                 <Label className="text-sm font-medium text-gray-700 group-focus-within:text-green-700 transition-colors">
                                                     <Phone className="h-4 w-4 inline mr-1" />
-                                                    Phone *
+                                                    Phone <span className="text-red-500 font-bold">*</span>
                                                 </Label>
                                                 <Input
                                                     name="phone"

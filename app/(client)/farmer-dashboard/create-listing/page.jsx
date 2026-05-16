@@ -54,7 +54,7 @@ import ImageUpload from "@/components/ImageUpload";
 
 // Constants
 const produceCategories = ["Tomatoes", "Onions", "Potatoes", "Grapes", "Pomegranate", "Sugarcane", "Wheat", "Rice", "Soybean", "Cotton", "Ginger", "Turmeric", "Green Chilli", "Lemon", "Other"];
-const unitOptions = ["kg", "ton", "quintal", "crate", "box"];
+const unitOptions = ["kg", "ton", "quintal", "crate", "box", "Other"];
 const gradeOptions = ["Export Quality", "Grade A (Premium)", "Grade B (Standard)", "Grade C (Mixed)", "Organic Certified"];
 
 // Steps configuration
@@ -84,6 +84,7 @@ export default function CreateListingPage() {
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [unit, setUnit] = useState("kg");
+  const [customUnit, setCustomUnit] = useState("");
 
   // Additional form state for persisted fields
   const [qualityGrade, setQualityGrade] = useState("");
@@ -146,6 +147,7 @@ export default function CreateListingPage() {
     const formData = new FormData(event.currentTarget);
 
     const category = selectedCategory === "Other" ? customCategory.trim() : selectedCategory;
+    const unitToSubmit = unit === "Other" ? customUnit.trim() : unit;
 
     if (!productName || productName.length < 3) {
       toast.error("Please enter a valid product name (min 3 chars).", {
@@ -175,7 +177,7 @@ export default function CreateListingPage() {
     formData.set("description", description);
     formData.set("availableStock", stock);
     formData.set("pricePerUnit", price);
-    formData.set("unit", unit);
+    formData.set("unit", unitToSubmit);
     formData.set("deliveryCharge", deliveryCharge);
     formData.set("deliveryChargeType", deliveryChargeType);
     formData.set("minOrderQuantity", minOrderQuantity);
@@ -197,7 +199,7 @@ export default function CreateListingPage() {
       availableStock: stock,
       pricePerUnit: price,
       minOrderQuantity,
-      unit,
+      unit: unitToSubmit,
       deliveryCharge,
       deliveryChargeType,
       qualityGrade,
@@ -640,7 +642,7 @@ export default function CreateListingPage() {
                               <div className="space-y-2 group">
                                 <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                                   <Clock className="h-4 w-4 text-emerald-500" />
-                                  Shelf Life
+                                  Shelf Life <span className="text-red-500">*</span>
                                 </Label>
                                 <Input
                                   name="shelfLife"
@@ -746,6 +748,31 @@ export default function CreateListingPage() {
                               ))}
                             </SelectContent>
                           </Select>
+
+                          <AnimatePresence>
+                            {unit === "Other" && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0, y: -10 }}
+                                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                                exit={{ opacity: 0, height: 0, y: -10 }}
+                                transition={{ duration: 0.3 }}
+                                className="pt-2"
+                              >
+                                <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100">
+                                  <Label className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1 block">
+                                    Enter Custom Unit
+                                  </Label>
+                                  <Input
+                                    placeholder="e.g. bundle, bunch, liter"
+                                    value={customUnit}
+                                    onChange={(e) => setCustomUnit(e.target.value)}
+                                    className="h-10 bg-white border-emerald-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-lg"
+                                    required={unit === "Other"}
+                                  />
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
 
                         {/* Price */}
@@ -774,7 +801,7 @@ export default function CreateListingPage() {
                         <div className="space-y-2 group">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <Truck className="h-4 w-4 text-emerald-500" />
-                            Delivery Charge
+                            Delivery Charge <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             type="number"
@@ -814,7 +841,7 @@ export default function CreateListingPage() {
                         <div className="space-y-2 group">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-emerald-500" />
-                            Max Delivery Range (KM)
+                            Max Delivery Range (KM) <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             type="number"
@@ -834,7 +861,7 @@ export default function CreateListingPage() {
                         <div className="space-y-2 group">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <TrendingUp className="h-4 w-4 text-emerald-500" />
-                            Min Order Qty
+                            Min Order Qty <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             type="number"

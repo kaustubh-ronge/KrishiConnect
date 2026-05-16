@@ -31,7 +31,7 @@ const agentProductCategories = [
   "Grains & Pulses", "Animal Feed", "Other"
 ];
 
-const unitOptions = ["kg", "ton", "quintal", "crate", "box", "liter", "packet", "piece"];
+const unitOptions = ["kg", "ton", "quintal", "crate", "box", "liter", "packet", "piece", "Other"];
 const gradeOptions = ["Standard", "Premium", "Export Quality", "Organic", "Commercial Grade", "Not Applicable"];
 
 const steps = [
@@ -58,6 +58,7 @@ export default function AgentCreateListingPage() {
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [unit, setUnit] = useState("piece");
+  const [customUnit, setCustomUnit] = useState("");
 
   const [qualityGrade, setQualityGrade] = useState("");
   const [description, setDescription] = useState("");
@@ -103,6 +104,7 @@ export default function AgentCreateListingPage() {
     const formData = new FormData(event.currentTarget);
 
     const category = selectedCategory === "Other" ? customCategory.trim() : selectedCategory;
+    const unitToSubmit = unit === "Other" ? customUnit.trim() : unit;
     if (!productName || productName.length < 3) { toast.error("Valid product name required", { icon: <AlertCircle className="h-5 w-5" /> }); return; }
     if (!category) { toast.error("Category required", { icon: <AlertCircle className="h-5 w-5" /> }); return; }
     if (images.length === 0) { toast.error("Images required", { icon: <AlertCircle className="h-5 w-5" /> }); return; }
@@ -113,7 +115,7 @@ export default function AgentCreateListingPage() {
     formData.set("description", description);
     formData.set("availableStock", stock);
     formData.set("pricePerUnit", price);
-    formData.set("unit", unit);
+    formData.set("unit", unitToSubmit);
     formData.set("deliveryCharge", deliveryCharge);
     formData.set("deliveryChargeType", deliveryChargeType);
     formData.set("minOrderQuantity", minOrderQuantity);
@@ -429,7 +431,7 @@ export default function AgentCreateListingPage() {
                             >
                               <div className="space-y-2 group">
                                 <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                  <Clock className="h-4 w-4 text-blue-500" /> Shelf Life
+                                  <Clock className="h-4 w-4 text-blue-500" /> Shelf Life <span className="text-red-500">*</span>
                                 </Label>
                                 <Input
                                   name="shelfLife"
@@ -513,6 +515,30 @@ export default function AgentCreateListingPage() {
                               ))}
                             </SelectContent>
                           </Select>
+
+                          <AnimatePresence>
+                            {unit === "Other" && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="pt-2 overflow-hidden"
+                              >
+                                <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                                  <Label className="text-blue-700 text-[10px] font-bold uppercase tracking-wider mb-1 block">
+                                    Enter Custom Unit
+                                  </Label>
+                                  <Input
+                                    placeholder="e.g. bundle, bunch, liter"
+                                    value={customUnit}
+                                    onChange={(e) => setCustomUnit(e.target.value)}
+                                    className="h-10 bg-white border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-lg"
+                                    required={unit === "Other"}
+                                  />
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
 
                         <div className="space-y-2 group">
@@ -534,7 +560,7 @@ export default function AgentCreateListingPage() {
 
                         <div className="space-y-2 group">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                            <Truck className="h-4 w-4 text-blue-500" /> Delivery Cost
+                            <Truck className="h-4 w-4 text-blue-500" /> Delivery Cost <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             type="number"
@@ -548,7 +574,7 @@ export default function AgentCreateListingPage() {
 
                         <div className="space-y-2 group">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                            <Truck className="h-4 w-4 text-blue-500" /> Max Delivery Range (KM)
+                            <Truck className="h-4 w-4 text-blue-500" /> Max Delivery Range (KM) <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             type="number"
@@ -564,7 +590,7 @@ export default function AgentCreateListingPage() {
 
                         <div className="space-y-2 group">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                            <Boxes className="h-4 w-4 text-blue-500" /> Min Order Qty
+                            <Boxes className="h-4 w-4 text-blue-500" /> Min Order Qty <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             type="number"

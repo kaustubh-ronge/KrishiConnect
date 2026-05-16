@@ -1211,7 +1211,7 @@ export default function DeliveryDashboardClient({
 
             <div className={`space-y-4 transition-all ${(!deliveryMethod || !deliveryPaymentStatus) ? 'opacity-30 pointer-events-none grayscale' : 'opacity-100'}`}>
               <div className="flex items-center justify-between">
-                <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">OTP Code *</Label>
+                <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">OTP Code <span className="text-red-500 font-bold">*</span></Label>
                 <Button
                   variant="ghost"
                   size="sm"

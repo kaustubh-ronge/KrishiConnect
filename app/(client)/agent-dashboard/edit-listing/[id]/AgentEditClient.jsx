@@ -28,7 +28,7 @@ const agentProductCategories = [
   "Other"
 ];
 
-const unitOptions = ["kg", "ton", "quintal", "crate", "box", "liter", "packet", "piece"];
+const unitOptions = ["kg", "ton", "quintal", "crate", "box", "liter", "packet", "piece", "Other"];
 const gradeOptions = ["Standard", "Premium", "Export Quality", "Organic", "Commercial Grade", "Not Applicable"];
 
 // Helper to check if name is standard
@@ -50,6 +50,9 @@ export default function AgentEditClient({ product }) {
   const [productName, setProductName] = useState(initialProductName);
   const [selectedCategory, setSelectedCategory] = useState(isStandardCategory(initialCategory) ? initialCategory : (initialCategory ? "Other" : ""));
   const [customCategory, setCustomCategory] = useState(isStandardCategory(initialCategory) ? "" : initialCategory);
+
+  const [unit, setUnit] = useState(unitOptions.includes(product.unit) ? product.unit : "Other");
+  const [customUnit, setCustomUnit] = useState(unitOptions.includes(product.unit) ? "" : product.unit);
 
   // --- Handlers ---
   const handleAddTag = (e) => {
@@ -84,6 +87,7 @@ export default function AgentEditClient({ product }) {
 
     // 1. Handle Category Logic
     const category = selectedCategory === "Other" ? customCategory.trim() : selectedCategory;
+    const unitToSubmit = unit === "Other" ? customUnit.trim() : unit;
 
     if (!productName || productName.trim().length < 3) {
       toast.error("Please enter a valid product name (min 3 chars).");
@@ -101,7 +105,7 @@ export default function AgentEditClient({ product }) {
     
     // Ensure Select values are captured (sometimes Shadcn Select needs explicit setting in formData)
     if (!formData.get("qualityGrade") && product.qualityGrade) formData.set("qualityGrade", product.qualityGrade);
-    if (!formData.get("unit") && product.unit) formData.set("unit", product.unit);
+    formData.set("unit", unitToSubmit);
     if (!formData.get("deliveryChargeType") && product.deliveryChargeType) formData.set("deliveryChargeType", product.deliveryChargeType);
     
     // 2. Append Images
@@ -229,10 +233,10 @@ export default function AgentEditClient({ product }) {
                     </div>
 
                     {/* Shelf Life Fields */}
-                    <div className="space-y-2 md:col-span-2"><Label>Shelf Life</Label><Input name="shelfLife" defaultValue={product.shelfLife} className="bg-white h-12" /></div>
+                    <div className="space-y-2 md:col-span-2"><Label>Shelf Life <span className="text-red-500 font-bold">*</span></Label><Input name="shelfLife" defaultValue={product.shelfLife} className="bg-white h-12" /></div>
 
                     <div className="space-y-2 md:col-span-2">
-                      <Label className="text-gray-700">Shelf Life Start Date</Label>
+                      <Label className="text-gray-700">Shelf Life Start Date <span className="text-red-500 font-bold">*</span></Label>
                       <Input
                         type="date"
                         name="shelfLifeStartDate"
@@ -253,9 +257,47 @@ export default function AgentEditClient({ product }) {
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2"><Label>Stock <span className="text-red-500">*</span></Label><Input name="availableStock" type="number" step="0.01" max={10000000} defaultValue={product.availableStock} required className="bg-white h-12" /></div>
-                    <div className="space-y-2"><Label>Unit <span className="text-red-500">*</span></Label><Select name="unit" defaultValue={product.unit}><SelectTrigger className="bg-white h-12"><SelectValue /></SelectTrigger><SelectContent>{unitOptions.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-2">
+                      <Label>Unit <span className="text-red-500">*</span></Label>
+                      <Select
+                        name="unit"
+                        value={unit}
+                        onValueChange={setUnit}
+                      >
+                        <SelectTrigger className="bg-white h-12">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {unitOptions.map(u => (
+                            <SelectItem key={u} value={u}>{u}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <AnimatePresence>
+                        {unit === "Other" && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="pt-2 overflow-hidden"
+                          >
+                            <Label className="text-blue-700 text-[10px] font-bold uppercase tracking-wider mb-1 block">
+                              Enter Custom Unit
+                            </Label>
+                            <Input
+                              placeholder="e.g. bundle, bunch"
+                              value={customUnit}
+                              onChange={(e) => setCustomUnit(e.target.value)}
+                              className="h-10 bg-white border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-lg"
+                              required={unit === "Other"}
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                     <div className="space-y-2"><Label>Price/Unit <span className="text-red-500">*</span></Label><Input name="pricePerUnit" type="number" step="0.01" max={100000000} defaultValue={product.pricePerUnit} required className="bg-white h-12" /></div>
-                    <div className="space-y-2"><Label>Delivery Charge (per unit)</Label><Input name="deliveryCharge" type="number" step="0.01" defaultValue={product.deliveryCharge || 0} className="bg-white h-12" /></div>
+                    <div className="space-y-2"><Label>Delivery Charge (per unit) <span className="text-red-500 font-bold">*</span></Label><Input name="deliveryCharge" type="number" step="0.01" defaultValue={product.deliveryCharge || 0} className="bg-white h-12" /></div>
                     <div className="space-y-2">
                       <Label>Delivery Type</Label>
                       <Select name="deliveryChargeType" defaultValue={product.deliveryChargeType || 'per_unit'}>
@@ -270,7 +312,7 @@ export default function AgentEditClient({ product }) {
                     <div className="space-y-2">
                       <Label className="flex items-center gap-2">
                         <Truck className="h-4 w-4 text-blue-500" />
-                        Max Delivery Range (KM)
+                        Max Delivery Range (KM) <span className="text-red-500 font-bold">*</span>
                       </Label>
                       <Input
                         name="maxDeliveryRange"
@@ -283,7 +325,7 @@ export default function AgentEditClient({ product }) {
                       <p className="text-xs text-gray-500 mt-1">Maximum delivery distance (overrides profile).</p>
                     </div>
 
-                    <div className="space-y-2"><Label>Min Order Qty</Label><Input name="minOrderQuantity" type="number" step="0.01" defaultValue={product.minOrderQuantity} className="bg-white h-12" /></div>
+                    <div className="space-y-2"><Label>Min Order Qty <span className="text-red-500 font-bold">*</span></Label><Input name="minOrderQuantity" type="number" step="0.01" defaultValue={product.minOrderQuantity} className="bg-white h-12" /></div>
                     <div className="space-y-2 md:col-span-2"><Label>Procured Date</Label><Input type="date" name="harvestDate" defaultValue={formatDate(product.harvestDate)} className="bg-white h-12" /></div>
                   </div>
                 </section>
