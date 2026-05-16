@@ -931,7 +931,7 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
               )}
             </div>
           </div>
-          
+
           {/* Main Action Grid */}
           {profileExists && user?.agentProfile && (user.agentProfile.lat === null || user.agentProfile.lng === null || user.agentProfile.lat === undefined || user.agentProfile.lng === undefined) && (
             <motion.div

@@ -603,49 +603,49 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
                                   </div>
                                 </div>
 
-                                  <div className="space-y-2 sm:col-span-2">
-                                    <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-                                      <Shield className="h-4 w-4" />
-                                      Aadhar Number {usagePurpose === "buy_and_sell" && <span className="text-red-500">*</span>}
-                                    </Label>
-                                    <div className="relative">
-                                      <Shield className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                                      <Input
-                                        name="aadharNumber"
-                                        placeholder="XXXX XXXX XXXX"
-                                        maxLength={12}
-                                        value={aadharNumber}
-                                        onChange={(e) => setAadharNumber(e.target.value)}
-                                        className="h-14 pl-12 bg-gray-50 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 rounded-xl transition-all font-mono tracking-widest"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-2">
-                                    <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-                                      Aadhar Front Side {usagePurpose === "buy_and_sell" && <span className="text-red-500">*</span>}
-                                    </Label>
-                                    <ImageUpload
-                                      value={aadharFront ? [aadharFront] : []}
-                                      onChange={(urls) => setAadharFront(urls[0])}
-                                      onRemove={() => setAadharFront("")}
-                                    />
-                                  </div>
-
-                                  <div className="space-y-2">
-                                    <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-                                      Aadhar Back Side {usagePurpose === "buy_and_sell" && <span className="text-red-500">*</span>}
-                                    </Label>
-                                    <ImageUpload
-                                      value={aadharBack ? [aadharBack] : []}
-                                      onChange={(urls) => setAadharBack(urls[0])}
-                                      onRemove={() => setAadharBack("")}
+                                <div className="space-y-2 sm:col-span-2">
+                                  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                                    <Shield className="h-4 w-4" />
+                                    Aadhar Number {usagePurpose === "buy_and_sell" && <span className="text-red-500">*</span>}
+                                  </Label>
+                                  <div className="relative">
+                                    <Shield className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                    <Input
+                                      name="aadharNumber"
+                                      placeholder="XXXX XXXX XXXX"
+                                      maxLength={12}
+                                      value={aadharNumber}
+                                      onChange={(e) => setAadharNumber(e.target.value)}
+                                      className="h-14 pl-12 bg-gray-50 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 rounded-xl transition-all font-mono tracking-widest"
                                     />
                                   </div>
                                 </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                                    Aadhar Front Side {usagePurpose === "buy_and_sell" && <span className="text-red-500">*</span>}
+                                  </Label>
+                                  <ImageUpload
+                                    value={aadharFront ? [aadharFront] : []}
+                                    onChange={(urls) => setAadharFront(urls[0])}
+                                    onRemove={() => setAadharFront("")}
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                                    Aadhar Back Side {usagePurpose === "buy_and_sell" && <span className="text-red-500">*</span>}
+                                  </Label>
+                                  <ImageUpload
+                                    value={aadharBack ? [aadharBack] : []}
+                                    onChange={(urls) => setAadharBack(urls[0])}
+                                    onRemove={() => setAadharBack("")}
+                                  />
+                                </div>
                               </div>
-                            </motion.div>
-                          )}
+                            </div>
+                          </motion.div>
+                        )}
 
                         {/* Step 2: Farm Info */}
                         {formStep === 2 && (
@@ -1081,37 +1081,37 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
             </div>
           </div>
 
-               {profileExists && user?.farmerProfile && (user.farmerProfile.lat === null || user.farmerProfile.lng === null || user.farmerProfile.lat === undefined || user.farmerProfile.lng === undefined) && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-10 p-6 bg-rose-50 border-2 border-rose-200 rounded-[2.5rem] shadow-xl shadow-rose-900/5 overflow-hidden relative group"
-          >
-            <div className="absolute top-0 right-0 p-6 opacity-10 rotate-12 group-hover:rotate-45 transition-transform duration-700">
-              <MapPin className="h-24 w-24 text-rose-600" />
-            </div>
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-              <div className="flex items-center gap-5">
-                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg shadow-rose-200 shrink-0">
-                  <MapPin className="h-8 w-8 text-rose-600 animate-bounce" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-rose-900 uppercase tracking-tight leading-none mb-2">Location Missing</h3>
-                  <p className="text-rose-600 font-bold text-sm leading-relaxed max-w-md">
-                    Please set your farm location in your profile to enable logistics calculation and reach local buyers effectively.
-                  </p>
-                </div>
+          {profileExists && user?.farmerProfile && (user.farmerProfile.lat === null || user.farmerProfile.lng === null || user.farmerProfile.lat === undefined || user.farmerProfile.lng === undefined) && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-10 p-6 bg-rose-50 border-2 border-rose-200 rounded-[2.5rem] shadow-xl shadow-rose-900/5 overflow-hidden relative group"
+            >
+              <div className="absolute top-0 right-0 p-6 opacity-10 rotate-12 group-hover:rotate-45 transition-transform duration-700">
+                <MapPin className="h-24 w-24 text-rose-600" />
               </div>
-              <Button
-                onClick={() => router.push('/farmer-dashboard/edit#location')}
-                className="w-full md:w-auto h-14 px-10 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-rose-600/20 transition-all hover:scale-[1.02] active:scale-95"
-              >
-                <Navigation className="h-5 w-5 mr-2" />
-                Update Location in Profile
-              </Button>
-            </div>
-          </motion.div>
-        )}
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+                <div className="flex items-center gap-5">
+                  <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg shadow-rose-200 shrink-0">
+                    <MapPin className="h-8 w-8 text-rose-600 animate-bounce" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-rose-900 uppercase tracking-tight leading-none mb-2">Location Missing</h3>
+                    <p className="text-rose-600 font-bold text-sm leading-relaxed max-w-md">
+                      Please set your farm location in your profile to enable logistics calculation and reach local buyers effectively.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => router.push('/farmer-dashboard/edit#location')}
+                  className="w-full md:w-auto h-14 px-10 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-rose-600/20 transition-all hover:scale-[1.02] active:scale-95"
+                >
+                  <Navigation className="h-5 w-5 mr-2" />
+                  Update Location in Profile
+                </Button>
+              </div>
+            </motion.div>
+          )}
           {(() => {
             const isSellingApproved = user.farmerProfile?.sellingStatus === 'APPROVED';
             return (
