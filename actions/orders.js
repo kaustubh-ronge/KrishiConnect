@@ -275,6 +275,9 @@ export async function initiateCheckout(params) {
     const sellerMap = new Map();
     for (const it of checkoutItems) {
       const sellerId = it.product.farmerId || it.product.agentId;
+      if (!sellerId) {
+        return { success: false, error: `Critical Error: Product "${it.product.productName}" has no associated seller profile. Please remove it from your cart.` };
+      }
       if (!sellerMap.has(sellerId)) {
         sellerMap.set(sellerId, {
           id: sellerId,
@@ -381,7 +384,7 @@ export async function initiateCheckout(params) {
         }
       } else {
         // --- CRITICAL: If seller has a range limit, we MUST have a location to verify ---
-        if (sellerProfile.maxDeliveryRange) {
+        if (sellerProfile && sellerProfile.maxDeliveryRange) {
           return {
             success: false,
             error: `Location Required: ${sellerProfile.name || sellerProfile.companyName} has a delivery range limit. Please set your location in your profile to proceed.`
