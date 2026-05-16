@@ -17,25 +17,65 @@ export const metadata = {
 };
 
 const Home = () => {
-    const jsonLd = {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://krishiconnect.com';
+
+    const websiteSchema = {
       "@context": "https://schema.org",
       "@type": "WebSite",
       "name": "KrishiConnect",
-      "url": "https://krishiconnect.com",
-      "description": "Connecting farmers directly with agents and delivery partners.",
+      "url": baseUrl,
+      "description": "Connecting farmers directly with agents and delivery partners in India.",
       "potentialAction": {
         "@type": "SearchAction",
-        "target": "https://krishiconnect.com/marketplace?search={search_term_string}",
+        "target": `${baseUrl}/marketplace?search={search_term_string}`,
         "query-input": "required name=search_term_string"
+      }
+    };
+
+    const localBusinessSchema = {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "KrishiConnect",
+      "image": `${baseUrl}/og-image.jpg`,
+      "@id": baseUrl,
+      "url": baseUrl,
+      "telephone": "+91-1234567890",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Agri Tech Park",
+        "addressLocality": "Pune",
+        "postalCode": "411001",
+        "addressRegion": "Maharashtra",
+        "addressCountry": "IN"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 18.5204,
+        "longitude": 73.8567
+      },
+      "openingHoursSpecification": {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday"
+        ],
+        "opens": "09:00",
+        "closes": "18:00"
       }
     };
 
     return (
         <div>
-            <Schema data={jsonLd} />
+            <Schema data={websiteSchema} />
+            <Schema data={localBusinessSchema} />
             <HeroServer />
         </div>
     )
 }
+
 
 export default Home

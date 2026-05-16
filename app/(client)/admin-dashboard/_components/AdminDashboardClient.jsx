@@ -620,7 +620,9 @@ export default function AdminDashboardClient({
                             <span className="font-mono font-bold text-slate-800 tracking-wider">{item.sellerProfile.ifscCode || 'N/A'}</span>
                           </div>
                           <div className="flex justify-between items-center pt-4 mt-2 border-t border-slate-100 border-dashed">
-                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">UPI ID</span>
+                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">
+                              {item.sellerProfile.paymentType === 'TRANSACTION' ? 'Transaction ID' : 'UPI ID'}
+                            </span>
                             <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200/60 tracking-wider">
                               {item.sellerProfile.upiId || 'N/A'}
                             </span>
@@ -684,7 +686,9 @@ export default function AdminDashboardClient({
                             <span className="font-mono font-bold text-slate-800 tracking-wider">{partner.bankDetails.ifscCode || 'N/A'}</span>
                           </div>
                           <div className="flex justify-between items-center pt-4 mt-2 border-t border-indigo-100/50 border-dashed">
-                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">UPI ID</span>
+                            <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">
+                              {partner.bankDetails.paymentType === 'TRANSACTION' ? 'Transaction ID' : 'UPI ID'}
+                            </span>
                             <span className="font-mono font-bold text-indigo-700 bg-white px-3 py-1.5 rounded-lg border border-indigo-200/60 tracking-wider">
                               {partner.bankDetails.upiId || 'N/A'}
                             </span>

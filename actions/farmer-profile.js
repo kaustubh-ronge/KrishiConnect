@@ -58,7 +58,7 @@ export async function createFarmerProfile(formData) {
     return { success: false, error: "Validation failed." };
   }
 
-  const { name, phone, address, aadharNumber, farmName, district, region, country, state, city, pincode, lat, lng, upiId, bankName, accountNumber, ifscCode } = validatedData;
+  const { name, phone, address, aadharNumber, farmName, district, region, country, state, city, pincode, lat, lng, upiId, paymentType, bankName, accountNumber, ifscCode } = validatedData;
   const farmSize = validatedData.farmSize ? parseFloat(validatedData.farmSize) : null;
   const farmingExperience = validatedData.farmingExperience ? parseInt(validatedData.farmingExperience) : null;
   const primaryProduce = validatedData.primaryProduce;
@@ -71,7 +71,7 @@ export async function createFarmerProfile(formData) {
       data: {
         userId, name, farmName, phone, address, country, state, city, pincode, lat, lng, district, region,
         aadharNumber, aadharFront, aadharBack, farmSize, farmingExperience, primaryProduce, usagePurpose,
-        upiId, bankName, accountNumber, ifscCode,
+        upiId, paymentType, bankName, accountNumber, ifscCode,
         sellingStatus: usagePurpose === 'buy_and_sell' ? 'PENDING' : 'NONE'
       }
     });
@@ -129,7 +129,7 @@ export async function updateFarmerProfile(formData) {
     return { success: false, error: "Validation failed." };
   }
 
-  const { name, phone, address, aadharNumber, farmName, district, region, upiId, bankName, accountNumber, ifscCode, country, state, city, pincode, lat, lng } = validatedData;
+  const { name, phone, address, aadharNumber, farmName, district, region, upiId, paymentType, bankName, accountNumber, ifscCode, country, state, city, pincode, lat, lng } = validatedData;
   const farmSize = validatedData.farmSize ? parseFloat(validatedData.farmSize) : null;
   const farmingExperience = validatedData.farmingExperience ? parseInt(validatedData.farmingExperience) : null;
   const primaryProduce = validatedData.primaryProduce;
@@ -153,7 +153,7 @@ export async function updateFarmerProfile(formData) {
 
     const updateData = {
       name, phone, address, aadharNumber, farmName, farmSize, farmingExperience, primaryProduce,
-      upiId, bankName, accountNumber, ifscCode, country, state, city, pincode, lat, lng, district, region,
+      upiId, paymentType, bankName, accountNumber, ifscCode, country, state, city, pincode, lat, lng, district, region,
       usagePurpose, sellingStatus: newSellingStatus
     };
 

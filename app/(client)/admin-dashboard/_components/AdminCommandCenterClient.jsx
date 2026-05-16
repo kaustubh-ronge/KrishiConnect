@@ -1268,6 +1268,7 @@ export default function AdminCommandCenterClient({
                         <TabsTrigger value="identity" className="h-full bg-transparent border-0 font-black text-[10px] uppercase tracking-widest data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none shadow-none text-slate-400 data-[state=active]:text-indigo-600">Member Info</TabsTrigger>
                         <TabsTrigger value="performance" className="h-full bg-transparent border-0 font-black text-[10px] uppercase tracking-widest data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none shadow-none text-slate-400 data-[state=active]:text-indigo-600">Performance</TabsTrigger>
                         <TabsTrigger value="documents" className="h-full bg-transparent border-0 font-black text-[10px] uppercase tracking-widest data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none shadow-none text-slate-400 data-[state=active]:text-indigo-600">Documents</TabsTrigger>
+                        <TabsTrigger value="banking" className="h-full bg-transparent border-0 font-black text-[10px] uppercase tracking-widest data-[state=active]:border-b-2 data-[state=active]:border-emerald-600 rounded-none shadow-none text-slate-400 data-[state=active]:text-emerald-600">Banking</TabsTrigger>
                         <TabsTrigger value="admin" className="h-full bg-transparent border-0 font-black text-[10px] uppercase tracking-widest data-[state=active]:border-b-2 data-[state=active]:border-rose-600 rounded-none shadow-none text-slate-400 data-[state=active]:text-rose-600">Admin Notes</TabsTrigger>
                      </TabsList>
                   </div>
@@ -1329,7 +1330,28 @@ export default function AdminCommandCenterClient({
                               ))}
                            </div>
                         </TabsContent>
-
+                        <TabsContent value="banking" className="m-0 space-y-8 animate-in fade-in duration-300 pr-2">
+                           <h5 className="flex items-center gap-4 text-xs font-black text-slate-400 uppercase tracking-widest"><Landmark className="h-7 w-7 text-emerald-600" /> Banking & Payouts</h5>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                              <div className="p-8 bg-slate-900 rounded-[2rem] text-white space-y-4">
+                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Settlement Account</p>
+                                 <p className="text-2xl font-mono font-black tracking-widest break-all">{selectedProfile?.accountNumber || "NOT PROVIDED"}</p>
+                                 <div className="pt-4 border-t border-white/10 grid grid-cols-2 gap-4">
+                                    <div><p className="text-[8px] text-slate-500 uppercase font-black">Bank</p><p className="text-xs font-black text-indigo-400">{selectedProfile?.bankName || "N/A"}</p></div>
+                                    <div><p className="text-[8px] text-slate-500 uppercase font-black">IFSC</p><p className="text-xs font-black text-emerald-400 font-mono">{selectedProfile?.ifscCode || "N/A"}</p></div>
+                                 </div>
+                              </div>
+                              <div className="p-8 bg-emerald-50 rounded-[2rem] border border-emerald-100 flex flex-col justify-center gap-4">
+                                 <div>
+                                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">
+                                       {selectedProfile?.paymentType === 'TRANSACTION' ? 'Transaction ID' : 'UPI ID'}
+                                    </p>
+                                    <p className="text-xl font-black text-emerald-900 font-mono">{selectedProfile?.upiId || "NOT PROVIDED"}</p>
+                                 </div>
+                                 <Badge className="bg-emerald-600 text-white border-0 text-[8px] px-3 py-1 uppercase font-black rounded-lg w-fit">VERIFIED ID</Badge>
+                              </div>
+                           </div>
+                        </TabsContent>
                         <TabsContent value="admin" className="m-0 space-y-8 animate-in fade-in duration-300 pr-2">
                            <div className="p-8 bg-rose-50 rounded-[2rem] border border-rose-100 space-y-4 mb-8">
                               <h5 className="flex items-center gap-3 text-[10px] font-black text-rose-600 uppercase tracking-widest"><ShieldAlert className="h-5 w-5" /> Security Controls</h5>
@@ -1498,6 +1520,12 @@ export default function AdminCommandCenterClient({
                                              <div><p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">Bank Branch</p><p className="text-xs font-black text-indigo-400 uppercase truncate">{sObj.bankDetails?.bankName || 'NOT SET'}</p></div>
                                              <div><p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">IFSC Routing</p><p className="text-xs font-black text-emerald-400 uppercase font-mono">{sObj.bankDetails?.ifscCode || 'NOT SET'}</p></div>
                                           </div>
+                                          <div className="pt-4 border-t border-white/5 space-y-1">
+                                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                                {sObj.bankDetails?.paymentType === 'TRANSACTION' ? 'Transaction ID' : 'UPI ID'}
+                                             </p>
+                                             <p className="text-sm font-black text-indigo-400 font-mono">{sObj.bankDetails?.upiId || 'NOT SET'}</p>
+                                          </div>
 
                                           {/* ITEM BREAKDOWN */}
                                           <div className="pt-4 border-t border-white/5">
@@ -1546,9 +1574,19 @@ export default function AdminCommandCenterClient({
                                           </div>
                                        </div>
                                     </div>
-                                    <div className="text-right">
-                                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fee</p>
-                                       <span className="text-3xl font-black text-slate-900 tracking-tighter">₹{dp.totalPrice}</span>
+                                    <div className="flex flex-col items-end gap-3">
+                                       <div className="text-right">
+                                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fee</p>
+                                          <span className="text-3xl font-black text-slate-900 tracking-tighter">₹{dp.totalPrice}</span>
+                                       </div>
+                                       {dp.bankDetails && (
+                                          <div className="text-right space-y-1">
+                                             <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">
+                                                {dp.bankDetails.paymentType === 'TRANSACTION' ? 'Transaction ID' : 'UPI ID'}
+                                             </p>
+                                             <p className="text-[10px] font-black text-slate-600 font-mono">{dp.bankDetails.upiId || 'N/A'}</p>
+                                          </div>
+                                       )}
                                     </div>
                                  </div>
                               ))}

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -87,6 +88,7 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
 
   // Payment info
   const [upiId, setUpiId] = useState("");
+  const [paymentType, setPaymentType] = useState("UPI");
   const [bankName, setBankName] = useState("");
   const [ifscCode, setIfscCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -122,6 +124,7 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
       setAadharNumber(user.agentProfile.aadharNumber || "");
       setAadharFront(user.agentProfile.aadharFront || "");
       setAadharBack(user.agentProfile.aadharBack || "");
+      setPaymentType(user.agentProfile.paymentType || "UPI");
       setUsagePurpose(user.agentProfile.usagePurpose || "buy");
       setUpiId(user.agentProfile.upiId || "");
       setBankName(user.agentProfile.bankName || "");
@@ -181,6 +184,7 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
     formData.set('lng', lng.toString());
 
     formData.set('upiId', upiId.trim());
+    formData.set('paymentType', paymentType);
     formData.set('bankName', bankName.trim());
     formData.set('ifscCode', ifscCode.trim());
     formData.set('accountNumber', accountNumber.trim());
@@ -794,11 +798,31 @@ export default function AgentDashboardClient({ user, profileExists: initialProfi
                               </div>
 
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div className="space-y-2 sm:col-span-2">
-                                  <Label className="text-sm font-semibold text-gray-700">UPI ID {usagePurpose === "buy_and_sell" && <span className="text-red-500">*</span>}</Label>
-                                  <div className="relative">
-                                    <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                                    <Input name="upiId" placeholder="user@bank" value={upiId} onChange={(e) => setUpiId(e.target.value)} className="h-14 pl-12 bg-gray-50 border-2 border-gray-200 hover:border-emerald-300 focus:border-emerald-500 font-mono text-emerald-700 rounded-xl" />
+                                <div className="space-y-4 sm:col-span-2">
+                                  <div className="flex flex-col gap-2">
+                                    <Label className="text-sm font-semibold text-gray-700">Payment Identifier Type</Label>
+                                    <Tabs value={paymentType} onValueChange={setPaymentType} className="w-full">
+                                      <TabsList className="grid w-full grid-cols-2 bg-gray-100/50 p-1 rounded-xl">
+                                        <TabsTrigger value="UPI" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm transition-all py-2.5 font-bold">UPI ID</TabsTrigger>
+                                        <TabsTrigger value="TRANSACTION" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm transition-all py-2.5 font-bold">Transaction ID</TabsTrigger>
+                                      </TabsList>
+                                    </Tabs>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <Label className="text-sm font-semibold text-gray-700">
+                                      {paymentType === "UPI" ? "UPI ID" : "Transaction ID"} {usagePurpose === "buy_and_sell" && <span className="text-red-500">*</span>}
+                                    </Label>
+                                    <div className="relative">
+                                      <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                      <Input
+                                        name="upiId"
+                                        placeholder={paymentType === "UPI" ? "user@bank" : "Enter Transaction ID"}
+                                        value={upiId}
+                                        onChange={(e) => setUpiId(e.target.value)}
+                                        className="h-14 pl-12 bg-gray-50 border-2 border-gray-200 hover:border-emerald-300 focus:border-emerald-500 font-mono text-emerald-700 rounded-xl"
+                                      />
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="space-y-2">

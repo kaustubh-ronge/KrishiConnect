@@ -158,6 +158,7 @@ export async function getAllOrders({
               name: seller.name || seller.companyName,
               sellerProfile: {
                 upiId: seller.upiId,
+                paymentType: seller.paymentType,
                 bankName: seller.bankName,
                 accountNumber: seller.accountNumber,
                 ifscCode: seller.ifscCode,
@@ -173,6 +174,7 @@ export async function getAllOrders({
           partnerPaymentReceived: job.partnerPaymentReceived,
           bankDetails: {
             upiId: job.deliveryBoy.upiId,
+            paymentType: job.deliveryBoy.paymentType,
             bankName: job.deliveryBoy.bankName,
             accountNumber: job.deliveryBoy.accountNumber,
             ifscCode: job.deliveryBoy.ifscCode
@@ -350,6 +352,7 @@ export async function getSellerBankDetailsForOrder(orderId) {
           phone: seller.phone,
           bankDetails: {
             upiId: seller.upiId,
+            paymentType: seller.paymentType,
             bankName: seller.bankName,
             accountNumber: seller.accountNumber,
             ifscCode: seller.ifscCode,
@@ -415,6 +418,7 @@ export async function getSellerBankDetailsForOrder(orderId) {
         partnerPaymentReceived: job.partnerPaymentReceived,
         bankDetails: {
           upiId: boy.upiId,
+          paymentType: boy.paymentType,
           bankName: boy.bankName,
           accountNumber: boy.accountNumber,
           ifscCode: boy.ifscCode,

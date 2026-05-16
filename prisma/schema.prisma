@@ -96,6 +96,7 @@ model FarmerProfile {
   farmingExperience Int?
 
   upiId         String?
+  paymentType   String?
   bankName      String?
   accountNumber String?
   ifscCode      String?
@@ -145,6 +146,7 @@ model AgentProfile {
   aadharBack   String?  // URL to image
 
   upiId         String?
+  paymentType   String?
   bankName      String?
   accountNumber String?
   ifscCode      String?
@@ -450,6 +452,7 @@ model DeliveryProfile {
   aadharBack    String?  // URL to image
 
   upiId         String?
+  paymentType   String?
   bankName      String?
   accountNumber String?
   ifscCode      String?

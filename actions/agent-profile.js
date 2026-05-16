@@ -55,14 +55,14 @@ export async function createAgentProfile(formData) {
     return { success: false, error: "Validation failed." };
   }
 
-  const { name, companyName, phone, region, district, upiId, bankName, accountNumber, ifscCode, agentType, aadharNumber, address, country, state, city, pincode, lat, lng, usagePurpose } = validatedData;
+  const { name, companyName, phone, region, district, upiId, paymentType, bankName, accountNumber, ifscCode, agentType, aadharNumber, address, country, state, city, pincode, lat, lng, usagePurpose } = validatedData;
   const aadharFront = formData.get('aadharFront')?.toString();
   const aadharBack = formData.get('aadharBack')?.toString();
 
   try {
     await db.agentProfile.create({
       data: {
-        userId, name, companyName, phone, region, upiId, bankName, accountNumber, ifscCode, agentType, aadharNumber,
+        userId, name, companyName, phone, region, upiId, paymentType, bankName, accountNumber, ifscCode, agentType, aadharNumber,
         address, country, state, city, pincode, lat, lng, district, aadharFront, aadharBack, usagePurpose,
         sellingStatus: usagePurpose === 'buy_and_sell' ? 'PENDING' : 'NONE'
       }
@@ -108,7 +108,7 @@ export async function updateAgentProfile(formData) {
     return { success: false, error: "Validation failed." };
   }
 
-  const { name, companyName, phone, region, district, upiId, bankName, accountNumber, ifscCode, agentType, aadharNumber, address, country, state, city, pincode, lat, lng, usagePurpose } = validatedData;
+  const { name, companyName, phone, region, district, upiId, paymentType, bankName, accountNumber, ifscCode, agentType, aadharNumber, address, country, state, city, pincode, lat, lng, usagePurpose } = validatedData;
   const aadharFront = formData.get('aadharFront')?.toString();
   const aadharBack = formData.get('aadharBack')?.toString();
 
@@ -126,7 +126,7 @@ export async function updateAgentProfile(formData) {
     }
 
     const updateData = {
-      name, companyName, phone, region, district, upiId, bankName, accountNumber, ifscCode, agentType, aadharNumber,
+      name, companyName, phone, region, district, upiId, paymentType, bankName, accountNumber, ifscCode, agentType, aadharNumber,
       address, country, state, city, pincode, lat, lng, usagePurpose, sellingStatus: newSellingStatus
     };
 

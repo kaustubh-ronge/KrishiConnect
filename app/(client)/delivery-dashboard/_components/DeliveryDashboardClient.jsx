@@ -74,6 +74,7 @@ export default function DeliveryDashboardClient({
   const [aadharBack, setAadharBack] = useState("");
   const [licenseImage, setLicenseImage] = useState("");
   const [upiId, setUpiId] = useState("");
+  const [paymentType, setPaymentType] = useState("UPI");
   const [bankName, setBankName] = useState("");
   const [ifscCode, setIfscCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -116,6 +117,7 @@ export default function DeliveryDashboardClient({
       setAadharBack(p.aadharBack || "");
       setLicenseImage(p.licenseImage || "");
       setUpiId(p.upiId || "");
+      setPaymentType(p.paymentType || "UPI");
       setBankName(p.bankName || "");
       setIfscCode(p.ifscCode || "");
       setAccountNumber(p.accountNumber || "");
@@ -171,10 +173,11 @@ export default function DeliveryDashboardClient({
     formData.set('aadharBack', aadharBack);
     formData.set('radius', radius);
     formData.set('pricePerKm', pricePerKm);
-    formData.set('upiId', upiId);
-    formData.set('bankName', bankName);
+    formData.append("accountNumber", accountNumber.trim());
+    formData.append("upiId", upiId.trim());
+    formData.append("paymentType", paymentType);
+    formData.append("bankName", bankName.trim());
     formData.set('ifscCode', ifscCode);
-    formData.set('accountNumber', accountNumber);
 
     try {
       deliverySchema.parse(Object.fromEntries(formData.entries()));
@@ -526,9 +529,28 @@ export default function DeliveryDashboardClient({
                     <h3 className="text-lg font-black text-gray-800 uppercase tracking-tight">Payment & Documents</h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">UPI ID <span className="text-red-500">*</span></Label>
-                      <Input placeholder="user@bank" value={upiId} onChange={e => setUpiId(e.target.value)} className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50 font-mono" />
+                    <div className="space-y-4 sm:col-span-2">
+                      <div className="flex flex-col gap-2">
+                        <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Payment Identifier Type</Label>
+                        <Tabs value={paymentType} onValueChange={setPaymentType} className="w-full">
+                          <TabsList className="grid w-full grid-cols-2 bg-gray-100/50 p-1 rounded-xl">
+                            <TabsTrigger value="UPI" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-pink-600 data-[state=active]:shadow-sm transition-all py-2 font-black text-[10px] uppercase">UPI ID</TabsTrigger>
+                            <TabsTrigger value="TRANSACTION" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-pink-600 data-[state=active]:shadow-sm transition-all py-2 font-black text-[10px] uppercase">Transaction ID</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">
+                          {paymentType === "UPI" ? "UPI ID" : "Transaction ID"} <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          placeholder={paymentType === "UPI" ? "user@bank" : "Enter Transaction ID"}
+                          value={upiId}
+                          onChange={e => setUpiId(e.target.value)}
+                          className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50 font-mono"
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Bank Name <span className="text-red-500">*</span></Label>

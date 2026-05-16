@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from "framer-motion";
@@ -71,6 +72,7 @@ export default function FarmerEditForm({ initialProfile = {}, user }) {
     const [pincode, setPincode] = useState(initialProfile.pincode || "");
     const [lat, setLat] = useState(initialProfile.lat || 20.5937);
     const [lng, setLng] = useState(initialProfile.lng || 78.9629);
+    const [paymentType, setPaymentType] = useState(initialProfile.paymentType || "UPI");
     const [usagePurpose, setUsagePurpose] = useState(initialProfile.usagePurpose || "buy");
 
     const handleSubmit = async (e) => {
@@ -95,6 +97,7 @@ export default function FarmerEditForm({ initialProfile = {}, user }) {
         formData.append('pincode', pincode.trim());
         formData.append('lat', lat.toString());
         formData.append('lng', lng.toString());
+        formData.append('paymentType', paymentType);
 
         // Validation
         const produce = formData.getAll('primaryProduce');
@@ -546,15 +549,28 @@ export default function FarmerEditForm({ initialProfile = {}, user }) {
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <div className="space-y-2 group">
-                                                <Label className="text-sm font-medium text-gray-700 group-focus-within:text-purple-700 transition-colors">
-                                                    UPI ID {usagePurpose === 'buy_and_sell' && <span className="text-red-500 font-bold">*</span>}
-                                                </Label>
-                                                <Input
-                                                    name="upiId"
-                                                    defaultValue={initialProfile.upiId}
-                                                    className="h-12 bg-white/70 backdrop-blur-sm border-green-200 hover:border-green-400 focus:ring-2 focus:ring-green-500/20 rounded-xl transition-all"
-                                                />
+                                            <div className="space-y-4 md:col-span-2">
+                                                <div className="flex flex-col gap-2">
+                                                    <Label className="text-sm font-medium text-gray-700">Payment Identifier Type</Label>
+                                                    <Tabs value={paymentType} onValueChange={setPaymentType} className="w-full max-w-md">
+                                                        <TabsList className="grid w-full grid-cols-2 bg-gray-100/50 p-1 rounded-xl">
+                                                            <TabsTrigger value="UPI" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-sm transition-all py-2 font-bold">UPI ID</TabsTrigger>
+                                                            <TabsTrigger value="TRANSACTION" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-sm transition-all py-2 font-bold">Transaction ID</TabsTrigger>
+                                                        </TabsList>
+                                                    </Tabs>
+                                                </div>
+
+                                                <div className="space-y-2 group">
+                                                    <Label className="text-sm font-medium text-gray-700 group-focus-within:text-purple-700 transition-colors">
+                                                        {paymentType === "UPI" ? "UPI ID" : "Transaction ID"} {usagePurpose === 'buy_and_sell' && <span className="text-red-500 font-bold">*</span>}
+                                                    </Label>
+                                                    <Input
+                                                        name="upiId"
+                                                        defaultValue={initialProfile.upiId}
+                                                        placeholder={paymentType === "UPI" ? "user@bank" : "Enter Transaction ID"}
+                                                        className="h-12 bg-white/70 backdrop-blur-sm border-green-200 hover:border-green-400 focus:ring-2 focus:ring-green-500/20 rounded-xl transition-all font-mono"
+                                                    />
+                                                </div>
                                             </div>
 
                                             <div className="space-y-2 group">

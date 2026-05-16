@@ -8,6 +8,7 @@ import GoogleTranslateManager from "@/components/GoogleTranslateManger";
 import Chatbot from "@/components/Chatbot";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import Schema from "@/components/Schema";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -68,9 +69,48 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://krishiconnect.com';
+
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "KrishiConnect",
+    "url": baseUrl,
+    "logo": `${baseUrl}/logo.png`,
+    "description": "Connecting farmers directly with agents and delivery partners in India.",
+    "sameAs": [
+      "https://facebook.com/krishiconnect",
+      "https://twitter.com/krishiconnect",
+      "https://instagram.com/krishiconnect"
+    ],
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+91-7498444684",
+      "contactType": "customer service",
+      "areaServed": "IN",
+      "availableLanguage": ["en", "hi", "mr"]
+    }
+  };
+
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "KrishiConnect",
+    "url": baseUrl,
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": `${baseUrl}/marketplace?search={search_term_string}`,
+      "query-input": "required name=search_term_string"
+    }
+  };
+
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
+        <head>
+          <Schema data={organizationSchema} />
+          <Schema data={websiteSchema} />
+        </head>
         <body suppressHydrationWarning
           className={inter.className}
         >
@@ -84,10 +124,10 @@ export default function RootLayout({ children }) {
             <HeaderServer />
             <main className="min-h-screen">{children}</main>
             <Chatbot />
-            <Toaster 
-              position="top-center" 
-              richColors 
-              closeButton 
+            <Toaster
+              position="top-center"
+              richColors
+              closeButton
             />
             <Analytics />
             <SpeedInsights />
