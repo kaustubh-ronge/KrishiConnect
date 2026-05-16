@@ -211,7 +211,7 @@ export default function LocationPicker({ value = {}, onChange }) {
 
         {/* State */}
         <div className="space-y-1.5">
-          <Label className="text-sm font-semibold text-gray-700">State / Province</Label>
+          <Label className="text-sm font-semibold text-gray-700">State / Province <span className="text-red-500">*</span></Label>
           <select
             value={stateCode}
             onChange={handleStateChange}
@@ -228,7 +228,7 @@ export default function LocationPicker({ value = {}, onChange }) {
 
         {/* City */}
         <div className="space-y-1.5">
-          <Label className="text-sm font-semibold text-gray-700">City / Village</Label>
+          <Label className="text-sm font-semibold text-gray-700">City / Village <span className="text-red-500">*</span></Label>
           <select
             value={city}
             onChange={handleCityChange}
@@ -247,7 +247,7 @@ export default function LocationPicker({ value = {}, onChange }) {
       {/* Pincode + Address */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="space-y-1.5">
-          <Label className="text-sm font-semibold text-gray-700">Pincode</Label>
+          <Label className="text-sm font-semibold text-gray-700">Pincode <span className="text-red-500">*</span></Label>
           <Input
             type="text"
             inputMode="numeric"

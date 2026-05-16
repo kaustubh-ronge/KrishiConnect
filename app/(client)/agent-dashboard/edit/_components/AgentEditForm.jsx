@@ -13,6 +13,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Progress } from "@/components/ui/progress";
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from "framer-motion";
+import ImageUpload from "@/components/ImageUpload";
 import {
     ArrowLeft,
     User,
@@ -76,6 +77,8 @@ export default function AgentEditForm({ initialProfile = {}, user }) {
     const [lat, setLat] = useState(initialProfile.lat || 20.5937);
     const [lng, setLng] = useState(initialProfile.lng || 78.9629);
     const [usagePurpose, setUsagePurpose] = useState(initialProfile.usagePurpose || "buy");
+    const [aadharFront, setAadharFront] = useState(initialProfile.aadharFront || "");
+    const [aadharBack, setAadharBack] = useState(initialProfile.aadharBack || "");
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -99,6 +102,8 @@ export default function AgentEditForm({ initialProfile = {}, user }) {
         formData.append('pincode', pincode.trim());
         formData.append('lat', lat.toString());
         formData.append('lng', lng.toString());
+        formData.append('aadharFront', aadharFront);
+        formData.append('aadharBack', aadharBack);
 
         // Validation
         const types = formData.getAll('agentType');
@@ -115,6 +120,8 @@ export default function AgentEditForm({ initialProfile = {}, user }) {
             formValues.agentType = types;
             formValues.lat = parseFloat(formValues.lat);
             formValues.lng = parseFloat(formValues.lng);
+            formValues.aadharFront = aadharFront;
+            formValues.aadharBack = aadharBack;
             
             agentSchema.parse(formValues);
         } catch (error) {
@@ -306,7 +313,7 @@ export default function AgentEditForm({ initialProfile = {}, user }) {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="space-y-2 group">
                                                 <Label className="text-sm font-medium text-gray-700 group-focus-within:text-blue-700 transition-colors">
-                                                    Full Name *
+                                                    Full Name <span className="text-red-500 font-bold">*</span>
                                                 </Label>
                                                 <Input
                                                     name="name"
@@ -343,7 +350,7 @@ export default function AgentEditForm({ initialProfile = {}, user }) {
                                             <div className="space-y-2 group">
                                                 <Label className="text-sm font-medium text-gray-700 group-focus-within:text-blue-700 transition-colors">
                                                     <Phone className="h-4 w-4 inline mr-1" />
-                                                    Phone Number *
+                                                    Phone Number <span className="text-red-500 font-bold">*</span>
                                                 </Label>
                                                 <Input
                                                     name="phone"
@@ -368,6 +375,48 @@ export default function AgentEditForm({ initialProfile = {}, user }) {
                                                 </Select>
                                             </div>
                                         </div>
+
+                                        <AnimatePresence>
+                                            {usagePurpose === 'buy_and_sell' && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, height: 0 }}
+                                                    animate={{ opacity: 1, height: 'auto' }}
+                                                    exit={{ opacity: 0, height: 0 }}
+                                                    className="mt-6 pt-6 border-t border-blue-100"
+                                                >
+                                                    <div className="flex items-center gap-2 mb-4">
+                                                        <Shield className="h-5 w-5 text-indigo-600" />
+                                                        <h4 className="font-bold text-gray-900">Identity Verification Documents</h4>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                                        <div className="space-y-3">
+                                                            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                                                Aadhar Front Side <span className="text-red-500 font-bold">*</span>
+                                                            </Label>
+                                                            <div className="bg-white rounded-2xl border-2 border-dashed border-blue-200 p-4 hover:border-blue-400 transition-colors">
+                                                                <ImageUpload
+                                                                    value={aadharFront ? [aadharFront] : []}
+                                                                    onChange={(urls) => setAadharFront(urls[0])}
+                                                                    onRemove={() => setAadharFront("")}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-3">
+                                                            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                                                Aadhar Back Side <span className="text-red-500 font-bold">*</span>
+                                                            </Label>
+                                                            <div className="bg-white rounded-2xl border-2 border-dashed border-blue-200 p-4 hover:border-blue-400 transition-colors">
+                                                                <ImageUpload
+                                                                    value={aadharBack ? [aadharBack] : []}
+                                                                    onChange={(urls) => setAadharBack(urls[0])}
+                                                                    onRemove={() => setAadharBack("")}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </motion.section>
 
                                     {/* Section 2: Categories */}

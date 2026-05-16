@@ -2871,11 +2871,15 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                     </CardHeader>
                                     <CardContent className="p-6 sm:p-10 space-y-8 w-full">
                                         {/* Shipping Info */}
+                                        {/* Shipping Info */}
                                         <div className="space-y-5 w-full">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><MapPin className="h-4 w-4 text-emerald-600" /></div>
+                                                <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                                                    <MapPin className="h-4 w-4 text-emerald-600" />
+                                                </div>
                                                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest break-words">Shipping Details</h4>
                                             </div>
+
                                             <div className="grid grid-cols-1 gap-4 w-full min-w-0">
                                                 <input
                                                     type="text"
@@ -2891,23 +2895,24 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                     onChange={(e) => setShippingPhone(e.target.value)}
                                                     className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl px-5 py-3 text-sm font-bold transition-all outline-none"
                                                 />
-                                                <div className="relative w-full">
+
+                                                {/* Separated Location Button & Textarea */}
+                                                <div className="flex flex-col gap-3 w-full">
                                                     <textarea
                                                         placeholder="Full Address"
                                                         value={shippingAddress}
                                                         onChange={(e) => setShippingAddress(e.target.value)}
-                                                        className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl px-4 py-3 text-sm font-bold transition-all outline-none min-h-[120px] resize-none pr-10"
+                                                        className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl px-5 py-3 text-sm font-bold transition-all outline-none min-h-[120px] resize-none"
                                                     />
                                                     <Button
                                                         type="button"
-                                                        variant="ghost"
+                                                        variant="outline"
                                                         onClick={handleUseCurrentLocation}
                                                         disabled={isLocating}
-                                                        className="absolute right-2 top-2 h-8 px-2 sm:px-3 rounded-xl bg-white/90 backdrop-blur-sm border border-slate-200 hover:border-emerald-300 text-emerald-700 shadow-sm flex items-center gap-1 sm:gap-2 text-[8px] sm:text-[9px] font-black uppercase tracking-wider transition-all shrink-0"
+                                                        className="w-full sm:w-auto self-start h-12 px-6 rounded-xl bg-emerald-50 border border-emerald-200 hover:border-emerald-400 hover:bg-emerald-100 text-emerald-700 shadow-sm flex items-center justify-center gap-2 text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all"
                                                     >
-                                                        {isLocating ? <Loader2 className="h-3 w-3 animate-spin shrink-0" /> : <Navigation className="h-3 w-3 shrink-0" />}
-                                                        <span className="hidden sm:inline">Auto Set Location</span>
-                                                        <span className="sm:hidden">Auto Set</span>
+                                                        {isLocating ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Navigation className="h-4 w-4 shrink-0" />}
+                                                        <span>Auto Set Location</span>
                                                     </Button>
                                                 </div>
                                             </div>
@@ -3088,7 +3093,7 @@ export default function CartClient({ initialCart, user, initialUnserviceableIds 
                                                         router.push(`${path}#location`);
                                                     }}
                                                 >
-                                                    <Navigation className="h-4 w-4 mr-2" /> 
+                                                    <Navigation className="h-4 w-4 mr-2" />
                                                     Update Location in Profile
                                                 </Button>
                                             </div>

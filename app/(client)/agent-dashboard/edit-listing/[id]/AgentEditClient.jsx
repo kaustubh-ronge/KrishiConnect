@@ -156,7 +156,7 @@ export default function AgentEditClient({ product }) {
 
                     {/* Product Name */}
                     <div className="space-y-2 md:col-span-2">
-                      <Label className="text-blue-700 font-semibold">Product Name *</Label>
+                      <Label className="text-blue-700 font-semibold">Product Name <span className="text-red-500">*</span></Label>
                       <Input
                         placeholder="e.g. Premium Neem Fertilizer"
                         value={productName}
@@ -169,7 +169,7 @@ export default function AgentEditClient({ product }) {
 
                     {/* Category Select + Custom Input */}
                     <div className="space-y-2">
-                      <Label>Product Category *</Label>
+                      <Label>Product Category <span className="text-red-500">*</span></Label>
                       <Select
                         name="category"
                         defaultValue={selectedCategory}
@@ -252,9 +252,9 @@ export default function AgentEditClient({ product }) {
                     Inventory & Pricing
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2"><Label>Stock</Label><Input name="availableStock" type="number" step="0.01" max={10000000} defaultValue={product.availableStock} required className="bg-white h-12" /></div>
-                    <div className="space-y-2"><Label>Unit</Label><Select name="unit" defaultValue={product.unit}><SelectTrigger className="bg-white h-12"><SelectValue /></SelectTrigger><SelectContent>{unitOptions.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="space-y-2"><Label>Price/Unit</Label><Input name="pricePerUnit" type="number" step="0.01" max={100000000} defaultValue={product.pricePerUnit} required className="bg-white h-12" /></div>
+                    <div className="space-y-2"><Label>Stock <span className="text-red-500">*</span></Label><Input name="availableStock" type="number" step="0.01" max={10000000} defaultValue={product.availableStock} required className="bg-white h-12" /></div>
+                    <div className="space-y-2"><Label>Unit <span className="text-red-500">*</span></Label><Select name="unit" defaultValue={product.unit}><SelectTrigger className="bg-white h-12"><SelectValue /></SelectTrigger><SelectContent>{unitOptions.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-2"><Label>Price/Unit <span className="text-red-500">*</span></Label><Input name="pricePerUnit" type="number" step="0.01" max={100000000} defaultValue={product.pricePerUnit} required className="bg-white h-12" /></div>
                     <div className="space-y-2"><Label>Delivery Charge (per unit)</Label><Input name="deliveryCharge" type="number" step="0.01" defaultValue={product.deliveryCharge || 0} className="bg-white h-12" /></div>
                     <div className="space-y-2">
                       <Label>Delivery Type</Label>
@@ -295,7 +295,7 @@ export default function AgentEditClient({ product }) {
                     Images & Info
                   </h3>
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-2"><ImageIcon className="h-4 w-4 text-gray-500" /> Product Images</Label>
+                    <Label className="flex items-center gap-2"><ImageIcon className="h-4 w-4 text-gray-500" /> Product Images <span className="text-red-500">*</span></Label>
                     <ImageUpload value={images} onChange={handleImageUpload} onRemove={handleRemoveImage} />
                   </div>
                   <div className="space-y-2 mt-4"><Label>Description</Label><Textarea name="description" defaultValue={product.description} className="min-h-[120px] bg-white" /></div>

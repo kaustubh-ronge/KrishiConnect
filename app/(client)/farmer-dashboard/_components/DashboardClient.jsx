@@ -173,6 +173,8 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
       accountNumber: accountNumber.trim(),
       usagePurpose,
       primaryProduce: submissionData.getAll('primaryProduce'),
+      aadharFront,
+      aadharBack,
     };
 
     try {
@@ -614,9 +616,10 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
                                     </div>
                                   </div>
 
-                                  {/* Aadhar Front */}
                                   <div className="space-y-2">
-                                    <Label className="text-sm font-semibold text-gray-700">Aadhar Front Side</Label>
+                                    <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                                      Aadhar Front Side {usagePurpose === "buy_and_sell" && <span className="text-red-500">*</span>}
+                                    </Label>
                                     <ImageUpload
                                       value={aadharFront ? [aadharFront] : []}
                                       onChange={(urls) => setAadharFront(urls[0])}
@@ -624,9 +627,10 @@ export default function DashboardClient({ user, profileExists: initialProfileExi
                                     />
                                   </div>
 
-                                  {/* Aadhar Back */}
                                   <div className="space-y-2">
-                                    <Label className="text-sm font-semibold text-gray-700">Aadhar Back Side</Label>
+                                    <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                                      Aadhar Back Side {usagePurpose === "buy_and_sell" && <span className="text-red-500">*</span>}
+                                    </Label>
                                     <ImageUpload
                                       value={aadharBack ? [aadharBack] : []}
                                       onChange={(urls) => setAadharBack(urls[0])}

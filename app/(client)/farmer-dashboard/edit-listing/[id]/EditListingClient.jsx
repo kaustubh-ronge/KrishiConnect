@@ -556,7 +556,7 @@ export default function EditListingClient({ product }) {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Product Name */}
                         <div className="space-y-2 md:col-span-2">
-                          <Label className="text-sm font-semibold text-gray-700">Product Name *</Label>
+                          <Label className="text-sm font-semibold text-gray-700">Product Name <span className="text-red-500">*</span></Label>
                           <Input
                             placeholder="e.g. Fresh Organic Alphanso Mangoes"
                             value={productName}
@@ -568,7 +568,7 @@ export default function EditListingClient({ product }) {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Category *</Label>
+                          <Label className="text-sm font-medium text-gray-700">Category <span className="text-red-500">*</span></Label>
                           <Select
                             name="category"
                             defaultValue={selectedCategory}
@@ -723,7 +723,7 @@ export default function EditListingClient({ product }) {
                         <div className="space-y-2">
                           <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                             <Scale className="h-4 w-4 text-gray-400" />
-                            Stock Quantity
+                            Stock Quantity <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             name="availableStock"
@@ -737,7 +737,7 @@ export default function EditListingClient({ product }) {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Unit</Label>
+                          <Label className="text-sm font-medium text-gray-700">Unit <span className="text-red-500">*</span></Label>
                           <Select name="unit" defaultValue={product.unit}>
                             <SelectTrigger className="h-12 bg-white/70 backdrop-blur-sm border-emerald-200 hover:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 rounded-xl">
                               <SelectValue />
@@ -753,7 +753,7 @@ export default function EditListingClient({ product }) {
                         <div className="space-y-2">
                           <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                             <IndianRupee className="h-4 w-4 text-gray-400" />
-                            Price per Unit
+                            Price per Unit <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             name="pricePerUnit"
@@ -859,7 +859,7 @@ export default function EditListingClient({ product }) {
                         <div>
                           <Label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
                             <Upload className="h-4 w-4 text-gray-400" />
-                            Product Images
+                            Product Images <span className="text-red-500">*</span>
                           </Label>
                           <ImageUpload
                             value={images}

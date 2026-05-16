@@ -416,15 +416,15 @@ export default function DeliveryDashboardClient({
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Full Name *</Label>
+                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Full Name <span className="text-red-500">*</span></Label>
                     <Input className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50 font-medium" value={name} onChange={e => setName(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Phone Number *</Label>
+                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Phone Number <span className="text-red-500">*</span></Label>
                     <Input className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50 font-medium" value={phone} onChange={e => setPhone(e.target.value)} />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
-                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Aadhar Number (12 Digits) *</Label>
+                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Aadhar Number (12 Digits) <span className="text-red-500">*</span></Label>
                     <Input className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50 font-mono tracking-[0.2em]" maxLength={12} placeholder="0000 0000 0000" value={aadharNumber} onChange={e => setAadharNumber(e.target.value.replace(/\D/g, ''))} />
                   </div>
                 </div>
@@ -445,7 +445,7 @@ export default function DeliveryDashboardClient({
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Vehicle Type *</Label>
+                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Vehicle Type <span className="text-red-500">*</span></Label>
                     <Select value={vehicleType} onValueChange={setVehicleType}>
                       <SelectTrigger className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50">
                         <SelectValue placeholder="Select type" />
@@ -460,22 +460,22 @@ export default function DeliveryDashboardClient({
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Vehicle Number Plate *</Label>
+                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Vehicle Number Plate <span className="text-red-500">*</span></Label>
                     <Input className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50 font-bold uppercase" placeholder="MH 12 AB 1234" value={vehicleNumber} onChange={e => setVehicleNumber(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Driving License Number *</Label>
+                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Driving License Number <span className="text-red-500">*</span></Label>
                     <Input className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50 font-bold uppercase" placeholder="DL-1234567890" value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Service Radius (KM) *</Label>
+                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Service Radius (KM) <span className="text-red-500">*</span></Label>
                     <div className="relative">
                       <Input type="number" className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50 pr-12 font-bold" value={radius} onChange={e => setRadius(e.target.value)} />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">KM</span>
                     </div>
                   </div>
                   <div className="space-y-2 sm:col-span-2">
-                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Price per KM (₹) *</Label>
+                    <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Price per KM (₹) <span className="text-red-500">*</span></Label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-emerald-600">₹</span>
                       <Input type="number" className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50 pl-8 font-bold" value={pricePerKm} onChange={e => setPricePerKm(e.target.value)} />
@@ -527,19 +527,19 @@ export default function DeliveryDashboardClient({
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-2 sm:col-span-2">
-                      <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">UPI ID *</Label>
+                      <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">UPI ID <span className="text-red-500">*</span></Label>
                       <Input placeholder="user@bank" value={upiId} onChange={e => setUpiId(e.target.value)} className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50 font-mono" />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Bank Name *</Label>
+                      <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Bank Name <span className="text-red-500">*</span></Label>
                       <Input placeholder="e.g. HDFC Bank" value={bankName} onChange={e => setBankName(e.target.value)} className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50" />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">IFSC Code *</Label>
+                      <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">IFSC Code <span className="text-red-500">*</span></Label>
                       <Input placeholder="HDFC0001234" value={ifscCode} onChange={e => setIfscCode(e.target.value)} className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50 uppercase font-mono" />
                     </div>
                     <div className="space-y-2 sm:col-span-2">
-                      <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Account Number *</Label>
+                      <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Account Number <span className="text-red-500">*</span></Label>
                       <Input type="password" placeholder="••••••••••••" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} className="h-12 rounded-xl border-2 border-gray-100 bg-gray-50/50 font-mono tracking-widest" />
                     </div>
                   </div>
@@ -547,15 +547,15 @@ export default function DeliveryDashboardClient({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Aadhar Front *</p>
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Aadhar Front <span className="text-red-500">*</span></p>
                     <ImageUpload value={aadharFront ? [aadharFront] : []} onChange={urls => setAadharFront(urls[0])} onRemove={() => setAadharFront("")} />
                   </div>
                   <div className="space-y-2">
-                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Aadhar Back *</p>
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Aadhar Back <span className="text-red-500">*</span></p>
                     <ImageUpload value={aadharBack ? [aadharBack] : []} onChange={urls => setAadharBack(urls[0])} onRemove={() => setAadharBack("")} />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
-                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Driving License *</p>
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Driving License <span className="text-red-500">*</span></p>
                     <ImageUpload value={licenseImage ? [licenseImage] : []} onChange={urls => setLicenseImage(urls[0])} onRemove={() => setLicenseImage("")} />
                   </div>
                 </div>

@@ -476,7 +476,7 @@ export default function CreateListingPage() {
                         <div className="space-y-2 group md:col-span-2">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <Tag className="h-4 w-4 text-emerald-500" />
-                            Product Name *
+                            Product Name <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             placeholder="e.g. Fresh Organic Alphanso Mangoes"
@@ -495,7 +495,7 @@ export default function CreateListingPage() {
                         <div className="space-y-2 group">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <Leaf className="h-4 w-4 text-emerald-500" />
-                            Category *
+                            Category <span className="text-red-500">*</span>
                           </Label>
                           <Select
                             name="category"
@@ -654,7 +654,7 @@ export default function CreateListingPage() {
                               <div className="space-y-2 group">
                                 <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                                   <Calendar className="h-4 w-4 text-emerald-500" />
-                                  Shelf Life Start Date *
+                                  Shelf Life Start Date <span className="text-red-500">*</span>
                                 </Label>
                                 <Input
                                   type="date"
@@ -703,7 +703,7 @@ export default function CreateListingPage() {
                         <div className="space-y-2 group">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <Scale className="h-4 w-4 text-emerald-500" />
-                            Total Stock *
+                            Total Stock <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             type="number"
@@ -725,7 +725,7 @@ export default function CreateListingPage() {
                         <div className="space-y-2 group">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <Hash className="h-4 w-4 text-emerald-500" />
-                            Unit *
+                            Unit <span className="text-red-500">*</span>
                           </Label>
                           <Select
                             name="unit"
@@ -752,7 +752,7 @@ export default function CreateListingPage() {
                         <div className="space-y-2 group">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <IndianRupee className="h-4 w-4 text-emerald-500" />
-                            Price per Unit *
+                            Price per Unit <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             type="number"
@@ -940,7 +940,7 @@ export default function CreateListingPage() {
                         <div className="space-y-3">
                           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <Upload className="h-4 w-4 text-emerald-500" />
-                            Product Images *
+                            Product Images <span className="text-red-500">*</span>
                           </Label>
 
                           <div className="bg-gradient-to-br from-gray-50 to-emerald-50/50 rounded-2xl border-2 border-dashed border-emerald-200 hover:border-emerald-400 transition-all duration-300 p-6">
