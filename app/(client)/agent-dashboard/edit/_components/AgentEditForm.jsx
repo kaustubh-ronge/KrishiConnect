@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from "framer-motion";
@@ -550,17 +550,20 @@ export default function AgentEditForm({ initialProfile = {}, user }) {
                                             <div className="space-y-4 md:col-span-2">
                                                 <div className="flex flex-col gap-2">
                                                     <Label className="text-sm font-medium text-gray-700">Payment Identifier Type</Label>
-                                                    <Tabs value={paymentType} onValueChange={setPaymentType} className="w-full max-w-md">
-                                                        <TabsList className="grid w-full grid-cols-2 bg-gray-100/50 p-1 rounded-xl">
-                                                            <TabsTrigger value="UPI" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm transition-all py-2 font-bold">UPI ID</TabsTrigger>
-                                                            <TabsTrigger value="TRANSACTION" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm transition-all py-2 font-bold">Transaction ID</TabsTrigger>
-                                                        </TabsList>
-                                                    </Tabs>
+                                                    <Select value={paymentType} onValueChange={setPaymentType}>
+                                                        <SelectTrigger className="h-12 bg-gray-50 border-2 border-gray-200 hover:border-violet-300 focus:border-violet-500 rounded-xl transition-all max-w-md">
+                                                            <SelectValue placeholder="Select Payment Type" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="UPI">UPI ID (e.g. user@bank)</SelectItem>
+                                                            <SelectItem value="TRANSACTION">Transaction ID (Reference Number)</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
                                                 </div>
 
                                                 <div className="space-y-2 group">
                                                     <Label className="text-sm font-medium text-gray-700 group-focus-within:text-violet-700 transition-colors">
-                                                        {paymentType === "UPI" ? "UPI ID" : "Transaction ID"} {usagePurpose === 'buy_and_sell' && <span className="text-red-500 font-bold">*</span>}
+                                                        {paymentType === "UPI" ? "UPI ID" : "Transaction ID"} <span className="text-gray-400 font-normal lowercase">(Optional)</span>
                                                     </Label>
                                                     <Input
                                                         name="upiId"

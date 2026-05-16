@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createDeliveryProfile, updateDeliveryProfile, toggleOnlineStatus } from '@/actions/delivery-profile';
 import { updateDeliveryJobStatus, completeDeliveryWithOtp, updateLiveLocation, markPartnerPaymentReceived, resendDeliveryOtp } from '@/actions/delivery-job';
 import { useFetch } from '@/hooks/use-fetch';
@@ -532,17 +532,20 @@ export default function DeliveryDashboardClient({
                     <div className="space-y-4 sm:col-span-2">
                       <div className="flex flex-col gap-2">
                         <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">Payment Identifier Type</Label>
-                        <Tabs value={paymentType} onValueChange={setPaymentType} className="w-full">
-                          <TabsList className="grid w-full grid-cols-2 bg-gray-100/50 p-1 rounded-xl">
-                            <TabsTrigger value="UPI" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-pink-600 data-[state=active]:shadow-sm transition-all py-2 font-black text-[10px] uppercase">UPI ID</TabsTrigger>
-                            <TabsTrigger value="TRANSACTION" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-pink-600 data-[state=active]:shadow-sm transition-all py-2 font-black text-[10px] uppercase">Transaction ID</TabsTrigger>
-                          </TabsList>
-                        </Tabs>
+                        <Select value={paymentType} onValueChange={setPaymentType}>
+                          <SelectTrigger className="h-12 bg-gray-50 border-2 border-gray-100 focus:border-pink-500 rounded-xl transition-all">
+                            <SelectValue placeholder="Select Payment Type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="UPI">UPI ID (e.g. user@bank)</SelectItem>
+                            <SelectItem value="TRANSACTION">Transaction ID (Reference Number)</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="space-y-2">
                         <Label className="text-xs font-black text-gray-400 uppercase tracking-wider">
-                          {paymentType === "UPI" ? "UPI ID" : "Transaction ID"} <span className="text-red-500">*</span>
+                          {paymentType === "UPI" ? "UPI ID" : "Transaction ID"} <span className="text-gray-400 font-normal lowercase">(Optional)</span>
                         </Label>
                         <Input
                           placeholder={paymentType === "UPI" ? "user@bank" : "Enter Transaction ID"}
