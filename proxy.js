@@ -1,20 +1,36 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import aj, { authRateLimit } from "./lib/arcjet";
 
 const isPublicRoute = createRouteMatcher([
   "/",
-  "/about",
-  "/how-it-works",
+  "/about(.*)",
+  "/how-it-works(.*)",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/sitemap.xml",
+  "/robots.txt",
+  "/.well-known(.*)",
 ]);
 
-import aj, { authRateLimit } from "./lib/arcjet";
-import { NextResponse } from "next/server";
 
 export default clerkMiddleware(async (auth, req) => {
-  // --- ARCJET PROTECTION ---
-  // Protect sensitive routes from bots and brute force
-  if (req.nextUrl.pathname.startsWith("/sign-in") || req.nextUrl.pathname.startsWith("/sign-up")) {
+  const path = req.nextUrl.pathname;
+
+  // SEO + crawler-safe bypass routes
+  if (
+    path === "/" ||
+    path === "/robots.txt" ||
+    path === "/sitemap.xml" ||
+    path.startsWith("/about") ||
+    path.startsWith("/how-it-works") ||
+    path.startsWith("/.well-known")
+  ) {
+    return NextResponse.next();
+  }
+
+  // Arcjet Security Layer
+  if (path.startsWith("/sign-in") || path.startsWith("/sign-up")) {
     const decision = await aj.protect(req, {
       rules: [authRateLimit],
     });
@@ -30,8 +46,7 @@ export default clerkMiddleware(async (auth, req) => {
     }
   }
 
-  // --- CLERK PROTECTION (TEMPORARILY DISABLED FOR TESTING) ---
-
+  // Clerk Authentication
   if (!isPublicRoute(req)) {
     const { userId } = await auth();
     if (!userId) {
@@ -40,7 +55,6 @@ export default clerkMiddleware(async (auth, req) => {
       return NextResponse.redirect(signInUrl);
     }
   }
-
 });
 
 export const config = {
@@ -53,3 +67,4 @@ export const config = {
     "/__clerk/(.*)",
   ],
 };
+
